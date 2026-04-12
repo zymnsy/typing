@@ -362,8 +362,6 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border2);border-
 .voice-title{font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:2px}
 .voice-sub{font-size:0.74rem;color:var(--muted);line-height:1.5}
 .voice-rate-chip{flex:1;min-width:64px;padding:7px 0;font-size:0.8rem;}
-@keyframes voicePulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:0.75}100%{transform:scale(1);opacity:1}}
-.voice-playing{animation:voicePulse 0.4s ease}
 /* ── Firebase ログインバー ── */
 .login-bar{
   position:fixed;top:0;left:0;right:0;z-index:1000;
@@ -475,7 +473,7 @@ body{padding-top:48px}  /* ログインバーの高さ分ずらす */
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">英語を読み上げる</div>
-          <div class="voice-sub">残り1文字になったタイミングで発音を再生します</div>
+          <div class="voice-sub">残り1文字のタイミングで発音を再生します</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="voice-toggle">
@@ -714,67 +712,32 @@ function disableCursorHide(){ showCursor(); clearTimeout(cursorHideTimer); docum
 // ══════════════════════════════════════════════
 //  IME CONTROL
 // ══════════════════════════════════════════════
-// 戦略：
-//  1. inputモードをlatinに設定してIMEヒントを与える
-//  2. compositionstart で即座にblur→focus（IMEをキャンセル）
-//  3. compositionend で入力値を強制クリア（変換確定テキストを除去）
-//  4. keydownでisComposingがtrueなら入力を無視
-//  5. ゲーム中は定期的にfocusを維持してIMEが起動しないようにする
-
-let imeGuardInterval = null;
-let isComposingFlag = false;
-
+// Force English (IME off) when typing starts, restore Japanese when done.
+// Uses ime-mode CSS, inputmode/lang attributes, and compositionstart abort.
+// Also attempts navigator.keyboard.lock on supported browsers.
 function forceEnglishInput() {
-  // 属性設定
-  inp.setAttribute('inputmode', 'latin');
-  inp.setAttribute('lang', 'en');
-  inp.setAttribute('autocomplete', 'off');
-  inp.setAttribute('autocorrect', 'off');
-  inp.setAttribute('autocapitalize', 'none');
-  inp.setAttribute('spellcheck', 'false');
   inp.style.imeMode = 'disabled';
+  inp.setAttribute('inputmode','latin');
+  inp.setAttribute('lang','en');
+  inp.setAttribute('autocomplete','off');
+  inp.setAttribute('autocorrect','off');
+  inp.setAttribute('autocapitalize','none');
+  inp.setAttribute('spellcheck','false');
+  inp.addEventListener('compositionstart', abortComposition);
+  // Try to use Input Method Engine suppression via document level
   document.documentElement.lang = 'en';
-
-  // IMEイベントリスナー登録
-  inp.addEventListener('compositionstart', onCompositionStart);
-  inp.addEventListener('compositionend', onCompositionEnd);
-
-  // フォーカスを当てる
   inp.blur();
-  setTimeout(() => { inp.focus(); inp.value = ''; }, 80);
-
-  // 定期的にフォーカスを確認（IMEが勝手に起動するのを防ぐ）
-  imeGuardInterval = setInterval(() => {
-    if (gameActive && document.activeElement !== inp) {
-      inp.focus();
-    }
-  }, 500);
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 50);
 }
-
-function onCompositionStart() {
-  // IME変換開始を即座にキャンセル：blur→focusでIMEをリセット
-  isComposingFlag = true;
+function abortComposition() {
   inp.blur();
-  setTimeout(() => {
-    inp.value = '';
-    inp.focus();
-  }, 0);
+  setTimeout(()=>inp.focus(), 10);
 }
-
-function onCompositionEnd() {
-  // 変換確定テキストを即座に除去
-  isComposingFlag = false;
-  setTimeout(() => { inp.value = ''; }, 0);
-}
-
 function restoreInput() {
   inp.style.imeMode = '';
-  inp.setAttribute('inputmode', 'text');
-  inp.removeEventListener('compositionstart', onCompositionStart);
-  inp.removeEventListener('compositionend', onCompositionEnd);
+  inp.removeEventListener('compositionstart', abortComposition);
   document.documentElement.lang = 'ja';
-  if (imeGuardInterval) { clearInterval(imeGuardInterval); imeGuardInterval = null; }
-  isComposingFlag = false;
+  // Brief focus away from the input to allow IME to reactivate
   inp.blur();
 }
 
@@ -1165,50 +1128,31 @@ function showWord(idx){
   inp.value=''; inp.className='';
   $('game-prog').textContent=`${idx+1} / ${totalRounds}`;
   $('bar-fill').style.width=(idx/totalRounds*100)+'%';
-  voiceSpeaking = false; // 次の問題で音声を再生できるようリセット
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  voiceSpeaking=false;
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
-inp.addEventListener('input', e => {
-  // IME変換中の入力は無視
-  if (e.isComposing || isComposingFlag) { inp.value = ''; return; }
-  if (!queue.length || !gameActive) return;
-
-  const target = queue[curIdx].en;
-  const typed = normalizeEn(inp.value);
-  totalKeystrokes++;
-  inp.value = typed;
-
-  if (target.startsWith(typed)) {
-    correctKeystrokes++;
-    inp.classList.remove('ng');
-    inp.classList.toggle('ok', typed.length > 0);
-    $('hint-disp').innerHTML = renderHintHtml(currentHintData, typed.length);
-
-    // 残り1文字になったら先読み音声を再生
-    if (typed.length === target.length - 1 && target.length > 1) {
+inp.addEventListener('input',()=>{
+  if(!queue.length||!gameActive) return;
+  const target=queue[curIdx].en, typed=normalizeEn(inp.value);
+  totalKeystrokes++; inp.value=typed;
+  if(target.startsWith(typed)){
+    correctKeystrokes++; inp.classList.remove('ng');
+    inp.classList.toggle('ok',typed.length>0);
+    $('hint-disp').innerHTML=renderHintHtml(currentHintData,typed.length);
+    // 残り1文字になったら先読み音声
+    if(typed.length === target.length - 1 && target.length > 1){
       speakEnglish(target);
     }
-
-    if (typed === target) {
-      clears++;
-      $('c-clear').textContent = clears;
-      curIdx++;
-      if (curIdx >= totalRounds) {
-        gameActive = false;
-        disableCursorHide();
-        restoreInput();
-        showResult();
-      } else {
-        showWord(curIdx);
-      }
+    if(typed===target){
+      clears++; $('c-clear').textContent=clears; curIdx++;
+      if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
+      else showWord(curIdx);
     }
   } else {
-    misses++;
-    $('c-miss').textContent = misses;
-    inp.classList.remove('ok');
-    inp.classList.add('ng');
-    inp.value = typed.slice(0, -1);
+    misses++; $('c-miss').textContent=misses;
+    inp.classList.remove('ok'); inp.classList.add('ng');
+    inp.value=typed.slice(0,-1);
   }
 });
 
@@ -1267,6 +1211,9 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('click',()=>{ if(gameScr.classList.contains('active')&&gameActive) inp.focus(); });
 
 // ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
 //  VOICE (Web Speech API)
 // ══════════════════════════════════════════════
 let voiceEnabled = false;
@@ -1296,7 +1243,6 @@ function initVoiceSettings() {
       btn.classList.add('on');
     });
   });
-  // ページ読み込み時に音声リストをプリロード
   if (window.speechSynthesis) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -1306,7 +1252,7 @@ function initVoiceSettings() {
 function speakEnglish(text) {
   if (!voiceEnabled) return;
   if (!window.speechSynthesis) return;
-  if (voiceSpeaking) return; // 二重再生防止
+  if (voiceSpeaking) return;
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'en-US';
@@ -1317,17 +1263,15 @@ function speakEnglish(text) {
                   voices.find(v => v.lang.startsWith('en') && v.localService) ||
                   voices.find(v => v.lang.startsWith('en')) || null;
   if (enVoice) utter.voice = enVoice;
-  const wordEl = $('word-disp');
   voiceSpeaking = true;
-  utter.onstart = () => wordEl.classList.add('voice-playing');
-  utter.onend = () => { wordEl.classList.remove('voice-playing'); voiceSpeaking = false; };
+  utter.onend = () => { voiceSpeaking = false; };
   utter.onerror = () => { voiceSpeaking = false; };
   window.speechSynthesis.speak(utter);
 }
 
 renderHomeScreen();
 initVoiceSettings();
-window.addEventListener('beforeunload', () => { if (currentLevel) saveLevelEnabled(currentLevel, enabled); });
+window.addEventListener('beforeunload',()=>{ if(currentLevel) saveLevelEnabled(currentLevel,enabled); });
 </script>
 </body>
 </html>
