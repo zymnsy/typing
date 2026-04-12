@@ -1223,24 +1223,41 @@ let enVoices = [];
 
 function loadEnVoices() {
   const all = window.speechSynthesis.getVoices();
-  enVoices = all.filter(v => v.lang.startsWith('en'));
+  // 優先順位：en-USのローカル音声 → en-GBのローカル音声 → その他英語ローカル → 英語全般
+  const enUS   = all.filter(v => v.lang === 'en-US' && v.localService);
+  const enGB   = all.filter(v => v.lang === 'en-GB' && v.localService);
+  const enOther= all.filter(v => v.lang.startsWith('en') && v.localService && v.lang !== 'en-US' && v.lang !== 'en-GB');
+  const enRemote= all.filter(v => v.lang.startsWith('en') && !v.localService);
+
+  // Macの場合、"compact"という名前は低品質なので除外
+  const filter = v => !v.name.toLowerCase().includes('compact');
+  enVoices = [
+    ...enUS.filter(filter),
+    ...enGB.filter(filter),
+    ...enOther.filter(filter),
+    ...enRemote.filter(filter),
+    // compactしかない場合の保険
+    ...enUS.filter(v => !filter(v)),
+  ];
+  // 重複除去
+  const seen = new Set();
+  enVoices = enVoices.filter(v => { if(seen.has(v.name)) return false; seen.add(v.name); return true; });
+
   const sel = $('voice-select');
   sel.innerHTML = '';
   enVoices.forEach((v, i) => {
     const opt = document.createElement('option');
     opt.value = i;
-    // 女性っぽい名前に印をつけてわかりやすく
-    const name = v.name;
-    opt.textContent = name + (v.localService ? ' ★' : '');
-    if (name === selectedVoiceName) opt.selected = true;
+    const lang = v.lang === 'en-US' ? '🇺🇸' : v.lang === 'en-GB' ? '🇬🇧' : v.lang === 'en-AU' ? '🇦🇺' : '🌐';
+    opt.textContent = lang + ' ' + v.name;
+    if (v.name === selectedVoiceName) opt.selected = true;
     sel.appendChild(opt);
   });
-  // 保存された声がなければ最初のローカル音声を選択
+
+  // 保存された声がなければen-USの最初を選択
   if (!selectedVoiceName && enVoices.length > 0) {
-    const local = enVoices.find(v => v.localService) || enVoices[0];
-    selectedVoiceName = local.name;
-    const idx = enVoices.indexOf(local);
-    sel.value = idx;
+    selectedVoiceName = enVoices[0].name;
+    sel.value = 0;
   }
 }
 
