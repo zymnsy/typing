@@ -356,6 +356,11 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border2);border-
 .title-edit-input::placeholder{color:var(--muted)}
 .title-save-btn{padding:4px 10px;background:var(--on);color:#fff;border:none;border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;flex-shrink:0;transition:opacity 0.13s;}
 .title-save-btn:hover{opacity:0.83}
+/* typed-disp: inputの代わりに入力内容を表示 */
+.typed-disp{width:100%;padding:15px 18px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:1.2rem;text-align:center;color:var(--text);letter-spacing:0.04em;min-height:56px;line-height:1.6;outline:none;user-select:none;}
+.typed-disp.placeholder{color:var(--muted)}
+.typed-disp.ok{border-color:var(--ok);background:var(--ok-bg)}
+.typed-disp.ng{border-color:var(--ng);background:var(--ng-bg);animation:shake 0.12s ease}
 /* ── 音声設定 ── */
 .voice-row{display:flex;align-items:center;gap:12px;}
 .voice-info{flex:1}
@@ -556,9 +561,11 @@ body{padding-top:48px}  /* ログインバーの高さ分ずらす */
       <div id="hint-disp"></div>
     </div>
   </div>
-  <input id="inp" type="text" placeholder="ここに入力…"
+  <!-- inputは隠す。キー入力はkeydownで直接受け取る -->
+  <input id="inp" type="text"
     autocomplete="off" autocorrect="off" autocapitalize="off"
-    spellcheck="false" inputmode="latin" lang="en">
+    spellcheck="false" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;">
+  <div id="typed-disp" class="typed-disp" tabindex="-1"></div>
   <div class="chips">
     <div class="chip"><span class="lbl">CLEAR</span><span class="v ok" id="c-clear">0</span></div>
     <div class="chip"><span class="lbl">MISS</span><span class="v ng" id="c-miss">0</span></div>
@@ -710,36 +717,10 @@ function enableCursorHide(){ hideCursor(); document.addEventListener('mousemove'
 function disableCursorHide(){ showCursor(); clearTimeout(cursorHideTimer); document.removeEventListener('mousemove',onMouseMove); }
 
 // ══════════════════════════════════════════════
-//  IME CONTROL
+//  IME CONTROL（keydown方式のため不要・空実装）
 // ══════════════════════════════════════════════
-// Force English (IME off) when typing starts, restore Japanese when done.
-// Uses ime-mode CSS, inputmode/lang attributes, and compositionstart abort.
-// Also attempts navigator.keyboard.lock on supported browsers.
-function forceEnglishInput() {
-  inp.style.imeMode = 'disabled';
-  inp.setAttribute('inputmode','latin');
-  inp.setAttribute('lang','en');
-  inp.setAttribute('autocomplete','off');
-  inp.setAttribute('autocorrect','off');
-  inp.setAttribute('autocapitalize','none');
-  inp.setAttribute('spellcheck','false');
-  inp.addEventListener('compositionstart', abortComposition);
-  // Try to use Input Method Engine suppression via document level
-  document.documentElement.lang = 'en';
-  inp.blur();
-  setTimeout(()=>{ inp.focus(); inp.select(); }, 50);
-}
-function abortComposition() {
-  inp.blur();
-  setTimeout(()=>inp.focus(), 10);
-}
-function restoreInput() {
-  inp.style.imeMode = '';
-  inp.removeEventListener('compositionstart', abortComposition);
-  document.documentElement.lang = 'ja';
-  // Brief focus away from the input to allow IME to reactivate
-  inp.blur();
-}
+function forceEnglishInput() { /* keydown方式なのでIME制御不要 */ }
+function restoreInput() { /* 同上 */ }
 
 // ══════════════════════════════════════════════
 //  DOM
@@ -1125,33 +1106,70 @@ function showWord(idx){
   const hintEl=$('hint-disp');
   hintEl.innerHTML=renderHintHtml(currentHintData,0);
   hintEl.classList.toggle('long-text',isLong);
-  inp.value=''; inp.className='';
+  typedBuffer='';
+  const td=$('typed-disp');
+  td.textContent='ここに入力…'; td.className='typed-disp placeholder';
   $('game-prog').textContent=`${idx+1} / ${totalRounds}`;
   $('bar-fill').style.width=(idx/totalRounds*100)+'%';
 }
 
-inp.addEventListener('input',()=>{
-  if(!queue.length||!gameActive) return;
-  const target=queue[curIdx].en, typed=normalizeEn(inp.value);
-  totalKeystrokes++; inp.value=typed;
-  if(target.startsWith(typed)){
-    correctKeystrokes++; inp.classList.remove('ng');
-    inp.classList.toggle('ok',typed.length>0);
-    $('hint-disp').innerHTML=renderHintHtml(currentHintData,typed.length);
+// ── keydownで直接入力を受け取る（IME完全無視）──
+let typedBuffer = '';
+
+document.addEventListener('keydown', e => {
+  // ゲーム中以外・修飾キーは無視
+  if (!gameActive || !queue.length) return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  // ESCは既存の処理に任せる
+  if (e.key === 'Escape') return;
+
+  const target = queue[curIdx].en;
+  const td = $('typed-disp');
+
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    typedBuffer = typedBuffer.slice(0, -1);
+    const disp = typedBuffer || '';
+    td.textContent = disp || 'ここに入力…';
+    td.className = 'typed-disp' + (disp ? ' ok' : ' placeholder');
+    $('hint-disp').innerHTML = renderHintHtml(currentHintData, typedBuffer.length);
+    return;
+  }
+
+  // 1文字の印字可能キーのみ受け付ける
+  if (e.key.length !== 1) return;
+  e.preventDefault();
+
+  const newTyped = normalizeEn(typedBuffer + e.key);
+  totalKeystrokes++;
+
+  if (target.startsWith(newTyped)) {
+    correctKeystrokes++;
+    typedBuffer = newTyped;
+    td.textContent = typedBuffer;
+    td.className = 'typed-disp ok';
+    $('hint-disp').innerHTML = renderHintHtml(currentHintData, typedBuffer.length);
+
     // 残り1文字になったら先読み音声
-    if(typed.length === target.length - 1 && target.length > 1){
+    if (typedBuffer.length === target.length - 1 && target.length > 1) {
       speakEnglish(target);
     }
-    if(typed===target){
-      clears++; $('c-clear').textContent=clears; curIdx++;
-      voiceSpeaking=false;
-      if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
-      else showWord(curIdx);
+
+    if (typedBuffer === target) {
+      clears++; $('c-clear').textContent = clears; curIdx++;
+      voiceSpeaking = false;
+      if (curIdx >= totalRounds) {
+        gameActive = false; disableCursorHide(); restoreInput(); showResult();
+      } else {
+        showWord(curIdx);
+      }
     }
   } else {
-    misses++; $('c-miss').textContent=misses;
-    inp.classList.remove('ok'); inp.classList.add('ng');
-    inp.value=typed.slice(0,-1);
+    misses++; $('c-miss').textContent = misses;
+    td.className = 'typed-disp ng';
+    setTimeout(() => {
+      if (td.classList.contains('ng')) td.className = 'typed-disp ok';
+    }, 120);
   }
 });
 
