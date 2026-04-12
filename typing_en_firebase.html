@@ -1226,24 +1226,27 @@ let enVoices = [];
 function loadEnVoices() {
   const all = window.speechSynthesis.getVoices();
 
-  // 品質の良い音声名を優先リスト化（Mac・Windows共通で良いもの）
-  const preferred = [
-    'Samantha','Alex','Karen','Daniel','Moira','Fiona',
-    'Microsoft Zira','Microsoft David','Microsoft Mark',
-    'Google US English','Google UK English Female','Google UK English Male'
-  ];
+  // Macかどうか判定
+  const isMac = /Mac/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
 
-  // compact除外・英語のみ・ローカル優先
-  const local = all.filter(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('compact'));
-  const remote = all.filter(v => v.lang.startsWith('en') && !v.localService);
-
-  // 優先リストにある声を先に、残りを後に
-  const sort = arr => [
-    ...arr.filter(v => preferred.some(p => v.name.includes(p))),
-    ...arr.filter(v => !preferred.some(p => v.name.includes(p)))
-  ];
-
-  enVoices = [...sort(local), ...sort(remote)].filter((v,i,a)=>a.findIndex(x=>x.name===v.name)===i);
+  if (isMac) {
+    // Macは厳選3つだけ表示（聞き取りやすい順）
+    const macPreferred = ['Samantha', 'Karen', 'Victoria'];
+    enVoices = macPreferred
+      .map(name => all.find(v => v.name === name))
+      .filter(Boolean);
+    // 万が一1つも見つからなければen-USローカルを使う
+    if (enVoices.length === 0) {
+      enVoices = all.filter(v => v.lang === 'en-US' && v.localService && !v.name.includes('compact'));
+    }
+  } else {
+    // Windows・その他はこれまで通り
+    const preferred = ['Microsoft Zira','Microsoft David','Microsoft Mark','Google US English','Google UK English Female','Google UK English Male'];
+    const local = all.filter(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('compact'));
+    const remote = all.filter(v => v.lang.startsWith('en') && !v.localService);
+    const sort = arr => [...arr.filter(v => preferred.some(p => v.name.includes(p))), ...arr.filter(v => !preferred.some(p => v.name.includes(p)))];
+    enVoices = [...sort(local), ...sort(remote)].filter((v,i,a) => a.findIndex(x => x.name === v.name) === i);
+  }
 
   const sel = $('voice-select');
   sel.innerHTML = '';
