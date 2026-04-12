@@ -825,7 +825,7 @@ function enterLevel(lv) {
   switchTab('practice');
   const settings=loadSettings();
   const sr=settings.rounds||20;
-  document.querySelectorAll('.round-chip').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
@@ -1092,9 +1092,9 @@ function parseCSVLine(line){
 // ══════════════════════════════════════════════
 //  ROUNDS
 // ══════════════════════════════════════════════
-document.querySelectorAll('.round-chip').forEach(btn=>{
+document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.round-chip').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveSettings({rounds:totalRounds});
   });
 });
@@ -1128,8 +1128,6 @@ function showWord(idx){
   inp.value=''; inp.className='';
   $('game-prog').textContent=`${idx+1} / ${totalRounds}`;
   $('bar-fill').style.width=(idx/totalRounds*100)+'%';
-  voiceSpeaking=false;
-  if(window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 inp.addEventListener('input',()=>{
@@ -1146,6 +1144,7 @@ inp.addEventListener('input',()=>{
     }
     if(typed===target){
       clears++; $('c-clear').textContent=clears; curIdx++;
+      voiceSpeaking=false;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
     }
