@@ -1144,10 +1144,12 @@ inp.addEventListener('input',()=>{
     correctKeystrokes++; inp.classList.remove('ng');
     inp.classList.toggle('ok',typed.length>0);
     $('hint-disp').innerHTML=renderHintHtml(currentHintData,typed.length);
-    if(typed.length===target.length-1&&target.length>1) speakEnglish(target);
+    // 残り1文字になったら先読み音声（1問1回のみ）
+    if(typed.length===target.length-1&&target.length>1&&!voiceSpeaking){
+      speakEnglish(target);
+    }
     if(typed===target){
       clears++; $('c-clear').textContent=clears; curIdx++;
-      voiceSpeaking=false;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
     }
@@ -1223,38 +1225,37 @@ let enVoices = [];
 
 function loadEnVoices() {
   const all = window.speechSynthesis.getVoices();
-  // 優先順位：en-USのローカル音声 → en-GBのローカル音声 → その他英語ローカル → 英語全般
-  const enUS   = all.filter(v => v.lang === 'en-US' && v.localService);
-  const enGB   = all.filter(v => v.lang === 'en-GB' && v.localService);
-  const enOther= all.filter(v => v.lang.startsWith('en') && v.localService && v.lang !== 'en-US' && v.lang !== 'en-GB');
-  const enRemote= all.filter(v => v.lang.startsWith('en') && !v.localService);
 
-  // Macの場合、"compact"という名前は低品質なので除外
-  const filter = v => !v.name.toLowerCase().includes('compact');
-  enVoices = [
-    ...enUS.filter(filter),
-    ...enGB.filter(filter),
-    ...enOther.filter(filter),
-    ...enRemote.filter(filter),
-    // compactしかない場合の保険
-    ...enUS.filter(v => !filter(v)),
+  // 品質の良い音声名を優先リスト化（Mac・Windows共通で良いもの）
+  const preferred = [
+    'Samantha','Alex','Karen','Daniel','Moira','Fiona',
+    'Microsoft Zira','Microsoft David','Microsoft Mark',
+    'Google US English','Google UK English Female','Google UK English Male'
   ];
-  // 重複除去
-  const seen = new Set();
-  enVoices = enVoices.filter(v => { if(seen.has(v.name)) return false; seen.add(v.name); return true; });
+
+  // compact除外・英語のみ・ローカル優先
+  const local = all.filter(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('compact'));
+  const remote = all.filter(v => v.lang.startsWith('en') && !v.localService);
+
+  // 優先リストにある声を先に、残りを後に
+  const sort = arr => [
+    ...arr.filter(v => preferred.some(p => v.name.includes(p))),
+    ...arr.filter(v => !preferred.some(p => v.name.includes(p)))
+  ];
+
+  enVoices = [...sort(local), ...sort(remote)].filter((v,i,a)=>a.findIndex(x=>x.name===v.name)===i);
 
   const sel = $('voice-select');
   sel.innerHTML = '';
   enVoices.forEach((v, i) => {
     const opt = document.createElement('option');
     opt.value = i;
-    const lang = v.lang === 'en-US' ? '🇺🇸' : v.lang === 'en-GB' ? '🇬🇧' : v.lang === 'en-AU' ? '🇦🇺' : '🌐';
-    opt.textContent = lang + ' ' + v.name;
+    const flag = v.lang==='en-US'?'🇺🇸':v.lang==='en-GB'?'🇬🇧':v.lang==='en-AU'?'🇦🇺':'🌐';
+    opt.textContent = flag + ' ' + v.name;
     if (v.name === selectedVoiceName) opt.selected = true;
     sel.appendChild(opt);
   });
 
-  // 保存された声がなければen-USの最初を選択
   if (!selectedVoiceName && enVoices.length > 0) {
     selectedVoiceName = enVoices[0].name;
     sel.value = 0;
@@ -1306,8 +1307,9 @@ function initVoiceSettings() {
 function speakEnglish(text) {
   if (!voiceEnabled) return;
   if (!window.speechSynthesis) return;
-  if (voiceSpeaking) return;
+  // 毎回キャンセルしてから新しい発音を再生（voiceSpeakingで二重防止しない）
   window.speechSynthesis.cancel();
+  voiceSpeaking = false;
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'en-US';
   utter.rate = voiceRate;
