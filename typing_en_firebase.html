@@ -243,7 +243,7 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .manage-row.drag-over-top{box-shadow:0 -2px 0 0 var(--on) inset}
 .manage-row.drag-over-bottom{box-shadow:0 2px 0 0 var(--on) inset}
 .count-badge{flex-shrink:0;min-width:32px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:10px;background:#e8f0fe;color:#2563eb;border:1px solid #c7daf5;}
-.count-badge[data-n="0"],.count-badge:empty{background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8;}
+.count-badge[data-zero="1"]{background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8;}
 .manage-cb{flex-shrink:0;width:17px;height:17px;accent-color:var(--ng);cursor:pointer;}
 /* bulk bar */
 .bulk-bar{display:none;align-items:center;gap:10px;padding:10px 12px;background:var(--ng-bg);border-radius:8px;margin-bottom:10px;animation:fadeSlideIn 0.2s ease-out;}
@@ -1013,7 +1013,7 @@ function renderManageList() {
       <input type="checkbox" class="manage-cb" data-i="${i}" ${manageSelected.has(i)?'checked':''}>
       <span class="word-ja">${escHtml(w.ja)}</span>
       <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
-      <span class="count-badge" title="累積出題回数" style="${(lvCounts[w.en]||0)===0?'background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8':''">${(lvCounts[w.en]||0).toLocaleString()}</span>
+      <span class="count-badge" title="累積出題回数" data-zero="${(lvCounts[w.en]||0)===0?1:0}">${(lvCounts[w.en]||0).toLocaleString()}</span>
       <button class="del-btn" title="削除" data-i="${i}">✕</button>
     `;
     row.querySelector('.manage-cb').addEventListener('change',e=>{
