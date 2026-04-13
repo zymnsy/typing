@@ -41,13 +41,18 @@ function userDocRef(uid) {
 // ── Firestoreに全データ保存 ──
 async function saveAllToCloud() {
   if (!currentUser) return;
+  if (!cloudLoadDone) return; // クラウドロード前は絶対に保存しない
   const payload = {};
   for (let lv = 1; lv <= 100; lv++) {
     const w = localStorage.getItem('typing-en-v2-words-lv'+lv);
     const e = localStorage.getItem('typing-en-v2-enabled-lv'+lv);
     const t = localStorage.getItem('typing-en-v2-title-lv'+lv);
     const c = localStorage.getItem('typing-en-v2-counts-lv'+lv);
-    if (w != null) payload['words_lv'+lv]   = JSON.parse(w);
+    if (w != null) {
+      const parsed = JSON.parse(w);
+      // 空配列はスキップ（クラウドの単語を消さないための安全策）
+      if (Array.isArray(parsed) && parsed.length > 0) payload['words_lv'+lv] = parsed;
+    }
     if (e != null) payload['enabled_lv'+lv] = JSON.parse(e);
     if (t != null) payload['title_lv'+lv]   = JSON.parse(t);
     if (c != null) payload['counts_lv'+lv]  = JSON.parse(c);
