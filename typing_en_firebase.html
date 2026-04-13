@@ -331,6 +331,23 @@ kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border2);border-
 .tier-d .speed-label,.tier-d .speed-value{color:#8a7070}
 .tier-d .speed-comment{color:#8a7070}
 .tier-d .rank-badge{background:#c0353520;color:var(--ng)}
+/* ── NEW TIERS ── */
+.speed-card.tier-ss{background:linear-gradient(135deg,#0d0d2b,#1a0a3a,#0a1a2a);border:2px solid #a855f7;position:relative;overflow:hidden;}
+.speed-card.tier-ss::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(59,130,246,0.15),rgba(236,72,153,0.15));animation:ssShimmer 2s ease-in-out infinite;}
+@keyframes ssShimmer{0%,100%{opacity:0.5}50%{opacity:1}}
+.tier-ss .speed-label{color:#c084fc}
+.tier-ss .speed-value{color:#f0abfc;text-shadow:0 0 20px #a855f7,0 0 40px #7c3aed;}
+.tier-ss .speed-comment{color:#e9d5ff}
+.tier-ss .rank-badge{background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;border:none;}
+.speed-card.tier-e{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac}
+.tier-e .speed-label,.tier-e .speed-value{color:#16a34a}
+.tier-e .speed-comment{color:#166534}
+.tier-e .rank-badge{background:#16a34a20;color:#16a34a}
+.speed-card.tier-f{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:1px solid #cbd5e1}
+.tier-f .speed-label,.tier-f .speed-value{color:#64748b}
+.tier-f .speed-comment{color:#475569}
+.tier-f .rank-badge{background:#64748b20;color:#64748b}
+#anim-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;}
 .res-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .res-cell{padding:12px 8px;background:var(--bg);border-radius:8px;text-align:center}
 .res-cell .rl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px}
@@ -400,6 +417,7 @@ body{padding-top:48px}  /* ログインバーの高さ分ずらす */
 </style>
 </head>
 <body>
+<div id="anim-canvas"></div>
 
 <!-- ログインバー -->
 <div class="login-bar">
@@ -1164,11 +1182,166 @@ inp.addEventListener('input',()=>{
 //  RESULT
 // ══════════════════════════════════════════════
 function getSpeedTier(speed){
-  if(speed>=7) return{tier:'s',rank:'RANK S',emoji:'👑',title:'Godlike Speed!',comment:'圧倒的な打鍵速度。英語タイピングの達人です！\nキーボードが悲鳴を上げるほどの爆速、脱帽です！'};
-  if(speed>=6) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Excellent!',comment:'安定した高速タイピング。英語のスペルも完璧ですね。\nこの調子なら RANK S の壁もすぐに超えられるはず！'};
-  if(speed>=5) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Typing!',comment:'実用レベルを超えた打鍵力。リズムに乗れていますね。\nスペルの暗記をさらに進めて上を目指しましょう！'};
-  if(speed>=4) return{tier:'c',rank:'RANK C',emoji:'👍',title:'Good Progress!',comment:'着実に力がついています。\n苦手な単語を集中的に練習すると、グンと伸びますよ。'};
-  return{tier:'d',rank:'RANK D',emoji:'💪',title:'Keep Going!',comment:'焦らず正確に打つことが上達の近道。\n毎日コツコツ続ければ、必ずスピードは上がります！'};
+  const s = Math.round(speed * 10) / 10;
+
+  // ── TIER SS: 8.0+ ─────────────────────────────
+  if(s>=8.0) return{tier:'ss',rank:'RANK SS',emoji:'🌌',title:'LEGENDARY!!',
+    comment:'もはや人間の限界を超えた領域！\n指が光速で動いている…これは伝説です。\nあなたの名前はタイピング史に刻まれました！',
+    anim:'legendary'};
+
+  // ── TIER S: 7.0～7.9 ──────────────────────────
+  if(s>=7.9) return{tier:'s',rank:'RANK S',emoji:'👑',title:'神速！GODLIKE!',
+    comment:'7.9打/秒…もう神の領域です！\nこの速さでこの正確さ、完璧すぎます！！',anim:'godlike'};
+  if(s>=7.8) return{tier:'s',rank:'RANK S',emoji:'👑',title:'超神速！',
+    comment:'7.8打/秒！キーボードが悲鳴を上げています！\nあなたはタイピングの神です、間違いなく！',anim:'godlike'};
+  if(s>=7.7) return{tier:'s',rank:'RANK S',emoji:'👑',title:'爆速の極み！',
+    comment:'7.7打/秒！もう誰も追いつけないスピード！\nその速さ、一生自慢し続けてください！',anim:'godlike'};
+  if(s>=7.6) return{tier:'s',rank:'RANK S',emoji:'👑',title:'無双タイピスト！',
+    comment:'7.6打/秒！完全に無双状態です！\nキーボードがあなたの意思を先読みしているレベル！',anim:'godlike'};
+  if(s>=7.5) return{tier:'s',rank:'RANK S',emoji:'👑',title:'MAX SPEED!!',
+    comment:'7.5打/秒！速すぎて目で追えません！\nもはや人類最速クラスの打鍵力です！！',anim:'godlike'};
+  if(s>=7.4) return{tier:'s',rank:'RANK S',emoji:'👑',title:'超絶速い！',
+    comment:'7.4打/秒！あなたの指、ロケットですか？\nこの速さは一生語り継がれる伝説です！',anim:'godlike'};
+  if(s>=7.3) return{tier:'s',rank:'RANK S',emoji:'👑',title:'鬼速タイピング！',
+    comment:'7.3打/秒！まさに鬼神の如き速さ！\nあなたのタイピングに「不可能」はありません！',anim:'godlike'};
+  if(s>=7.2) return{tier:'s',rank:'RANK S',emoji:'👑',title:'INSANE!!',
+    comment:'7.2打/秒！これはもう才能の次元が違います！\n全タイピング界があなたを称えています！',anim:'godlike'};
+  if(s>=7.1) return{tier:'s',rank:'RANK S',emoji:'👑',title:'天才タイピスト！',
+    comment:'7.1打/秒！神がかった速さです！\nキーボードがあなたのために存在しています！',anim:'godlike'};
+  if(s>=7.0) return{tier:'s',rank:'RANK S',emoji:'👑',title:'Godlike Speed!!',
+    comment:'7.0打/秒！圧倒的な打鍵速度！\nキーボードが悲鳴を上げるほどの爆速、脱帽です！',anim:'godlike'};
+
+  // ── TIER A: 6.0～6.9 ──────────────────────────
+  if(s>=6.9) return{tier:'a',rank:'RANK A',emoji:'🚀',title:'超高速！あと少し！',
+    comment:'6.9打/秒！RANK Sまであと0.1！\nここまで来たら神の領域も夢じゃない！',anim:'fireworks'};
+  if(s>=6.8) return{tier:'a',rank:'RANK A',emoji:'🚀',title:'爆速タイパー！',
+    comment:'6.8打/秒！もうプロレベルを超えてます！\n指先が音速で動いてますね！',anim:'fireworks'};
+  if(s>=6.7) return{tier:'a',rank:'RANK A',emoji:'🚀',title:'High Speed!!',
+    comment:'6.7打/秒！素晴らしいスピードです！\nこの調子でRANK Sを狙いましょう！',anim:'fireworks'};
+  if(s>=6.6) return{tier:'a',rank:'RANK A',emoji:'✨',title:'超絶上手い！',
+    comment:'6.6打/秒！かなりの実力者です！\nもう少しでSランク、頑張れー！',anim:'fireworks'};
+  if(s>=6.5) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Excellent Plus!',
+    comment:'6.5打/秒！安定した神速タイピング！\nその指のキレ、もはや才能です！',anim:'fireworks'};
+  if(s>=6.4) return{tier:'a',rank:'RANK A',emoji:'✨',title:'めちゃくちゃ速い！',
+    comment:'6.4打/秒！本当に速い！\nスペルも完璧でこの速さは驚異的です！',anim:'fireworks'};
+  if(s>=6.3) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Amazing!!',
+    comment:'6.3打/秒！完全に上位層のスピード！\nこのペースを保てればSランクも射程圏内！',anim:'fireworks'};
+  if(s>=6.2) return{tier:'a',rank:'RANK A',emoji:'✨',title:'かなりすごい！',
+    comment:'6.2打/秒！十分すぎるほどのスピード！\nタイピングの腕前、本物です！',anim:'fireworks'};
+  if(s>=6.1) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Fantastic!',
+    comment:'6.1打/秒！かなりのハイレベル！\nこの調子でさらに上を目指せます！',anim:'fireworks'};
+  if(s>=6.0) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Excellent!',
+    comment:'6.0打/秒！安定した高速タイピング！\nこの調子なら RANK S の壁もすぐに超えられるはず！',anim:'fireworks'};
+
+  // ── TIER B: 5.0～5.9 ──────────────────────────
+  if(s>=5.9) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'もうAランク目前！',
+    comment:'5.9打/秒！Aランクまであと0.1！\nもう一息、絶対に届きます！',anim:'flames'};
+  if(s>=5.8) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'超速い！',
+    comment:'5.8打/秒！かなり速いです！\nAランクが視野に入ってきました！',anim:'flames'};
+  if(s>=5.7) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Speed!!',
+    comment:'5.7打/秒！実用レベルを大幅に超えてます！\nリズムよくキープできていますね！',anim:'flames'};
+  if(s>=5.6) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'かっこいい！',
+    comment:'5.6打/秒！このスピードでこの正確さ、すごい！\nもっと速くなれるポテンシャルを感じます！',anim:'flames'};
+  if(s>=5.5) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'VERY GOOD!!',
+    comment:'5.5打/秒！ちょうど折り返し地点、いい感じ！\nあなたのタイピングは着実に上達しています！',anim:'flames'};
+  if(s>=5.4) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'速い！',
+    comment:'5.4打/秒！なかなかのスピードです！\nさらに練習すればAランクが見えてきます！',anim:'flames'};
+  if(s>=5.3) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Good Typing!',
+    comment:'5.3打/秒！十分なスピードです！\nスペルの反射速度を上げれば一気に伸びます！',anim:'flames'};
+  if(s>=5.2) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'いい感じ！',
+    comment:'5.2打/秒！良いペースです！\nリズムをキープしながら続けましょう！',anim:'flames'};
+  if(s>=5.1) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Typing!',
+    comment:'5.1打/秒！実用レベルを超えた打鍵力！\nリズムに乗れていますね！',anim:'flames'};
+  if(s>=5.0) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Typing!',
+    comment:'5.0打/秒！素晴らしい！実用レベルを超えています！\nスペルの暗記をさらに進めて上を目指しましょう！',anim:'flames'};
+
+  // ── TIER C: 4.0～4.9 ──────────────────────────
+  if(s>=4.9) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'Bランクまであと少し！',
+    comment:'4.9打/秒！Bランクまであと一歩！\nこの調子で続けていけば必ず届きます！',anim:'stars'};
+  if(s>=4.8) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'かなりいい！',
+    comment:'4.8打/秒！十分速いです！\n苦手な単語を減らせばすぐにBランクです！',anim:'stars'};
+  if(s>=4.7) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'Good+!!',
+    comment:'4.7打/秒！良いスピードです！\nもう少しで上位ランクが見えてきます！',anim:'stars'};
+  if(s>=4.6) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'なかなか速い！',
+    comment:'4.6打/秒！着実に伸びています！\n集中して練習すれば一気に加速できます！',anim:'stars'};
+  if(s>=4.5) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'Good Progress!',
+    comment:'4.5打/秒！中間地点をクリア！\nここから先は練習量がモノを言います！',anim:'stars'};
+  if(s>=4.4) return{tier:'c',rank:'RANK C',emoji:'👍',title:'いいペース！',
+    comment:'4.4打/秒！着実に力がついています！\n苦手な単語を集中的に練習するとグンと伸びますよ！',anim:'stars'};
+  if(s>=4.3) return{tier:'c',rank:'RANK C',emoji:'👍',title:'Good!!',
+    comment:'4.3打/秒！しっかりとしたスピードです！\n毎日の積み重ねが確実に実力になっています！',anim:'stars'};
+  if(s>=4.2) return{tier:'c',rank:'RANK C',emoji:'👍',title:'上達してる！',
+    comment:'4.2打/秒！なかなかのスピードです！\n正確さを維持しながら速度を上げていきましょう！',anim:'stars'};
+  if(s>=4.1) return{tier:'c',rank:'RANK C',emoji:'👍',title:'Keep it up!',
+    comment:'4.1打/秒！いいペースです！\nこの調子でコツコツ続けましょう！',anim:'stars'};
+  if(s>=4.0) return{tier:'c',rank:'RANK C',emoji:'👍',title:'Good Progress!',
+    comment:'4.0打/秒！着実に力がついています！\n苦手な単語を集中的に練習すると、グンと伸びますよ！',anim:'stars'};
+
+  // ── TIER D: 3.0～3.9 ──────────────────────────
+  if(s>=3.9) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Cランクまであと少し！',
+    comment:'3.9打/秒！Cランクまであと0.1！\nもう少しで次のステージです、頑張れ！',anim:'bubbles'};
+  if(s>=3.8) return{tier:'d',rank:'RANK D',emoji:'💪',title:'いい感じ！',
+    comment:'3.8打/秒！着実に上達しています！\nもう少し指が慣れれば一気に加速できます！',anim:'bubbles'};
+  if(s>=3.7) return{tier:'d',rank:'RANK D',emoji:'💪',title:'ちょっとずつ速くなってる！',
+    comment:'3.7打/秒！良いペースです！\n毎日練習すれば必ずCランクに届きます！',anim:'bubbles'};
+  if(s>=3.6) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Keep Going+!',
+    comment:'3.6打/秒！順調に伸びています！\n正確に打つことを意識しながら続けましょう！',anim:'bubbles'};
+  if(s>=3.5) return{tier:'d',rank:'RANK D',emoji:'💪',title:'半分を超えた！',
+    comment:'3.5打/秒！中間点を超えました！\nここからさらに伸びていきますよ！',anim:'bubbles'};
+  if(s>=3.4) return{tier:'d',rank:'RANK D',emoji:'💪',title:'練習の成果が出てる！',
+    comment:'3.4打/秒！練習の成果が出ていますね！\n焦らずコツコツ続けましょう！',anim:'bubbles'};
+  if(s>=3.3) return{tier:'d',rank:'RANK D',emoji:'💪',title:'順調です！',
+    comment:'3.3打/秒！順調なペースです！\n毎日の練習が一番の近道です！',anim:'bubbles'};
+  if(s>=3.2) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Good Effort!',
+    comment:'3.2打/秒！ちゃんと速くなっています！\nもう少しで指が自然に動くようになりますよ！',anim:'bubbles'};
+  if(s>=3.1) return{tier:'d',rank:'RANK D',emoji:'💪',title:'着実に成長中！',
+    comment:'3.1打/秒！着実に成長していますよ！\n苦手なスペルを覚えると一気に速くなります！',anim:'bubbles'};
+  if(s>=3.0) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Keep Going!',
+    comment:'3.0打/秒！焦らず正確に打つことが上達の近道。\n毎日コツコツ続ければ、必ずスピードは上がります！',anim:'bubbles'};
+
+  // ── TIER E: 2.0～2.9 ──────────────────────────
+  if(s>=2.9) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'Dランクまであと少し！',
+    comment:'2.9打/秒！Dランクまでもうすぐ！\nあきらめずに続ければ絶対に届きます！',anim:'gentle'};
+  if(s>=2.8) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'もう少し！',
+    comment:'2.8打/秒！頑張っています！\n毎日少しずつ練習するのが上達の秘訣です！',anim:'gentle'};
+  if(s>=2.7) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'続けることが大事！',
+    comment:'2.7打/秒！継続は力なり！\n今日の練習が必ず明日の速さにつながります！',anim:'gentle'};
+  if(s>=2.6) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'頑張ってる！',
+    comment:'2.6打/秒！着実に歩んでいます！\nアルファベットの位置を覚えると一気に速くなりますよ！',anim:'gentle'};
+  if(s>=2.5) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'Keep Trying!',
+    comment:'2.5打/秒！半分以上の速さです！\n焦らず確実に、が上達の近道です！',anim:'gentle'};
+  if(s>=2.4) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'よく頑張ってる！',
+    comment:'2.4打/秒！練習していることが伝わります！\nホームポジションを意識するとグッと速くなりますよ！',anim:'gentle'};
+  if(s>=2.3) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'着実に前進！',
+    comment:'2.3打/秒！前に進んでいます！\n正確さを大切にしながら続けましょう！',anim:'gentle'};
+  if(s>=2.2) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'やればできる！',
+    comment:'2.2打/秒！始めの一歩を踏み出しています！\n毎日練習すれば必ず上手くなります！',anim:'gentle'};
+  if(s>=2.1) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'継続が力！',
+    comment:'2.1打/秒！焦らなくて大丈夫！\nキーの位置を覚えながら丁寧に打ちましょう！',anim:'gentle'};
+  if(s>=2.0) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'Keep Going!',
+    comment:'2.0打/秒！まだまだこれからです！\n焦らず、ゆっくりでも正確に打つことを意識しましょう！',anim:'gentle'};
+
+  // ── TIER F: 1.0～1.9 ──────────────────────────
+  if(s>=1.9) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Eランクまであと少し！',
+    comment:'1.9打/秒！Eランクまであと一歩！\n落ち着いてキーを探しながら打ちましょう！',anim:'calm'};
+  if(s>=1.8) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'ゆっくり確実に！',
+    comment:'1.8打/秒！スピードより正確さが大切です。\n一つ一つ確認しながら進みましょう！',anim:'calm'};
+  if(s>=1.7) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'丁寧にいこう！',
+    comment:'1.7打/秒！急がなくて大丈夫！\n落ち着いてキーボードを見ながら打ちましょう！',anim:'calm'};
+  if(s>=1.6) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Take It Easy!',
+    comment:'1.6打/秒！深呼吸して落ち着いて！\nゆっくりでも完走できたことが大切です！',anim:'calm'};
+  if(s>=1.5) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'焦らなくていい！',
+    comment:'1.5打/秒！スピードはあとからついてきます！\nまずはキーの場所を覚えることに集中しましょう！',anim:'calm'};
+  if(s>=1.4) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Relax & Type!',
+    comment:'1.4打/秒！リラックスして打ちましょう！\nキーボードに目を向けながら確実に！',anim:'calm'};
+  if(s>=1.3) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'ゆっくりでいい！',
+    comment:'1.3打/秒！焦らないで大丈夫！\n一文字ずつ丁寧に打つ練習が一番の近道です！',anim:'calm'};
+  if(s>=1.2) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'確実に打とう！',
+    comment:'1.2打/秒！スピードは気にしないで！\n正確に打つことだけを意識しましょう！',anim:'calm'};
+  if(s>=1.1) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'まず慣れることから！',
+    comment:'1.1打/秒！まずはキーボードに慣れましょう！\n毎日少しずつでも続けることが大切です！',anim:'calm'};
+  return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Calm & Steady!',
+    comment:'落ち着いてキーを確認しながら打ちましょう！\n一歩ずつ確実に、焦らなくて大丈夫！',anim:'calm'};
 }
 function showResult(){
   pausedElapsed+=Date.now()-t0;
@@ -1189,6 +1362,7 @@ function showResult(){
   $('r-miss').textContent=misses; $('r-acc').textContent=acc+'%';
   $('bar-fill').style.width='100%';
   showScreen('result');
+  setTimeout(()=>launchResultAnim(tier.anim, speed), 300);
 }
 $('r-retry').addEventListener('click',startGame);
 $('r-back').addEventListener('click',()=>showScreen('setup'));
@@ -1323,6 +1497,166 @@ function speakEnglish(text) {
   utter.onend = () => { voiceSpeaking = false; };
   utter.onerror = () => { voiceSpeaking = false; };
   window.speechSynthesis.speak(utter);
+}
+
+// ══════════════════════════════════════════════
+//  RESULT ANIMATIONS
+// ══════════════════════════════════════════════
+function launchResultAnim(type, speed) {
+  const canvas = document.getElementById('anim-canvas');
+  canvas.innerHTML = '';
+
+  const configs = {
+    legendary: { count: 120, duration: 5000, fn: spawnLegendary },
+    godlike:   { count: 80,  duration: 4000, fn: spawnFireworks },
+    fireworks: { count: 60,  duration: 3500, fn: spawnFireworks },
+    flames:    { count: 40,  duration: 3000, fn: spawnFlames },
+    stars:     { count: 30,  duration: 2500, fn: spawnStars },
+    bubbles:   { count: 20,  duration: 2000, fn: spawnBubbles },
+    gentle:    { count: 12,  duration: 1800, fn: spawnGentle },
+    calm:      { count: 6,   duration: 1500, fn: spawnCalm },
+  };
+  const cfg = configs[type] || configs.calm;
+  const interval = cfg.duration / cfg.count;
+  let fired = 0;
+  const timer = setInterval(() => {
+    if (fired >= cfg.count) { clearInterval(timer); return; }
+    cfg.fn(canvas);
+    fired++;
+  }, interval);
+  setTimeout(() => { clearInterval(timer); canvas.innerHTML = ''; }, cfg.duration + 1500);
+}
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+
+const CONFETTI_COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff','#ff9f1c','#e63946','#2ec4b6'];
+const EMOJIS_GODLIKE = ['👑','🏆','💥','⚡','🌟','🔥','✨','💎','🎆','🎇'];
+const EMOJIS_FIREWORKS = ['🎉','✨','🌟','⭐','💫','🎊','🎈'];
+const EMOJIS_FLAMES = ['🔥','⚡','💪','👍','✊'];
+const EMOJIS_STARS = ['⭐','🌟','💫','✨','👏'];
+const EMOJIS_BUBBLES = ['💧','🫧','🌱','💙','🔵'];
+
+function makeParticle(canvas, content, x, y, style = {}) {
+  const el = document.createElement('div');
+  el.className = 'anim-particle';
+  el.textContent = content;
+  el.style.cssText = `left:${x}px;top:${y}px;font-size:${style.size||20}px;position:absolute;
+    animation:${style.anim||'floatUp'} ${style.dur||1.2}s ease-out forwards;
+    opacity:1;transform-origin:center;${style.extra||''}`;
+  canvas.appendChild(el);
+  setTimeout(() => el.remove(), (style.dur || 1.2) * 1000 + 100);
+}
+
+// Inject keyframes once
+(function injectKeyframes() {
+  if (document.getElementById('anim-keyframes')) return;
+  const style = document.createElement('style');
+  style.id = 'anim-keyframes';
+  style.textContent = `
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)}100%{opacity:0;transform:translateY(-180px) scale(0.4) rotate(var(--rot,30deg))}}
+@keyframes floatUpSpin{0%{opacity:1;transform:translateY(0) scale(1.2) rotate(0deg)}100%{opacity:0;transform:translateY(-220px) scale(0.3) rotate(720deg)}}
+@keyframes burst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx,0px),var(--ty,-150px)) scale(0.2)}}
+@keyframes confettiFall{0%{opacity:1;transform:translateY(-30px) rotate(0deg) scaleX(1)}60%{opacity:1}100%{opacity:0;transform:translateY(100vh) rotate(var(--rot,360deg)) scaleX(-1)}}
+@keyframes sparkle{0%{opacity:0;transform:scale(0) rotate(0deg)}30%{opacity:1;transform:scale(1.4) rotate(180deg)}100%{opacity:0;transform:scale(0.2) rotate(360deg)}}
+@keyframes galaxySpin{0%{opacity:1;transform:scale(1) rotate(0deg) translateY(0)}100%{opacity:0;transform:scale(0.1) rotate(1080deg) translateY(-200px)}}
+@keyframes gentleFloat{0%{opacity:0.8;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-100px) scale(0.6)}}
+@keyframes softPop{0%{opacity:0;transform:scale(0)}40%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(0.5) translateY(-60px)}}
+  `;
+  document.head.appendChild(style);
+})();
+
+function spawnLegendary(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  // Galaxy particles + confetti rain + big emojis
+  const r = Math.random();
+  if (r < 0.3) {
+    // confetti strip
+    const x = rand(0, W);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const rot = rand(-720, 720);
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:-20px;width:${rand(6,12)}px;height:${rand(14,22)}px;
+      background:${color};border-radius:2px;--rot:${rot}deg;
+      animation:confettiFall ${rand(2.5,4.5)}s ease-in forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 4600);
+  } else if (r < 0.6) {
+    // galaxy spin emoji
+    const emoji = EMOJIS_GODLIKE[randInt(0, EMOJIS_GODLIKE.length - 1)];
+    const x = rand(W*0.1, W*0.9), y = rand(H*0.1, H*0.7);
+    makeParticle(canvas, emoji, x, y, {size: randInt(24,48), anim:'galaxySpin', dur: rand(1.5,3), extra:`--rot:${rand(-360,360)}deg`});
+  } else {
+    // sparkle dot
+    const x = rand(0, W), y = rand(0, H);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${rand(6,16)}px;height:${rand(6,16)}px;
+      border-radius:50%;background:${color};box-shadow:0 0 8px ${color};
+      animation:sparkle ${rand(0.8,1.8)}s ease-out forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 1900);
+  }
+}
+
+function spawnFireworks(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const r = Math.random();
+  if (r < 0.4) {
+    // burst emojis
+    const emoji = EMOJIS_FIREWORKS[randInt(0, EMOJIS_FIREWORKS.length - 1)];
+    const x = rand(W*0.05, W*0.95), y = rand(H*0.05, H*0.65);
+    const tx = rand(-120, 120), ty = rand(-200, -60);
+    makeParticle(canvas, emoji, x, y, {size: randInt(16,36), anim:'burst', dur: rand(1.0,2.0), extra:`--tx:${tx}px;--ty:${ty}px`});
+  } else {
+    // confetti
+    const x = rand(0, W);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const rot = rand(-540, 540);
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:-10px;width:${rand(5,10)}px;height:${rand(12,20)}px;
+      background:${color};border-radius:2px;--rot:${rot}deg;
+      animation:confettiFall ${rand(2,3.5)}s ease-in forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  }
+}
+
+function spawnFlames(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_FLAMES[randInt(0, EMOJIS_FLAMES.length - 1)];
+  const x = rand(W*0.05, W*0.95), y = rand(H*0.2, H*0.8);
+  makeParticle(canvas, emoji, x, y, {size: randInt(18,32), anim:'floatUpSpin', dur: rand(1.0,1.8), extra:`--rot:${rand(-60,60)}deg`});
+}
+
+function spawnStars(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_STARS[randInt(0, EMOJIS_STARS.length - 1)];
+  const x = rand(W*0.05, W*0.95), y = rand(H*0.1, H*0.85);
+  makeParticle(canvas, emoji, x, y, {size: randInt(16,28), anim:'sparkle', dur: rand(0.9,1.6)});
+}
+
+function spawnBubbles(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_BUBBLES[randInt(0, EMOJIS_BUBBLES.length - 1)];
+  const x = rand(W*0.1, W*0.9), y = rand(H*0.3, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(14,22), anim:'gentleFloat', dur: rand(1.2,2.0)});
+}
+
+function spawnGentle(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const items = ['🌱','💧','🌿','🍀','🌸'];
+  const emoji = items[randInt(0, items.length - 1)];
+  const x = rand(W*0.1, W*0.9), y = rand(H*0.4, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(12,20), anim:'softPop', dur: rand(1.2,1.8)});
+}
+
+function spawnCalm(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const items = ['🐣','💤','🌙','⭕'];
+  const emoji = items[randInt(0, items.length - 1)];
+  const x = rand(W*0.2, W*0.8), y = rand(H*0.5, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(12,18), anim:'softPop', dur: rand(1.0,1.5)});
 }
 
 renderHomeScreen();
