@@ -77,10 +77,12 @@ async function loadFromCloud() {
 }
 
 // ── localStorage書き換えを監視してクラウド同期 ──
+// 初回クラウド読み込み完了前はsyncをブロック
+let cloudLoadDone = false;
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if (key.startsWith('typing-en-v2-') && currentUser) {
+  if (key.startsWith('typing-en-v2-') && currentUser && cloudLoadDone) {
     clearTimeout(localStorage._syncTimer);
     localStorage._syncTimer = setTimeout(saveAllToCloud, 800);
   }
@@ -93,10 +95,12 @@ onAuthStateChanged(auth, async user => {
     updateLoginUI(user);
     showSyncBadge('syncing');
     await loadFromCloud();
+    cloudLoadDone = true;
     showSyncBadge('ok');
     // ホーム画面を再描画（データ更新後）
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
   } else {
+    cloudLoadDone = true;
     updateLoginUI(null);
     showSyncBadge('off');
   }
@@ -708,8 +712,8 @@ const settingsKey  = ()  => P+'settings';
 
 function loadLevelWords(lv) {
   try { const r=localStorage.getItem(lvWordsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
-  const def = (DEFAULT_WORDS[lv-1]||[]).map(w=>({...w}));
-  saveLevelWords(lv,def); return def;
+  // デフォルト値を返すだけ。保存はしない（クラウドへの誤上書き防止）
+  return (DEFAULT_WORDS[lv-1]||[]).map(w=>({...w}));
 }
 function saveLevelWords(lv,list){ localStorage.setItem(lvWordsKey(lv),JSON.stringify(list)); }
 
