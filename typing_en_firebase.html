@@ -46,9 +46,11 @@ async function saveAllToCloud() {
     const w = localStorage.getItem('typing-en-v2-words-lv'+lv);
     const e = localStorage.getItem('typing-en-v2-enabled-lv'+lv);
     const t = localStorage.getItem('typing-en-v2-title-lv'+lv);
+    const c = localStorage.getItem('typing-en-v2-counts-lv'+lv);
     if (w != null) payload['words_lv'+lv]   = JSON.parse(w);
     if (e != null) payload['enabled_lv'+lv] = JSON.parse(e);
     if (t != null) payload['title_lv'+lv]   = JSON.parse(t);
+    if (c != null) payload['counts_lv'+lv]  = JSON.parse(c);
   }
   payload['settings'] = JSON.parse(localStorage.getItem('typing-en-v2-settings') || 'null');
   payload['updatedAt'] = Date.now();
@@ -68,6 +70,7 @@ async function loadFromCloud() {
       if (d['words_lv'+lv]   != null) localStorage.setItem('typing-en-v2-words-lv'+lv,   JSON.stringify(d['words_lv'+lv]));
       if (d['enabled_lv'+lv] != null) localStorage.setItem('typing-en-v2-enabled-lv'+lv, JSON.stringify(d['enabled_lv'+lv]));
       if (d['title_lv'+lv]   != null) localStorage.setItem('typing-en-v2-title-lv'+lv,   JSON.stringify(d['title_lv'+lv]));
+      if (d['counts_lv'+lv]  != null) localStorage.setItem('typing-en-v2-counts-lv'+lv,  JSON.stringify(d['counts_lv'+lv]));
     }
     if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
   } catch(e) { console.warn('Cloud load failed:', e); }
@@ -230,6 +233,8 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .manage-row.dragging{opacity:0.35;background:var(--bg)}
 .manage-row.drag-over-top{box-shadow:0 -2px 0 0 var(--on) inset}
 .manage-row.drag-over-bottom{box-shadow:0 2px 0 0 var(--on) inset}
+.count-badge{flex-shrink:0;min-width:32px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:10px;background:#e8f0fe;color:#2563eb;border:1px solid #c7daf5;}
+.count-badge[data-n="0"],.count-badge:empty{background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8;}
 .manage-cb{flex-shrink:0;width:17px;height:17px;accent-color:var(--ng);cursor:pointer;}
 /* bulk bar */
 .bulk-bar{display:none;align-items:center;gap:10px;padding:10px 12px;background:var(--ng-bg);border-radius:8px;margin-bottom:10px;animation:fadeSlideIn 0.2s ease-out;}
@@ -523,6 +528,20 @@ body{padding-top:48px}  /* ログインバーの高さ分ずらす */
         <input type="text" class="title-edit-input" id="level-title-input" placeholder="レベルのタイトルを入力">
         <button class="title-save-btn" id="level-title-save-btn">保存</button>
       </div>
+      <div id="cumulative-banner" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(135deg,#f0f7ff,#e8f0fe);border:1px solid #b8d0f0;border-radius:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#4a6fa5;text-transform:uppercase;margin-bottom:3px">累積出題数</div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span id="cumulative-count" style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:#2563eb;line-height:1;">0</span>
+            <span style="font-size:0.78rem;color:#4a6fa5;font-weight:500;">語</span>
+            <span id="cumulative-goal" style="font-size:0.75rem;color:#6b8fc4;margin-left:4px;"></span>
+          </div>
+          <div id="cumulative-bar-wrap" style="margin-top:6px;height:4px;background:#c7daf5;border-radius:2px;width:180px;overflow:hidden;">
+            <div id="cumulative-bar" style="height:100%;background:#2563eb;border-radius:2px;transition:width 0.4s ease;width:0%"></div>
+          </div>
+        </div>
+        <button id="count-reset-btn" style="padding:5px 12px;background:transparent;border:1px solid #b8d0f0;border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.74rem;color:#6b8fc4;cursor:pointer;transition:all 0.13s;white-space:nowrap;" onmouseover="this.style.background='#dce8fc';this.style.borderColor='#7faad8'" onmouseout="this.style.background='transparent';this.style.borderColor='#b8d0f0'">🔄 カウントリセット</button>
+      </div>
       <div class="sec-label">登録済み単語 <span id="word-count-label"></span></div>
       <div class="bulk-bar" id="bulk-bar">
         <span class="bulk-info" id="bulk-info"></span>
@@ -709,6 +728,28 @@ function loadLevelTitle(lv) {
 }
 function saveLevelTitle(lv,t){ localStorage.setItem(lvTitleKey(lv),JSON.stringify(t)); }
 
+const lvCountsKey = lv => P+'counts-lv'+lv;
+function loadLevelCounts(lv) {
+  try { const r=localStorage.getItem(lvCountsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  return {};
+}
+function saveLevelCounts(lv,obj){ localStorage.setItem(lvCountsKey(lv),JSON.stringify(obj)); }
+// en文字列をキーに1カウント加算
+function incrementWordCount(lv, enKey) {
+  const counts = loadLevelCounts(lv);
+  counts[enKey] = (counts[enKey] || 0) + 1;
+  saveLevelCounts(lv, counts);
+}
+// レベル全体の累積出題数
+function getTotalCount(lv) {
+  const counts = loadLevelCounts(lv);
+  return Object.values(counts).reduce((s,v)=>s+v, 0);
+}
+// カウントリセット
+function resetLevelCounts(lv) {
+  localStorage.removeItem(lvCountsKey(lv));
+}
+
 function loadSettings() { try { const r=localStorage.getItem(settingsKey()); if(r) return JSON.parse(r); } catch(e){} return {}; }
 function saveSettings(obj){ const c=loadSettings(); Object.assign(c,obj); localStorage.setItem(settingsKey(),JSON.stringify(c)); }
 
@@ -866,6 +907,7 @@ $('back-to-home-btn').addEventListener('click',goHome);
 //  TAB
 // ══════════════════════════════════════════════
 function switchTab(tab) {
+  updateCumulativeBanner();
   $('tab-practice').classList.toggle('active',tab==='practice');
   $('tab-manage').classList.toggle('active',tab==='manage');
   $('pane-practice').style.display=tab==='practice'?'flex':'none';
@@ -928,10 +970,28 @@ $('all-off-btn').addEventListener('click',()=>{ enabled.clear(); saveLevelEnable
 // ══════════════════════════════════════════════
 //  MANAGE LIST
 // ══════════════════════════════════════════════
+// ── 累積出題カウント バナー更新 ──
+const GOAL = 10000;
+function updateCumulativeBanner() {
+  if (!currentLevel) return;
+  const total = getTotalCount(currentLevel);
+  const el = $('cumulative-count');
+  const bar = $('cumulative-bar');
+  const goal = $('cumulative-goal');
+  if (!el) return;
+  el.textContent = total.toLocaleString();
+  const pct = Math.min(total / GOAL * 100, 100);
+  bar.style.width = pct + '%';
+  const remaining = GOAL - total;
+  goal.textContent = remaining > 0 ? `目標 ${GOAL.toLocaleString()} まであと ${remaining.toLocaleString()}` : '🎉 目標達成！';
+}
+
 function renderManageList() {
   const list=$('manage-list'), empty=$('manage-empty');
   list.innerHTML='';
   $('word-count-label').textContent=`（${words.length}件）`;
+  const lvCounts = currentLevel ? loadLevelCounts(currentLevel) : {};
+  updateCumulativeBanner();
   if(words.length===0){ empty.style.display='block'; $('manage-select-actions').style.display='none'; return; }
   empty.style.display='none'; $('manage-select-actions').style.display='flex';
   words.forEach((w,i)=>{
@@ -944,6 +1004,7 @@ function renderManageList() {
       <input type="checkbox" class="manage-cb" data-i="${i}" ${manageSelected.has(i)?'checked':''}>
       <span class="word-ja">${escHtml(w.ja)}</span>
       <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
+      <span class="count-badge" title="累積出題回数" style="${(lvCounts[w.en]||0)===0?'background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8':''">${(lvCounts[w.en]||0).toLocaleString()}</span>
       <button class="del-btn" title="削除" data-i="${i}">✕</button>
     `;
     row.querySelector('.manage-cb').addEventListener('change',e=>{
@@ -1045,6 +1106,13 @@ function clearAddMsg(){ const el=$('add-msg'); el.className='msg'; el.textConten
 $('add-btn').addEventListener('click',addWord);
 $('add-en').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();addWord();}});
 $('add-ja').addEventListener('keydown',e=>{if(e.key==='Enter')$('add-en').focus();});
+$('count-reset-btn').addEventListener('click',()=>{
+  if(!currentLevel) return;
+  if(!confirm('このレベルの累積出題カウントをリセットしますか？\nタイピング記録がすべて0になります。')) return;
+  resetLevelCounts(currentLevel);
+  updateCumulativeBanner();
+  renderManageList();
+});
 $('reset-btn').addEventListener('click',()=>{
   if(!confirm('このレベルの単語をすべて削除しますか？')) return;
   words=[]; saveLevelWords(currentLevel,words); enabled=new Set(); saveLevelEnabled(currentLevel,enabled);
@@ -1167,6 +1235,7 @@ inp.addEventListener('input',()=>{
       speakEnglish(target);
     }
     if(typed===target){
+      incrementWordCount(currentLevel, target);
       clears++; $('c-clear').textContent=clears; curIdx++;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
