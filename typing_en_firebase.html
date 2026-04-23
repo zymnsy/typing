@@ -1,0 +1,2122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>typing_en</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script type="module">
+// ══════════════════════════════════════════════
+//  🔥 FIREBASE CONFIG
+//  ↓ ここにあなたのFirebase設定を貼り付けてください
+// ══════════════════════════════════════════════
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyB9xZpDd8m1H6mYnXZ514uDO6awBXQn8LU",
+  authDomain:        "typing-126f3.firebaseapp.com",
+  projectId:         "typing-126f3",
+  storageBucket:     "typing-126f3.firebasestorage.app",
+  messagingSenderId: "676446520842",
+  appId:             "1:676446520842:web:784aadf151545776fec1f3"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser = null;
+let unsubscribeSnapshot = null;
+
+// ── ユーザードキュメント参照 ──
+function userDocRef(uid) {
+  return doc(db, 'users', uid, 'data', 'typing');
+}
+
+// ── Firestoreに全データ保存 ──
+async function saveAllToCloud() {
+  if (!currentUser) return;
+  if (!cloudLoadDone) return; // クラウドロード前は絶対に保存しない
+  const payload = {};
+  for (let lv = 1; lv <= 100; lv++) {
+    const w = localStorage.getItem('typing-en-v2-words-lv'+lv);
+    const e = localStorage.getItem('typing-en-v2-enabled-lv'+lv);
+    const t = localStorage.getItem('typing-en-v2-title-lv'+lv);
+    const c = localStorage.getItem('typing-en-v2-counts-lv'+lv);
+    if (w != null) {
+      const parsed = JSON.parse(w);
+      // 空配列はスキップ（クラウドの単語を消さないための安全策）
+      if (Array.isArray(parsed) && parsed.length > 0) payload['words_lv'+lv] = parsed;
+    }
+    if (e != null) payload['enabled_lv'+lv] = JSON.parse(e);
+    if (t != null) payload['title_lv'+lv]   = JSON.parse(t);
+    if (c != null) payload['counts_lv'+lv]  = JSON.parse(c);
+    const b = localStorage.getItem('typing-en-v2-best-lv'+lv);
+    const ls = localStorage.getItem('typing-en-v2-last-lv'+lv);
+    if (b != null)  payload['best_lv'+lv]  = JSON.parse(b);
+    if (ls != null) payload['last_lv'+lv]  = JSON.parse(ls);
+  }
+  payload['settings'] = JSON.parse(localStorage.getItem('typing-en-v2-settings') || 'null');
+  payload['updatedAt'] = Date.now();
+  try {
+    await setDoc(userDocRef(currentUser.uid), payload, { merge: true });
+  } catch(e) { console.warn('Cloud save failed:', e); }
+}
+
+// ── Firestoreからローカルに復元 ──
+async function loadFromCloud() {
+  if (!currentUser) return;
+  try {
+    const snap = await getDoc(userDocRef(currentUser.uid));
+    if (!snap.exists()) return; // 初回は何もしない
+    const d = snap.data();
+    for (let lv = 1; lv <= 100; lv++) {
+      if (d['words_lv'+lv]   != null) localStorage.setItem('typing-en-v2-words-lv'+lv,   JSON.stringify(d['words_lv'+lv]));
+      if (d['enabled_lv'+lv] != null) localStorage.setItem('typing-en-v2-enabled-lv'+lv, JSON.stringify(d['enabled_lv'+lv]));
+      if (d['title_lv'+lv]   != null) localStorage.setItem('typing-en-v2-title-lv'+lv,   JSON.stringify(d['title_lv'+lv]));
+      if (d['counts_lv'+lv]  != null) localStorage.setItem('typing-en-v2-counts-lv'+lv,  JSON.stringify(d['counts_lv'+lv]));
+      if (d['best_lv'+lv]    != null) localStorage.setItem('typing-en-v2-best-lv'+lv,    JSON.stringify(d['best_lv'+lv]));
+      if (d['last_lv'+lv]    != null) localStorage.setItem('typing-en-v2-last-lv'+lv,    JSON.stringify(d['last_lv'+lv]));
+    }
+    if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
+  } catch(e) { console.warn('Cloud load failed:', e); }
+}
+
+// ── localStorage書き換えを監視してクラウド同期 ──
+// 初回クラウド読み込み完了前はsyncをブロック
+let cloudLoadDone = false;
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  _origSetItem(key, value);
+  if (key.startsWith('typing-en-v2-') && currentUser && cloudLoadDone) {
+    clearTimeout(localStorage._syncTimer);
+    localStorage._syncTimer = setTimeout(saveAllToCloud, 800);
+  }
+};
+
+// ── ログイン状態監視 ──
+onAuthStateChanged(auth, async user => {
+  currentUser = user;
+  if (user) {
+    updateLoginUI(user);
+    showSyncBadge('syncing');
+    await loadFromCloud();
+    cloudLoadDone = true;
+    showSyncBadge('ok');
+    // ホーム画面を再描画（データ更新後）
+    if (typeof renderHomeScreen === 'function') renderHomeScreen();
+  } else {
+    cloudLoadDone = true;
+    updateLoginUI(null);
+    showSyncBadge('off');
+  }
+});
+
+// ── UI更新 ──
+function updateLoginUI(user) {
+  const btn = document.getElementById('login-btn');
+  const info = document.getElementById('user-info');
+  if (!btn || !info) return;
+  if (user) {
+    btn.textContent = 'ログアウト';
+    btn.onclick = () => signOut(auth);
+    info.textContent = user.displayName || user.email || '';
+    info.style.display = 'block';
+  } else {
+    btn.textContent = 'Googleでログイン';
+    btn.onclick = () => signInWithPopup(auth, provider).catch(e => console.warn(e));
+    info.textContent = '';
+    info.style.display = 'none';
+  }
+}
+
+function showSyncBadge(state) {
+  const b = document.getElementById('sync-badge');
+  if (!b) return;
+  if (state === 'syncing') { b.textContent = '☁ 同期中…'; b.className = 'sync-badge syncing'; }
+  else if (state === 'ok')  { b.textContent = '☁ 同期済み'; b.className = 'sync-badge ok';
+    setTimeout(() => { if(b.textContent==='☁ 同期済み') b.className='sync-badge idle'; }, 2000); }
+  else { b.textContent = '☁ オフライン'; b.className = 'sync-badge off'; }
+}
+
+// グローバルに公開（既存コードから呼べるように）
+window._fbSaveAll = saveAllToCloud;
+window._fbShowSync = showSyncBadge;
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f3;--surface:#ffffff;--border:#e5e3dd;--border2:#ccc9c2;
+  --text:#1a1918;--sub:#6e6b64;--muted:#b0ada6;
+  --on:#c96442;--on-bg:#fdf0eb;--on-hover:#b5573a;
+  --ok:#2a7a4b;--ok-bg:#eaf5ee;--ng:#c03535;--ng-bg:#fdeaea;
+  --gold:#b8860b;--gold-bg:#fdf6e3;
+  --r:10px;--sh:0 1px 4px rgba(0,0,0,0.06);--sh2:0 2px 12px rgba(0,0,0,0.08);
+  --lv1:#8b3a62;--lv1-bg:#f8edf3;--lv1-border:#d9b0c8;
+  --lv2:#2a6b8a;--lv2-bg:#eaf3f8;--lv2-border:#a8cfe0;
+  --lv3:#5a8a3a;--lv3-bg:#eff8ea;--lv3-border:#b0d9a0;
+  --lv4:#7a5a2a;--lv4-bg:#f8f3ea;--lv4-border:#d9c9a0;
+  --lv5:#5a2a8a;--lv5-bg:#f3eaf8;--lv5-border:#c9a0d9;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+body.hide-cursor,body.hide-cursor *{cursor:none!important}
+.screen{display:none;width:100%;max-width:640px;flex-direction:column;gap:16px;
+  animation:fadeSlideIn 0.25s ease-out;}
+.screen.active{display:flex}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.hrow{display:flex;align-items:flex-end;justify-content:space-between}
+.page-title{font-size:1.35rem;font-weight:700;letter-spacing:-0.01em}
+.page-sub{font-size:0.82rem;color:var(--sub);margin-top:3px}
+/* level grid */
+.level-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.level-card{padding:12px 10px;border-radius:var(--r);background:var(--surface);
+  border:2px solid var(--border);cursor:pointer;text-align:left;
+  transition:all 0.18s ease;box-shadow:var(--sh);position:relative;overflow:hidden;}
+.level-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;transition:height 0.18s ease;}
+.level-card:hover{transform:translateY(-2px);box-shadow:var(--sh2)}
+.level-card .level-num{font-family:'JetBrains Mono',monospace;font-size:0.95rem;font-weight:700;margin-bottom:3px;}
+.level-card .level-title{font-size:0.78rem;font-weight:600;margin-bottom:3px;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.level-card .level-count{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--muted);margin-top:4px;}
+.level-card[data-lv="1"]::before,.level-card[data-cycle="1"]::before{background:var(--lv1)}
+.level-card[data-lv="2"]::before,.level-card[data-cycle="2"]::before{background:var(--lv2)}
+.level-card[data-lv="3"]::before,.level-card[data-cycle="3"]::before{background:var(--lv3)}
+.level-card[data-lv="4"]::before,.level-card[data-cycle="4"]::before{background:var(--lv4)}
+.level-card[data-lv="5"]::before,.level-card[data-cycle="5"]::before{background:var(--lv5)}
+.level-card[data-lv="1"]:hover,.level-card[data-cycle="1"]:hover{border-color:var(--lv1)}
+.level-card[data-lv="2"]:hover,.level-card[data-cycle="2"]:hover{border-color:var(--lv2)}
+.level-card[data-lv="3"]:hover,.level-card[data-cycle="3"]:hover{border-color:var(--lv3)}
+.level-card[data-lv="4"]:hover,.level-card[data-cycle="4"]:hover{border-color:var(--lv4)}
+.level-card[data-lv="5"]:hover,.level-card[data-cycle="5"]:hover{border-color:var(--lv5)}
+/* badges */
+.game-lv-badge{font-size:0.72rem;font-weight:600;padding:2px 10px;border-radius:12px;}
+.game-lv-badge.lv1{background:var(--lv1-bg);color:var(--lv1)}
+.game-lv-badge.lv2{background:var(--lv2-bg);color:var(--lv2)}
+.game-lv-badge.lv3{background:var(--lv3-bg);color:var(--lv3)}
+.game-lv-badge.lv4{background:var(--lv4-bg);color:var(--lv4)}
+.game-lv-badge.lv5{background:var(--lv5-bg);color:var(--lv5)}
+.setup-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;}
+.setup-badge.lv1{background:var(--lv1-bg);color:var(--lv1);border:1px solid var(--lv1-border)}
+.setup-badge.lv2{background:var(--lv2-bg);color:var(--lv2);border:1px solid var(--lv2-border)}
+.setup-badge.lv3{background:var(--lv3-bg);color:var(--lv3);border:1px solid var(--lv3-border)}
+.setup-badge.lv4{background:var(--lv4-bg);color:var(--lv4);border:1px solid var(--lv4-border)}
+.setup-badge.lv5{background:var(--lv5-bg);color:var(--lv5);border:1px solid var(--lv5-border)}
+/* tab */
+.tabbar{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);}
+.tab{flex:1;padding:10px 0;text-align:center;font-size:0.83rem;font-weight:500;color:var(--sub);cursor:pointer;border:none;background:transparent;transition:background 0.13s,color 0.13s;border-right:1px solid var(--border);}
+.tab:last-child{border-right:none}
+.tab:hover{background:var(--bg)}
+.tab.active{background:var(--on-bg);color:var(--on);font-weight:700}
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh)}
+.sec-label{font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+/* word scroll */
+.word-scroll{max-height:320px;overflow-y:auto}
+.word-scroll::-webkit-scrollbar{width:4px}
+.word-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+/* toggle row */
+.word-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background 0.1s;user-select:none;}
+.word-row:hover{background:var(--bg)}
+.toggle{position:relative;width:34px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:var(--border2);border-radius:19px;transition:background 0.18s;}
+.toggle input:checked + .toggle-track{background:var(--on)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:15px;height:15px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.18);transition:transform 0.18s;}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(15px)}
+.word-ja{font-size:0.88rem;font-weight:500;flex:1;min-width:0}
+.word-en{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);flex:1;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.select-actions{display:flex;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.link-btn{font-size:0.78rem;color:var(--on);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
+.link-btn:hover{opacity:0.75}
+/* manage row */
+.manage-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;transition:background 0.1s;position:relative;}
+.manage-row:hover{background:var(--bg)}
+.manage-row .word-ja{font-size:0.88rem;font-weight:500;flex:1}
+.manage-row .word-en{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);flex:1.2;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.del-btn{flex-shrink:0;width:26px;height:26px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.13s,border-color 0.13s,color 0.13s;}
+.del-btn:hover{background:var(--ng-bg);border-color:var(--ng);color:var(--ng)}
+.drag-handle{flex-shrink:0;width:20px;height:26px;display:flex;align-items:center;justify-content:center;cursor:grab;color:var(--muted);user-select:none;touch-action:none;transition:color 0.13s;}
+.drag-handle:active{cursor:grabbing}
+.drag-handle:hover{color:var(--sub)}
+.drag-handle svg{width:14px;height:14px;pointer-events:none}
+.manage-row.dragging{opacity:0.35;background:var(--bg)}
+.manage-row.drag-over-top{box-shadow:0 -2px 0 0 var(--on) inset}
+.manage-row.drag-over-bottom{box-shadow:0 2px 0 0 var(--on) inset}
+.count-badge{flex-shrink:0;min-width:32px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:10px;background:#e8f0fe;color:#2563eb;border:1px solid #c7daf5;}
+.count-badge[data-zero="1"]{background:#f1f1f1;color:#b0ada6;border-color:#e0ddd8;}
+.manage-cb{flex-shrink:0;width:17px;height:17px;accent-color:var(--ng);cursor:pointer;}
+/* bulk bar */
+.bulk-bar{display:none;align-items:center;gap:10px;padding:10px 12px;background:var(--ng-bg);border-radius:8px;margin-bottom:10px;animation:fadeSlideIn 0.2s ease-out;}
+.bulk-bar.show{display:flex}
+.bulk-bar .bulk-info{flex:1;font-size:0.8rem;color:var(--ng);font-weight:500}
+.bulk-bar .btn-bulk-delete{flex-shrink:0;padding:6px 14px;background:var(--ng);color:#fff;border:none;border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;transition:opacity 0.13s;}
+.bulk-bar .btn-bulk-delete:hover{opacity:0.83}
+.bulk-bar .btn-bulk-cancel{flex-shrink:0;padding:6px 10px;background:transparent;color:var(--ng);border:1px solid var(--ng);border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.78rem;cursor:pointer;transition:background 0.13s;}
+.bulk-bar .btn-bulk-cancel:hover{background:rgba(192,53,53,0.08)}
+.manage-select-actions{display:flex;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px;align-items:center;}
+.manage-select-actions .link-btn{font-size:0.75rem}
+/* add form */
+.add-form{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.add-form input,.add-form textarea{flex:1;min-width:120px;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.13s;resize:vertical;}
+.add-form input:focus,.add-form textarea:focus{border-color:var(--on)}
+.add-form input::placeholder,.add-form textarea::placeholder{color:var(--muted)}
+.add-form textarea{min-height:42px;max-height:160px;line-height:1.5;font-family:'JetBrains Mono','Noto Sans JP',sans-serif;font-size:0.82rem;}
+.add-form .btn-add{padding:9px 16px;background:var(--on);color:#fff;border:none;border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:opacity 0.13s;flex-shrink:0;}
+.add-form .btn-add:hover{opacity:0.83}
+.add-form .btn-add:disabled{opacity:0.35;cursor:not-allowed}
+.add-hint{font-size:0.73rem;color:var(--muted);margin-top:6px;width:100%;line-height:1.6;}
+.add-hint b{font-family:'JetBrains Mono',monospace;color:var(--sub)}
+.msg{font-size:0.78rem;padding:7px 11px;border-radius:6px;margin-top:8px;display:none;}
+.msg.err{background:var(--ng-bg);color:var(--ng);display:block}
+.msg.suc{background:var(--ok-bg);color:var(--ok);display:block}
+/* round */
+.round-row{display:flex;gap:6px;flex-wrap:wrap}
+.round-chip{flex:1;min-width:54px;padding:9px 0;text-align:center;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.88rem;color:var(--sub);transition:all 0.13s}
+.round-chip:hover{border-color:var(--border2)}
+.round-chip.on{border-color:var(--on);background:var(--on-bg);color:var(--on);font-weight:600}
+/* hint box */
+.hint-box{padding:11px 14px;background:var(--on-bg);border-radius:8px;font-size:0.76rem;color:var(--sub);line-height:1.9}
+.hint-box b{font-family:'JetBrains Mono',monospace;color:var(--on)}
+/* buttons */
+.btn-primary{width:100%;padding:13px;background:var(--text);color:#fff;border:none;border-radius:var(--r);font-family:'Noto Sans JP',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;transition:opacity 0.14s}
+.btn-primary:hover{opacity:0.83}
+.btn-primary:disabled{opacity:0.3;cursor:not-allowed}
+.btn-ghost{padding:7px 13px;background:transparent;border:1px solid var(--border);border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:0.8rem;color:var(--sub);cursor:pointer;transition:border-color 0.13s,color 0.13s}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+/* game */
+.game-top{display:flex;align-items:center;justify-content:space-between}
+.game-prog{font-family:'JetBrains Mono',monospace;font-size:0.88rem;color:var(--sub)}
+.esc-hint{font-size:0.73rem;color:var(--muted)}
+kbd{display:inline-block;padding:1px 5px;border:1px solid var(--border2);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.7rem;background:var(--bg);color:var(--sub);}
+.bar-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+#bar-fill{height:100%;background:var(--on);width:0%;transition:width 0.25s ease;border-radius:2px}
+.word-box{text-align:center;padding:24px 16px}
+#word-disp{font-size:1.5rem;font-weight:500;margin-bottom:12px;letter-spacing:0.01em;color:var(--sub);line-height:1.5;word-break:break-word;}
+#hint-disp{font-family:'JetBrains Mono',monospace;font-size:1.3rem;letter-spacing:0.04em;min-height:1.7em;word-break:break-all;line-height:1.8;}
+#word-disp.long-text{font-size:1.1rem}
+#hint-disp.long-text{font-size:0.95rem;letter-spacing:0.02em}
+#hint-disp .hint-char{color:var(--muted);transition:color 0.08s}
+#hint-disp .hint-hidden{color:transparent;border-bottom:1.5px dashed var(--border2);margin:0 0.5px}
+#hint-disp .hint-typed{color:var(--ok);font-weight:600}
+#hint-disp .hint-space{display:inline-block;width:0.7em;text-align:center;color:var(--border2);font-size:0.7em;vertical-align:middle;position:relative;margin:0 1px;}
+#hint-disp .hint-space::after{content:'␣';font-size:0.9em;opacity:0.5}
+#hint-disp .hint-space-typed{display:inline-block;width:0.7em;text-align:center;position:relative;margin:0 1px;}
+#hint-disp .hint-space-typed::after{content:'␣';font-size:0.65em;color:var(--ok);opacity:0.6}
+#inp{width:100%;padding:15px 18px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:1.2rem;text-align:center;color:var(--text);outline:none;transition:border-color 0.12s,background 0.12s;letter-spacing:0.04em;}
+#inp:focus{border-color:var(--border2)}
+#inp.ok{border-color:var(--ok);background:var(--ok-bg)}
+#inp.ng{border-color:var(--ng);background:var(--ng-bg);animation:shake 0.12s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}33%{transform:translateX(-5px)}66%{transform:translateX(5px)}}
+.chips{display:flex;gap:8px;justify-content:center}
+.chip{padding:5px 14px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:0.8rem;display:flex;gap:5px;align-items:center}
+.chip .lbl{color:var(--muted)}
+.chip .v{font-family:'JetBrains Mono',monospace;font-weight:600}
+.v.ok{color:var(--ok)}.v.ng{color:var(--ng)}
+.space-start-hint{text-align:center;font-size:0.78rem;color:var(--muted);padding:4px 0 0;}
+.space-start-hint kbd{margin:0 3px;vertical-align:1px}
+/* result */
+.res-hero{text-align:center;padding:16px 0 6px}
+.res-emoji{font-size:2.6rem;margin-bottom:8px}
+.res-title{font-size:1.25rem;font-weight:700;margin-bottom:4px}
+.res-sub{font-size:0.82rem;color:var(--sub)}
+.speed-card{text-align:center;padding:22px 16px;border-radius:10px}
+.speed-label{font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+.speed-value{font-family:'JetBrains Mono',monospace;font-size:2.4rem;font-weight:600;line-height:1;}
+.speed-unit{font-family:'Noto Sans JP',sans-serif;font-size:0.78rem;font-weight:500;margin-left:4px;}
+.speed-comment{font-size:0.85rem;font-weight:500;margin-top:12px;line-height:1.7;}
+.rank-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:20px;margin-bottom:8px;letter-spacing:0.05em;}
+.speed-card.tier-s{background:linear-gradient(135deg,#fdf6e3,#fff8e1);border:1px solid #e6d5a0}
+.tier-s .speed-label,.tier-s .speed-value{color:var(--gold)}
+.tier-s .speed-comment{color:#8b6914}
+.tier-s .rank-badge{background:#d4a91740;color:var(--gold)}
+.speed-card.tier-a{background:var(--ok-bg);border:1px solid #b8dcc5}
+.tier-a .speed-label,.tier-a .speed-value{color:var(--ok)}
+.tier-a .speed-comment{color:#1e6338}
+.tier-a .rank-badge{background:#2a7a4b20;color:var(--ok)}
+.speed-card.tier-b{background:var(--on-bg);border:1px solid #e8c4b3}
+.tier-b .speed-label,.tier-b .speed-value{color:var(--on)}
+.tier-b .speed-comment{color:#a04e2e}
+.tier-b .rank-badge{background:#c9644220;color:var(--on)}
+.speed-card.tier-c{background:#f0f0ee;border:1px solid var(--border)}
+.tier-c .speed-label,.tier-c .speed-value{color:var(--sub)}
+.tier-c .speed-comment{color:var(--sub)}
+.tier-c .rank-badge{background:#6e6b6420;color:var(--sub)}
+.speed-card.tier-d{background:#f5f0f0;border:1px solid #ddd}
+.tier-d .speed-label,.tier-d .speed-value{color:#8a7070}
+.tier-d .speed-comment{color:#8a7070}
+.tier-d .rank-badge{background:#c0353520;color:var(--ng)}
+/* ── NEW TIERS ── */
+.speed-card.tier-ss{background:linear-gradient(135deg,#0d0d2b,#1a0a3a,#0a1a2a);border:2px solid #a855f7;position:relative;overflow:hidden;}
+.speed-card.tier-ss::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(59,130,246,0.15),rgba(236,72,153,0.15));animation:ssShimmer 2s ease-in-out infinite;}
+@keyframes ssShimmer{0%,100%{opacity:0.5}50%{opacity:1}}
+.tier-ss .speed-label{color:#c084fc}
+.tier-ss .speed-value{color:#f0abfc;text-shadow:0 0 20px #a855f7,0 0 40px #7c3aed;}
+.tier-ss .speed-comment{color:#e9d5ff}
+.tier-ss .rank-badge{background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;border:none;}
+.speed-card.tier-e{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac}
+.tier-e .speed-label,.tier-e .speed-value{color:#16a34a}
+.tier-e .speed-comment{color:#166534}
+.tier-e .rank-badge{background:#16a34a20;color:#16a34a}
+.speed-card.tier-f{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:1px solid #cbd5e1}
+.tier-f .speed-label,.tier-f .speed-value{color:#64748b}
+.tier-f .speed-comment{color:#475569}
+.tier-f .rank-badge{background:#64748b20;color:#64748b}
+#anim-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;}
+.res-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.res-cell{padding:12px 8px;background:var(--bg);border-radius:8px;text-align:center}
+.res-cell .rl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px}
+.res-cell .rv{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:600}
+.res-cell .rv.ok-c{color:var(--ok)}
+.res-cell .rv.ng-c{color:var(--ng)}
+.res-btns{display:flex;gap:8px}
+.res-btns .btn-primary{flex:2}.res-btns .btn-ghost{flex:1}
+.empty{text-align:center;padding:24px 0;font-size:0.83rem;color:var(--muted)}
+.back-link{display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;color:var(--sub);cursor:pointer;background:none;border:none;padding:0;transition:color 0.13s;}
+.back-link:hover{color:var(--text)}
+.reset-row{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.btn-reset{font-size:0.75rem;color:var(--ng);background:none;border:1px solid var(--ng);padding:5px 12px;border-radius:6px;cursor:pointer;transition:background 0.13s,color 0.13s;}
+.btn-reset:hover{background:var(--ng);color:#fff}
+.reset-label{font-size:0.73rem;color:var(--muted)}
+.csv-row{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.btn-csv{padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:0.8rem;color:var(--sub);cursor:pointer;transition:border-color 0.13s,color 0.13s;}
+.btn-csv:hover{border-color:var(--border2);color:var(--text)}
+/* title edit */
+.title-edit-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);}
+.title-edit-label{font-size:0.72rem;color:var(--muted);flex-shrink:0}
+.title-edit-input{flex:1;border:none;background:transparent;font-family:'Noto Sans JP',sans-serif;font-size:0.9rem;font-weight:600;color:var(--text);outline:none;}
+.title-edit-input::placeholder{color:var(--muted)}
+.title-save-btn{padding:4px 10px;background:var(--on);color:#fff;border:none;border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;flex-shrink:0;transition:opacity 0.13s;}
+.title-save-btn:hover{opacity:0.83}
+/* ── 音声設定 ── */
+.voice-row{display:flex;align-items:center;gap:12px;}
+.voice-info{flex:1}
+.voice-title{font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:2px}
+.voice-sub{font-size:0.74rem;color:var(--muted);line-height:1.5}
+.voice-rate-chip{flex:1;min-width:64px;padding:7px 0;font-size:0.8rem;}
+/* ── Firebase ログインバー ── */
+.login-bar{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  display:flex;align-items:center;gap:10px;
+  padding:7px 16px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  box-shadow:0 1px 6px rgba(0,0,0,0.06);
+  font-size:0.78rem;
+}
+.login-bar #user-info{
+  flex:1;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#login-btn{
+  padding:5px 14px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-family:'Noto Sans JP',sans-serif;
+  font-size:0.76rem;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:border-color 0.13s,background 0.13s;flex-shrink:0;
+}
+#login-btn:hover{border-color:var(--on);color:var(--on)}
+.sync-badge{
+  font-size:0.7rem;font-weight:600;padding:2px 9px;border-radius:12px;
+  white-space:nowrap;flex-shrink:0;transition:opacity 0.3s;
+}
+.sync-badge.ok      {background:var(--ok-bg);color:var(--ok)}
+.sync-badge.syncing {background:var(--gold-bg);color:var(--gold)}
+.sync-badge.off     {background:var(--bg);color:var(--muted)}
+.sync-badge.idle    {opacity:0}
+body{padding-top:48px}  /* ログインバーの高さ分ずらす */
+
+/* ── IME ヒント ── */
+.ime-hint{
+  display:none;padding:8px 12px;border-radius:8px;font-size:0.78rem;text-align:center;
+  background:var(--on-bg);color:var(--on);border:1px solid #e8c4b3;font-weight:500;
+  transition:background 0.2s,color 0.2s,border-color 0.2s,box-shadow 0.2s;
+}
+.ime-hint.show{display:block}
+.ime-hint.warn{
+  background:var(--ng-bg);color:var(--ng);border-color:var(--ng);
+  font-weight:700;animation:imeShake 0.5s ease;
+  box-shadow:0 0 0 3px rgba(192,53,53,0.15);
+}
+@keyframes imeShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* ── 進捗バーの冒険キャラ ── */
+.bar-track{position:relative;overflow:visible}
+#bar-hero{
+  position:absolute;top:50%;left:0%;transform:translate(-50%,-55%);
+  font-size:1.15rem;transition:left 0.35s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+  z-index:2;
+}
+#bar-hero.hop{animation:heroHop 0.35s ease}
+@keyframes heroHop{
+  0%{transform:translate(-50%,-55%) scale(1)}
+  40%{transform:translate(-50%,-110%) scale(1.18) rotate(-8deg)}
+  70%{transform:translate(-50%,-80%) scale(1.1) rotate(4deg)}
+  100%{transform:translate(-50%,-55%) scale(1)}
+}
+
+/* ── コンボバッジ ── */
+.combo-badge{
+  display:inline-block;margin-top:6px;font-family:'JetBrains Mono',monospace;
+  font-size:0.8rem;font-weight:700;color:var(--on);
+  opacity:0;transform:scale(0.7);transition:opacity 0.2s,transform 0.25s;
+  min-height:1.2em;
+}
+.combo-badge.show{opacity:1;transform:scale(1)}
+.combo-badge.fire{
+  color:#ff6b35;text-shadow:0 0 8px rgba(255,107,53,0.5);
+  animation:comboBeat 0.5s ease;
+}
+.combo-badge.inferno{
+  color:#fff;background:linear-gradient(90deg,#ff6b35,#ffd93d);
+  padding:3px 12px;border-radius:14px;font-size:0.88rem;
+  box-shadow:0 0 18px rgba(255,107,53,0.6);
+  animation:comboBeat 0.4s ease;
+}
+@keyframes comboBeat{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+/* コンボ中のゲーム画面の縁光 */
+#game-screen.combo-glow .card{
+  box-shadow:0 0 0 2px rgba(255,107,53,0.35),0 4px 20px rgba(255,107,53,0.2);
+  transition:box-shadow 0.3s;
+}
+#game-screen.combo-inferno .card{
+  box-shadow:0 0 0 3px rgba(255,107,53,0.55),0 0 30px rgba(255,180,50,0.35);
+  transition:box-shadow 0.3s;
+}
+
+/* ── マイルストン演出 ── */
+.milestone-flash{
+  position:fixed;inset:0;z-index:9998;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at center,rgba(255,215,0,0.25),rgba(255,215,0,0) 60%);
+  animation:milestoneFlash 1.1s ease-out forwards;
+}
+.milestone-flash .ms-text{
+  font-family:'JetBrains Mono',monospace;font-weight:800;font-size:2rem;
+  color:#fff;text-shadow:0 0 20px #ffd700,0 0 40px #ff6b35;
+  letter-spacing:0.12em;transform:scale(0.8);
+  animation:msTextPop 1.1s ease-out forwards;
+}
+@keyframes milestoneFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+@keyframes msTextPop{
+  0%{transform:scale(0.5);opacity:0}
+  30%{transform:scale(1.2);opacity:1}
+  70%{transform:scale(1);opacity:1}
+  100%{transform:scale(1.05);opacity:0}
+}
+
+/* ── ランクアップ／ベストバナー ── */
+.rankup-banner,.best-banner{
+  display:none;padding:14px 18px;border-radius:12px;font-weight:700;
+  text-align:center;font-size:0.95rem;animation:bannerIn 0.5s cubic-bezier(.34,1.56,.64,1);
+  position:relative;overflow:hidden;
+}
+.rankup-banner.show,.best-banner.show{display:block}
+.rankup-banner{
+  background:linear-gradient(90deg,#ffd700,#ffb347,#ff6b35);
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.25);
+  box-shadow:0 4px 18px rgba(255,140,60,0.4);
+}
+.rankup-banner::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);
+  animation:shimmer 2s infinite;
+}
+.best-banner{
+  background:linear-gradient(90deg,#6ec1e4,#5b8def);
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.2);
+  box-shadow:0 4px 14px rgba(91,141,239,0.35);
+}
+@keyframes bannerIn{0%{opacity:0;transform:translateY(-12px) scale(0.92)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* 速度差分表示 */
+.speed-delta{
+  font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:600;
+  margin-top:4px;min-height:1.1em;
+}
+.speed-delta.up{color:var(--ok)}
+.speed-delta.down{color:var(--sub)}
+.speed-delta.same{color:var(--muted)}
+
+/* 自己ベストカード */
+.best-row{display:flex;gap:10px}
+.best-item{flex:1;padding:10px 12px;background:var(--bg);border-radius:8px;text-align:center}
+.best-l{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px}
+.best-v{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:700;color:var(--text)}
+.best-u{font-family:'Noto Sans JP',sans-serif;font-size:0.72rem;margin-left:3px;color:var(--sub);font-weight:500}
+
+@media(max-width:480px){
+  .level-grid{grid-template-columns:1fr 1fr}
+  .round-chip{min-width:60px}
+  #word-disp{font-size:1.2rem}
+  #hint-disp{font-size:1rem}
+  #inp{font-size:1rem;padding:12px 14px}
+}
+</style>
+</head>
+<body>
+<div id="anim-canvas"></div>
+
+<!-- ログインバー -->
+<div class="login-bar">
+  <span id="sync-badge" class="sync-badge off">☁ オフライン</span>
+  <span id="user-info" style="display:none"></span>
+  <button id="login-btn">Googleでログイン</button>
+</div>
+
+<!-- HOME -->
+<div id="home-screen" class="screen active">
+  <div class="hrow">
+    <div>
+      <div class="page-title">英語タイピング練習</div>
+      <div class="page-sub">レベルを選んで練習しましょう</div>
+    </div>
+  </div>
+  <div style="position:relative">
+    <input type="text" id="level-search" placeholder="🔍 タイトルで検索…"
+      style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--r);
+             font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;color:var(--text);
+             background:var(--surface);outline:none;transition:border-color 0.13s;box-shadow:var(--sh);"
+      oninput="filterHomeGrid(this.value)">
+  </div>
+  <div id="home-grid-wrap" style="max-height:60vh;overflow-y:auto;border-radius:var(--r);">
+    <div class="level-grid" id="home-level-grid"></div>
+    <div id="home-no-result" style="display:none;text-align:center;padding:24px 0;font-size:0.83rem;color:var(--muted)">
+      該当するレベルが見つかりません
+    </div>
+  </div>
+  <div class="hint-box">
+    <b>使い方</b>　レベル 1〜100 それぞれに独立した単語リストを登録できます。<br>
+    レベルをクリック → 設定画面 → <kbd>Space</kbd> でタイピング開始。<br>
+    タイピング中は自動的に <b>英語入力（IMEオフ）</b> に切り替わります。
+  </div>
+</div>
+
+<!-- SETUP -->
+<div id="setup-screen" class="screen">
+  <div class="hrow">
+    <div>
+      <button class="back-link" id="back-to-home-btn">← レベル選択に戻る</button>
+      <div class="page-title" style="margin-top:6px">練習設定</div>
+    </div>
+    <span class="setup-badge" id="setup-badge"></span>
+  </div>
+  <div class="tabbar">
+    <button class="tab active" id="tab-practice" onclick="switchTab('practice')">🎯 練習設定</button>
+    <button class="tab" id="tab-manage" onclick="switchTab('manage')">✏️ 単語管理</button>
+  </div>
+  <div id="pane-practice" style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="sec-label">練習する単語（個別に ON / OFF）</div>
+      <div class="select-actions">
+        <button class="link-btn" id="all-on-btn">すべて ON</button>
+        <button class="link-btn" id="all-off-btn">すべて OFF</button>
+      </div>
+      <div class="word-scroll" id="word-list"></div>
+    </div>
+    <div class="card">
+      <div class="sec-label">出題数</div>
+      <div class="round-row">
+        <button class="round-chip" data-n="10">10問</button>
+        <button class="round-chip on" data-n="20">20問</button>
+        <button class="round-chip" data-n="30">30問</button>
+        <button class="round-chip" data-n="40">40問</button>
+        <button class="round-chip" data-n="50">50問</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-label">音声読み上げ</div>
+      <div class="voice-row">
+        <div class="voice-info">
+          <div class="voice-title">英語を読み上げる</div>
+          <div class="voice-sub">残り1文字のタイミングで発音を再生します</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="voice-toggle">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div id="voice-options" style="display:none;margin-top:12px;display:none;flex-direction:column;gap:10px;">
+        <div>
+          <div class="sec-label" style="margin-bottom:6px">声の種類</div>
+          <select id="voice-select" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;color:var(--text);background:var(--surface);outline:none;cursor:pointer;"></select>
+        </div>
+        <div>
+          <div class="sec-label" style="margin-bottom:6px">読み上げ速度</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="round-chip voice-rate-chip" data-rate="0.7">ゆっくり</button>
+            <button class="round-chip voice-rate-chip on" data-rate="1.0">普通</button>
+            <button class="round-chip voice-rate-chip" data-rate="1.3">速め</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" id="start-btn">練習を開始する</button>
+    <div class="space-start-hint"><kbd>Space</kbd> でも開始できます</div>
+  </div>
+  <div id="pane-manage" style="display:none;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="title-edit-row">
+        <span class="title-edit-label">タイトル</span>
+        <input type="text" class="title-edit-input" id="level-title-input" placeholder="レベルのタイトルを入力">
+        <button class="title-save-btn" id="level-title-save-btn">保存</button>
+      </div>
+      <div id="cumulative-banner" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(135deg,#f0f7ff,#e8f0fe);border:1px solid #b8d0f0;border-radius:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;color:#4a6fa5;text-transform:uppercase;margin-bottom:3px">累積出題数</div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span id="cumulative-count" style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:#2563eb;line-height:1;">0</span>
+            <span style="font-size:0.78rem;color:#4a6fa5;font-weight:500;">語</span>
+            <span id="cumulative-goal" style="font-size:0.75rem;color:#6b8fc4;margin-left:4px;"></span>
+          </div>
+          <div id="cumulative-bar-wrap" style="margin-top:6px;height:4px;background:#c7daf5;border-radius:2px;width:180px;overflow:hidden;">
+            <div id="cumulative-bar" style="height:100%;background:#2563eb;border-radius:2px;transition:width 0.4s ease;width:0%"></div>
+          </div>
+        </div>
+        <button id="count-reset-btn" style="padding:5px 12px;background:transparent;border:1px solid #b8d0f0;border-radius:6px;font-family:'Noto Sans JP',sans-serif;font-size:0.74rem;color:#6b8fc4;cursor:pointer;transition:all 0.13s;white-space:nowrap;" onmouseover="this.style.background='#dce8fc';this.style.borderColor='#7faad8'" onmouseout="this.style.background='transparent';this.style.borderColor='#b8d0f0'">🔄 カウントリセット</button>
+      </div>
+      <div class="sec-label">登録済み単語 <span id="word-count-label"></span></div>
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="bulk-info" id="bulk-info"></span>
+        <button class="btn-bulk-cancel" id="bulk-cancel-btn">選択解除</button>
+        <button class="btn-bulk-delete" id="bulk-delete-btn">削除</button>
+      </div>
+      <div class="manage-select-actions" id="manage-select-actions">
+        <button class="link-btn" id="manage-all-sel-btn">すべて選択</button>
+        <button class="link-btn" id="manage-all-desel-btn">すべて解除</button>
+      </div>
+      <div class="word-scroll" id="manage-list"></div>
+      <div class="empty" id="manage-empty" style="display:none">単語が登録されていません</div>
+      <div class="add-form">
+        <input type="text" id="add-ja" placeholder="日本語（例：りんご）">
+        <textarea id="add-en" placeholder="英語（例：apple）&#10;長文もOK（500文字まで）" rows="2"></textarea>
+        <button class="btn-add" id="add-btn">追加</button>
+      </div>
+      <div class="add-hint">
+        日本語の意味と、タイプする英語を入力してください。<br>
+        <b>大文字・小文字はそのまま保持</b>されます。英語は最大 <b>500文字</b> まで。
+      </div>
+      <div class="msg" id="add-msg"></div>
+      <div class="csv-row">
+        <div class="sec-label" style="margin-bottom:10px">CSV インポート / エクスポート</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-csv" id="csv-export-btn">📥 CSVエクスポート</button>
+          <button class="btn-csv" id="csv-import-btn">📤 CSVインポート</button>
+          <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none">
+        </div>
+        <div class="add-hint" style="margin-top:8px">
+          CSV形式：1行目はヘッダー <b>ja,en</b>　2行目以降が単語データ。<br>
+          インポートは既存リストに追加されます（重複する日本語はスキップ）。
+        </div>
+        <div class="msg" id="csv-msg"></div>
+      </div>
+      <div class="reset-row">
+        <span class="reset-label">このレベルの単語を全削除</span>
+        <button class="btn-reset" id="reset-btn">クリア</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game-screen" class="screen">
+  <div id="ime-hint" class="ime-hint">⌨️ <b>英語入力</b>モードで打ってください <span style="opacity:.7">（半角/全角キー）</span></div>
+  <div class="game-top">
+    <span class="game-lv-badge" id="game-badge"></span>
+    <span class="game-prog" id="game-prog">1 / 20</span>
+    <span class="esc-hint"><kbd>ESC</kbd> で中断</span>
+  </div>
+  <div class="bar-track">
+    <div id="bar-fill"></div>
+    <div id="bar-hero" aria-hidden="true">🏃</div>
+  </div>
+  <div class="card">
+    <div class="word-box">
+      <div id="word-disp">—</div>
+      <div id="hint-disp"></div>
+      <div id="combo-badge" class="combo-badge"></div>
+    </div>
+  </div>
+  <input id="inp" type="text" placeholder="ここに入力…"
+    autocomplete="off" autocorrect="off" autocapitalize="off"
+    spellcheck="false" inputmode="latin" lang="en">
+  <div class="chips">
+    <div class="chip"><span class="lbl">CLEAR</span><span class="v ok" id="c-clear">0</span></div>
+    <div class="chip"><span class="lbl">MISS</span><span class="v ng" id="c-miss">0</span></div>
+    <div class="chip"><span class="lbl">COMBO</span><span class="v" id="c-combo" style="color:var(--on)">0</span></div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div id="result-screen" class="screen">
+  <div id="rankup-banner" class="rankup-banner"></div>
+  <div id="best-banner" class="best-banner"></div>
+  <div class="card">
+    <div class="res-hero">
+      <div class="res-emoji" id="r-emoji">🎉</div>
+      <div class="res-title" id="r-title">完了！</div>
+      <div class="res-sub" id="r-sub"></div>
+    </div>
+  </div>
+  <div class="speed-card" id="speed-card">
+    <div class="rank-badge" id="r-rank">RANK S</div>
+    <div class="speed-label">タイピングスピード</div>
+    <div><span class="speed-value" id="r-speed">—</span><span class="speed-unit">打 / 秒</span></div>
+    <div id="r-delta" class="speed-delta"></div>
+    <div class="speed-comment" id="r-comment"></div>
+  </div>
+  <div class="card" id="best-card" style="display:none">
+    <div class="sec-label">自己ベスト</div>
+    <div class="best-row">
+      <div class="best-item">
+        <div class="best-l">このレベルの最速</div>
+        <div class="best-v"><span id="best-speed">—</span><span class="best-u">打/秒</span></div>
+      </div>
+      <div class="best-item">
+        <div class="best-l">ランク</div>
+        <div class="best-v"><span id="best-rank">—</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-label">詳細データ</div>
+    <div class="res-grid">
+      <div class="res-cell"><div class="rl">出題数</div><div class="rv" id="r-total">—</div></div>
+      <div class="res-cell"><div class="rl">総打鍵数</div><div class="rv" id="r-keys">—</div></div>
+      <div class="res-cell"><div class="rl">経過時間</div><div class="rv" id="r-time">—</div></div>
+      <div class="res-cell"><div class="rl">正確打鍵</div><div class="rv ok-c" id="r-correct">—</div></div>
+      <div class="res-cell"><div class="rl">ミス打鍵</div><div class="rv ng-c" id="r-miss">—</div></div>
+      <div class="res-cell"><div class="rl">正確率</div><div class="rv" id="r-acc">—</div></div>
+    </div>
+  </div>
+  <div class="res-btns">
+    <button class="btn-ghost" id="r-back">← 設定</button>
+    <button class="btn-primary" id="r-retry">もう一度</button>
+  </div>
+  <div class="space-start-hint"><kbd>Space</kbd> でもう一度　<kbd>ESC</kbd> で設定に戻る</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  DEFAULTS
+// ══════════════════════════════════════════════
+const NUM_LEVELS = 100;
+const DEFAULT_TITLES = Array.from({length:100},(_,i)=>'レベル '+(i+1));
+const DEFAULT_WORDS = (() => {
+  const arr = Array.from({length:100}, ()=>[]);
+  arr[0] = [{ja:"りんご",en:"apple"},{ja:"バナナ",en:"banana"},{ja:"オレンジ",en:"orange"},
+   {ja:"ぶどう",en:"grape"},{ja:"いちご",en:"strawberry"},{ja:"レモン",en:"lemon"},
+   {ja:"犬",en:"dog"},{ja:"猫",en:"cat"},{ja:"うさぎ",en:"rabbit"},
+   {ja:"おはよう",en:"good morning"},{ja:"ありがとう",en:"thank you"},
+   {ja:"さようなら",en:"goodbye"},{ja:"お願いします",en:"please"},
+   {ja:"簡単",en:"easy"},{ja:"難しい",en:"difficult"},{ja:"天気",en:"weather"},
+   {ja:"誕生日",en:"birthday"},{ja:"友達",en:"friend"},{ja:"家族",en:"family"},{ja:"学校",en:"school"}];
+  arr[1] = [{ja:"コンピューター",en:"computer"},{ja:"キーボード",en:"keyboard"},
+   {ja:"インターネット",en:"internet"},{ja:"データベース",en:"database"},
+   {ja:"アルゴリズム",en:"algorithm"},{ja:"チョコレート",en:"chocolate"},
+   {ja:"レストラン",en:"restaurant"},{ja:"図書館",en:"library"},
+   {ja:"大学",en:"university"},{ja:"素晴らしい",en:"wonderful"},
+   {ja:"美しい",en:"beautiful"},{ja:"面白い",en:"interesting"},
+   {ja:"想像力",en:"imagination"},{ja:"環境",en:"environment"},
+   {ja:"経験",en:"experience"},{ja:"情報",en:"information"},
+   {ja:"お元気ですか？",en:"How are you?"},{ja:"素敵な一日を",en:"Have a nice day."},
+   {ja:"頑張って",en:"Do your best!"},{ja:"夢は叶う",en:"Dreams come true."}];
+  arr[2] = [{ja:"プログラミング",en:"programming"},{ja:"テクノロジー",en:"technology"},
+   {ja:"コミュニケーション",en:"communication"},{ja:"フィロソフィー",en:"philosophy"},
+   {ja:"練習は完璧を作る",en:"Practice makes perfect."},
+   {ja:"時は金なり",en:"Time is money."},{ja:"知識は力なり",en:"Knowledge is power."},
+   {ja:"継続は力なり",en:"Persistence is power."},
+   {ja:"私はりんごが好きです",en:"I like apples."},
+   {ja:"私は学生です",en:"I am a student."},
+   {ja:"英語を勉強しています",en:"I am studying English."},
+   {ja:"それは素晴らしいアイデアです",en:"That is a wonderful idea."},
+   {ja:"一石二鳥",en:"Kill two birds with one stone."},
+   {ja:"信じられない",en:"unbelievable"},{ja:"冒険",en:"adventure"}];
+  return arr;
+})();
+
+// ══════════════════════════════════════════════
+//  HINT
+// ══════════════════════════════════════════════
+function generateHint(en) {
+  return en.split('').map(c => ({ char: c, visible: true }));
+}
+function renderHintHtml(data, typedLen) {
+  return data.map((h, i) => {
+    if (h.char === ' ') {
+      return i < typedLen ? '<span class="hint-space-typed"></span>' : '<span class="hint-space"></span>';
+    }
+    if (i < typedLen) return `<span class="hint-char hint-typed">${escHtml(h.char)}</span>`;
+    if (h.visible) return `<span class="hint-char">${escHtml(h.char)}</span>`;
+    return `<span class="hint-hidden">_</span>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════════
+const P = 'typing-en-v2-';
+const lvWordsKey   = lv => P+'words-lv'+lv;
+const lvEnabledKey = lv => P+'enabled-lv'+lv;
+const lvTitleKey   = lv => P+'title-lv'+lv;
+const settingsKey  = ()  => P+'settings';
+
+function loadLevelWords(lv) {
+  try { const r=localStorage.getItem(lvWordsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  // デフォルト値を返すだけ。保存はしない（クラウドへの誤上書き防止）
+  return (DEFAULT_WORDS[lv-1]||[]).map(w=>({...w}));
+}
+function saveLevelWords(lv,list){ localStorage.setItem(lvWordsKey(lv),JSON.stringify(list)); }
+
+function loadLevelEnabled(lv,count) {
+  try {
+    const r=localStorage.getItem(lvEnabledKey(lv));
+    if(r){ const arr=JSON.parse(r); const s=new Set(); arr.forEach(i=>{if(i>=0&&i<count)s.add(i);}); return s; }
+  } catch(e){}
+  return new Set(Array.from({length:count},(_,i)=>i));
+}
+function saveLevelEnabled(lv,set){ localStorage.setItem(lvEnabledKey(lv),JSON.stringify([...set])); }
+
+function loadLevelTitle(lv) {
+  try { const r=localStorage.getItem(lvTitleKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  return DEFAULT_TITLES[lv-1]||('レベル '+lv);
+}
+function saveLevelTitle(lv,t){ localStorage.setItem(lvTitleKey(lv),JSON.stringify(t)); }
+
+const lvCountsKey = lv => P+'counts-lv'+lv;
+function loadLevelCounts(lv) {
+  try { const r=localStorage.getItem(lvCountsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  return {};
+}
+function saveLevelCounts(lv,obj){ localStorage.setItem(lvCountsKey(lv),JSON.stringify(obj)); }
+// en文字列をキーに1カウント加算
+function incrementWordCount(lv, enKey) {
+  const counts = loadLevelCounts(lv);
+  counts[enKey] = (counts[enKey] || 0) + 1;
+  saveLevelCounts(lv, counts);
+}
+// レベル全体の累積出題数
+function getTotalCount(lv) {
+  const counts = loadLevelCounts(lv);
+  return Object.values(counts).reduce((s,v)=>s+v, 0);
+}
+// カウントリセット
+function resetLevelCounts(lv) {
+  localStorage.removeItem(lvCountsKey(lv));
+}
+
+// ── 自己ベスト（レベル毎） ──
+const lvBestKey = lv => P+'best-lv'+lv;
+function loadLevelBest(lv) {
+  try { const r=localStorage.getItem(lvBestKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  return null; // {speed, rank, tier, acc, date}
+}
+function saveLevelBest(lv, rec) { localStorage.setItem(lvBestKey(lv), JSON.stringify(rec)); }
+function loadLastScore(lv) {
+  try { const r=localStorage.getItem(P+'last-lv'+lv); if(r) return JSON.parse(r); } catch(e){}
+  return null;
+}
+function saveLastScore(lv, rec) { localStorage.setItem(P+'last-lv'+lv, JSON.stringify(rec)); }
+
+function loadSettings() { try { const r=localStorage.getItem(settingsKey()); if(r) return JSON.parse(r); } catch(e){} return {}; }
+function saveSettings(obj){ const c=loadSettings(); Object.assign(c,obj); localStorage.setItem(settingsKey(),JSON.stringify(c)); }
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
+let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
+let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
+let manageSelected=new Set();
+let comboCount=0, maxCombo=0, milestonesShown=new Set();
+
+// ══════════════════════════════════════════════
+//  CURSOR
+// ══════════════════════════════════════════════
+let cursorHideTimer=null;
+function hideCursor(){ document.body.classList.add('hide-cursor'); }
+function showCursor(){ document.body.classList.remove('hide-cursor'); }
+function onMouseMove(){
+  showCursor(); clearTimeout(cursorHideTimer);
+  if(gameActive) cursorHideTimer=setTimeout(hideCursor,2000);
+}
+function enableCursorHide(){ hideCursor(); document.addEventListener('mousemove',onMouseMove); }
+function disableCursorHide(){ showCursor(); clearTimeout(cursorHideTimer); document.removeEventListener('mousemove',onMouseMove); }
+
+// ══════════════════════════════════════════════
+//  IME CONTROL
+// ══════════════════════════════════════════════
+// ゲーム開始時に英語入力に強制、終了時に日本語入力へ復帰。
+// 日本語が混じった場合は視覚警告バッジを表示。
+let imeWarnTimer = null;
+function forceEnglishInput() {
+  inp.style.imeMode = 'disabled';
+  inp.setAttribute('inputmode','latin');
+  inp.setAttribute('lang','en');
+  inp.setAttribute('autocomplete','off');
+  inp.setAttribute('autocorrect','off');
+  inp.setAttribute('autocapitalize','none');
+  inp.setAttribute('spellcheck','false');
+  inp.addEventListener('compositionstart', abortComposition);
+  inp.addEventListener('compositionupdate', abortComposition);
+  // document全体にも英語ヒントを出してIMEに「今は英語」と示す
+  document.documentElement.lang = 'en';
+  // focusを剥がして再度当てるとIMEの変換モードがリセットされやすい
+  inp.blur();
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+  showImeHint();
+}
+function abortComposition(e) {
+  // 変換を中止：一瞬blurしてfocusしなおすとIMEが解除される
+  try { e && e.preventDefault && e.preventDefault(); } catch(_){}
+  const v = inp.value;
+  inp.blur();
+  showImeWarn();
+  setTimeout(()=>{
+    inp.focus();
+    // 合成途中の文字列が残っている可能性を消す
+    inp.value = v.replace(/[^\x20-\x7E]/g,'');
+  }, 10);
+}
+function restoreInput() {
+  inp.style.imeMode = '';
+  inp.removeEventListener('compositionstart', abortComposition);
+  inp.removeEventListener('compositionupdate', abortComposition);
+  document.documentElement.lang = 'ja';
+  inp.blur();
+  hideImeHint();
+}
+function showImeHint() {
+  const hint = $('ime-hint');
+  if (!hint) return;
+  hint.classList.remove('warn');
+  hint.classList.add('show');
+  hint.innerHTML = '⌨️ <b>英語入力</b>モードで打ってください <span style="opacity:.7">（半角/全角キー）</span>';
+}
+function showImeWarn() {
+  const hint = $('ime-hint');
+  if (!hint) return;
+  hint.classList.add('show','warn');
+  hint.innerHTML = '⚠️ <b>IMEをオフ</b>にしてください！ <span style="opacity:.85">半角/全角キーを押す</span>';
+  clearTimeout(imeWarnTimer);
+  imeWarnTimer = setTimeout(()=>{
+    hint.classList.remove('warn');
+    hint.innerHTML = '⌨️ <b>英語入力</b>モードで打ってください <span style="opacity:.7">（半角/全角キー）</span>';
+  }, 2500);
+}
+function hideImeHint() {
+  const hint = $('ime-hint');
+  if (!hint) return;
+  hint.classList.remove('show','warn');
+}
+
+// ══════════════════════════════════════════════
+//  DOM
+// ══════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const homeScr=$('home-screen'),setupScr=$('setup-screen'),gameScr=$('game-screen'),resScr=$('result-screen');
+const inp=$('inp');
+
+function showScreen(id) {
+  [homeScr,setupScr,gameScr,resScr].forEach(s=>s.classList.remove('active'));
+  $(id+'-screen').classList.add('active');
+  if(id!=='game') disableCursorHide();
+}
+function currentScreen() {
+  if(homeScr.classList.contains('active')) return 'home';
+  if(setupScr.classList.contains('active')) return 'setup';
+  if(gameScr.classList.contains('active')) return 'game';
+  if(resScr.classList.contains('active')) return 'result';
+  return '';
+}
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════════════
+function renderHomeScreen() {
+  const grid=$('home-level-grid');
+  grid.innerHTML='';
+  for(let lv=1;lv<=NUM_LEVELS;lv++) {
+    const title=loadLevelTitle(lv);
+    const wlist=loadLevelWords(lv);
+    const cycle=((lv-1)%5)+1;
+    const card=document.createElement('div');
+    card.className='level-card';
+    card.dataset.lv=lv;
+    card.dataset.cycle=cycle;
+    card.dataset.title=title.toLowerCase();
+    card.innerHTML=`
+      <div class="level-num" style="color:var(--lv${cycle})">${lv}</div>
+      <div class="level-title">${escHtml(title)}</div>
+      <div class="level-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</div>
+    `;
+    card.addEventListener('click',()=>enterLevel(lv));
+    grid.appendChild(card);
+  }
+}
+function filterHomeGrid(q) {
+  const kw=q.trim().toLowerCase();
+  let found=0;
+  document.querySelectorAll('#home-level-grid .level-card').forEach(card=>{
+    const match=!kw||card.dataset.title.includes(kw)||card.dataset.lv.includes(kw);
+    card.style.display=match?'':'none';
+    if(match) found++;
+  });
+  $('home-no-result').style.display=found===0?'block':'none';
+}
+function refreshHomeCard(lv) {
+  const card=document.querySelector(`.level-card[data-lv="${lv}"]`);
+  if(!card) return;
+  const title=loadLevelTitle(lv);
+  card.querySelector('.level-title').textContent=title;
+  card.dataset.title=title.toLowerCase();
+  const n=loadLevelWords(lv).length;
+  card.querySelector('.level-count').textContent=n>0?n+' 語':'単語なし';
+}
+
+// ══════════════════════════════════════════════
+//  ENTER LEVEL
+// ══════════════════════════════════════════════
+function enterLevel(lv) {
+  currentLevel=lv;
+  words=loadLevelWords(lv);
+  enabled=loadLevelEnabled(lv,words.length);
+  saveSettings({lastLevel:lv});
+  const title=loadLevelTitle(lv);
+  const cycle=((lv-1)%5)+1;
+  const badge=$('setup-badge');
+  badge.className=`setup-badge lv${cycle}`;
+  badge.textContent=`Lv.${lv}  ${title}`;
+  const gb=$('game-badge');
+  gb.className=`game-lv-badge lv${cycle}`;
+  gb.textContent=`Lv.${lv}  ${title}`;
+  switchTab('practice');
+  const settings=loadSettings();
+  const sr=settings.rounds||20;
+  document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
+  const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
+  if(rb){ rb.classList.add('on'); totalRounds=sr; }
+  else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
+  renderWordList(); updateStartBtn(); showScreen('setup');
+}
+
+function goHome() {
+  if(currentLevel) saveLevelEnabled(currentLevel,enabled);
+  renderHomeScreen(); showScreen('home');
+}
+$('back-to-home-btn').addEventListener('click',goHome);
+
+// ══════════════════════════════════════════════
+//  TAB
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  updateCumulativeBanner();
+  $('tab-practice').classList.toggle('active',tab==='practice');
+  $('tab-manage').classList.toggle('active',tab==='manage');
+  $('pane-practice').style.display=tab==='practice'?'flex':'none';
+  $('pane-manage').style.display=tab==='manage'?'flex':'none';
+  if(tab==='manage'){
+    manageSelected.clear();
+    $('level-title-input').value=loadLevelTitle(currentLevel);
+    renderManageList(); updateBulkBar();
+  }
+  clearAddMsg();
+}
+$('level-title-save-btn').addEventListener('click',()=>{
+  const v=$('level-title-input').value.trim();
+  if(!v) return;
+  saveLevelTitle(currentLevel,v);
+  const cycle=((currentLevel-1)%5)+1;
+  $('setup-badge').textContent=`Lv.${currentLevel}  ${v}`;
+  $('game-badge').textContent=`Lv.${currentLevel}  ${v}`;
+  refreshHomeCard(currentLevel);
+  showMsg('suc','タイトルを保存しました');
+});
+
+// ══════════════════════════════════════════════
+//  PRACTICE LIST
+// ══════════════════════════════════════════════
+function renderWordList() {
+  const list=$('word-list'); list.innerHTML='';
+  if(words.length===0){
+    list.innerHTML='<div class="empty">単語がありません。「単語管理」タブから追加またはCSVインポートしてください。</div>';
+    return;
+  }
+  words.forEach((w,i)=>{
+    const uid='tw'+i;
+    const row=document.createElement('div');
+    row.className='word-row';
+    row.innerHTML=`
+      <label class="toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="${uid}" ${enabled.has(i)?'checked':''}>
+        <div class="toggle-track"></div><div class="toggle-thumb"></div>
+      </label>
+      <span class="word-ja">${escHtml(w.ja)}</span>
+      <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
+    `;
+    row.addEventListener('click',()=>{
+      const cb=$(uid); cb.checked=!cb.checked;
+      if(cb.checked) enabled.add(i); else enabled.delete(i);
+      saveLevelEnabled(currentLevel,enabled); updateStartBtn();
+    });
+    row.querySelector('input').addEventListener('change',e=>{
+      if(e.target.checked) enabled.add(i); else enabled.delete(i);
+      saveLevelEnabled(currentLevel,enabled); updateStartBtn(); e.stopPropagation();
+    });
+    list.appendChild(row);
+  });
+}
+function updateStartBtn(){ $('start-btn').disabled=enabled.size===0; }
+$('all-on-btn').addEventListener('click',()=>{ words.forEach((_,i)=>enabled.add(i)); saveLevelEnabled(currentLevel,enabled); renderWordList(); updateStartBtn(); });
+$('all-off-btn').addEventListener('click',()=>{ enabled.clear(); saveLevelEnabled(currentLevel,enabled); renderWordList(); updateStartBtn(); });
+
+// ══════════════════════════════════════════════
+//  MANAGE LIST
+// ══════════════════════════════════════════════
+// ── 累積出題カウント バナー更新 ──
+const GOAL = 10000;
+function updateCumulativeBanner() {
+  if (!currentLevel) return;
+  const total = getTotalCount(currentLevel);
+  const el = $('cumulative-count');
+  const bar = $('cumulative-bar');
+  const goal = $('cumulative-goal');
+  if (!el) return;
+  el.textContent = total.toLocaleString();
+  const pct = Math.min(total / GOAL * 100, 100);
+  bar.style.width = pct + '%';
+  const remaining = GOAL - total;
+  goal.textContent = remaining > 0 ? `目標 ${GOAL.toLocaleString()} まであと ${remaining.toLocaleString()}` : '🎉 目標達成！';
+}
+
+function renderManageList() {
+  const list=$('manage-list'), empty=$('manage-empty');
+  list.innerHTML='';
+  $('word-count-label').textContent=`（${words.length}件）`;
+  const lvCounts = currentLevel ? loadLevelCounts(currentLevel) : {};
+  updateCumulativeBanner();
+  if(words.length===0){ empty.style.display='block'; $('manage-select-actions').style.display='none'; return; }
+  empty.style.display='none'; $('manage-select-actions').style.display='flex';
+  words.forEach((w,i)=>{
+    const row=document.createElement('div');
+    row.className='manage-row'; row.draggable=true; row.dataset.idx=i;
+    row.innerHTML=`
+      <span class="drag-handle" title="ドラッグして並べ替え">
+        <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.5"/><circle cx="11" cy="3" r="1.5"/><circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/><circle cx="5" cy="13" r="1.5"/><circle cx="11" cy="13" r="1.5"/></svg>
+      </span>
+      <input type="checkbox" class="manage-cb" data-i="${i}" ${manageSelected.has(i)?'checked':''}>
+      <span class="word-ja">${escHtml(w.ja)}</span>
+      <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
+      <span class="count-badge" title="累積出題回数" data-zero="${(lvCounts[w.en]||0)===0?1:0}">${(lvCounts[w.en]||0).toLocaleString()}</span>
+      <button class="del-btn" title="削除" data-i="${i}">✕</button>
+    `;
+    row.querySelector('.manage-cb').addEventListener('change',e=>{
+      const idx=parseInt(e.target.dataset.i);
+      if(e.target.checked) manageSelected.add(idx); else manageSelected.delete(idx);
+      updateBulkBar();
+    });
+    row.querySelector('.del-btn').addEventListener('click',()=>deleteWord(i));
+    row.addEventListener('dragstart',onDragStart); row.addEventListener('dragend',onDragEnd);
+    row.addEventListener('dragover',onDragOver); row.addEventListener('dragenter',onDragEnter);
+    row.addEventListener('dragleave',onDragLeave); row.addEventListener('drop',onDrop);
+    row.addEventListener('touchstart',onTouchStart,{passive:false});
+    row.addEventListener('touchmove',onTouchMove,{passive:false});
+    row.addEventListener('touchend',onTouchEnd);
+    list.appendChild(row);
+  });
+}
+
+// ══════════════════════════════════════════════
+//  DRAG & DROP
+// ══════════════════════════════════════════════
+let dragSrcIdx=null;
+function reorderWord(from,to) {
+  if(from===to) return;
+  const m=words.splice(from,1)[0]; words.splice(to,0,m);
+  const oe=[...enabled], ne=new Set();
+  oe.forEach(old=>{
+    let n=old;
+    if(old===from) n=to;
+    else { if(old>from) n--; if(n>=to) n++; }
+    ne.add(n);
+  });
+  enabled=ne;
+  saveLevelWords(currentLevel,words); saveLevelEnabled(currentLevel,enabled);
+  manageSelected.clear(); renderManageList(); renderWordList(); updateBulkBar();
+}
+function onDragStart(e){ dragSrcIdx=parseInt(e.currentTarget.dataset.idx); e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',dragSrcIdx); }
+function onDragEnd(){ dragSrcIdx=null; document.querySelectorAll('.manage-row').forEach(r=>r.classList.remove('dragging','drag-over-top','drag-over-bottom')); }
+function onDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; const row=e.currentTarget, rect=row.getBoundingClientRect(); row.classList.remove('drag-over-top','drag-over-bottom'); if(e.clientY<rect.top+rect.height/2) row.classList.add('drag-over-top'); else row.classList.add('drag-over-bottom'); }
+function onDragEnter(e){ e.preventDefault(); }
+function onDragLeave(e){ const row=e.currentTarget; if(!row.contains(e.relatedTarget)) row.classList.remove('drag-over-top','drag-over-bottom'); }
+function onDrop(e){ e.preventDefault(); const row=e.currentTarget, dropIdx=parseInt(row.dataset.idx); if(dragSrcIdx===null||dragSrcIdx===dropIdx){row.classList.remove('drag-over-top','drag-over-bottom');return;} const rect=row.getBoundingClientRect(); let ti=e.clientY<rect.top+rect.height/2?dropIdx:dropIdx+1; if(dragSrcIdx<ti) ti--; if(dragSrcIdx!==ti) reorderWord(dragSrcIdx,ti); dragSrcIdx=null; }
+let touchSrcIdx=null,touchClone=null;
+function onTouchStart(e){ const h=e.target.closest('.drag-handle'); if(!h) return; const row=e.target.closest('.manage-row'); if(!row) return; touchSrcIdx=parseInt(row.dataset.idx); touchClone=row.cloneNode(true); touchClone.style.cssText=`position:fixed;left:${row.getBoundingClientRect().left}px;width:${row.offsetWidth}px;top:${e.touches[0].clientY-row.offsetHeight/2}px;opacity:0.85;z-index:9999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.15);border-radius:7px;background:var(--surface);`; document.body.appendChild(touchClone); row.classList.add('dragging'); e.preventDefault(); }
+function onTouchMove(e){ if(touchSrcIdx===null||!touchClone) return; const y=e.touches[0].clientY; touchClone.style.top=(y-20)+'px'; document.querySelectorAll('.manage-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom')); const el=document.elementFromPoint(e.touches[0].clientX,y), row=el?el.closest('.manage-row'):null; if(row&&parseInt(row.dataset.idx)!==touchSrcIdx){const rect=row.getBoundingClientRect();if(y<rect.top+rect.height/2)row.classList.add('drag-over-top');else row.classList.add('drag-over-bottom');}e.preventDefault(); }
+function onTouchEnd(e){ if(touchSrcIdx===null) return; const y=e.changedTouches[0].clientY; const el=document.elementFromPoint(e.changedTouches[0].clientX,y), row=el?el.closest('.manage-row'):null; if(row){const di=parseInt(row.dataset.idx);if(di!==touchSrcIdx){const rect=row.getBoundingClientRect();let ti=y<rect.top+rect.height/2?di:di+1;if(touchSrcIdx<ti)ti--;if(touchSrcIdx!==ti)reorderWord(touchSrcIdx,ti);}} if(touchClone&&touchClone.parentNode) touchClone.parentNode.removeChild(touchClone); touchClone=null; touchSrcIdx=null; document.querySelectorAll('.manage-row').forEach(r=>r.classList.remove('dragging','drag-over-top','drag-over-bottom')); }
+
+// ══════════════════════════════════════════════
+//  BULK DELETE
+// ══════════════════════════════════════════════
+function updateBulkBar(){ const bar=$('bulk-bar'),count=manageSelected.size; if(count>0){bar.classList.add('show');$('bulk-info').textContent=`${count} 件選択中`;}else bar.classList.remove('show'); }
+$('manage-all-sel-btn').addEventListener('click',()=>{ words.forEach((_,i)=>manageSelected.add(i)); renderManageList(); updateBulkBar(); });
+$('manage-all-desel-btn').addEventListener('click',()=>{ manageSelected.clear(); renderManageList(); updateBulkBar(); });
+$('bulk-cancel-btn').addEventListener('click',()=>{ manageSelected.clear(); renderManageList(); updateBulkBar(); });
+$('bulk-delete-btn').addEventListener('click',()=>{
+  const count=manageSelected.size; if(count===0) return;
+  const names=[...manageSelected].sort((a,b)=>a-b).slice(0,5).map(i=>`「${words[i].ja}」`).join('、');
+  const suffix=count>5?`…他 ${count-5} 件`:'';
+  if(!confirm(`${count} 件の単語を削除しますか？\n\n${names}${suffix}`)) return;
+  const sorted=[...manageSelected].sort((a,b)=>b-a), oe=[...enabled];
+  sorted.forEach(idx=>words.splice(idx,1));
+  const ds=new Set(sorted), ne=new Set();
+  oe.forEach(old=>{ if(ds.has(old)) return; let sh=0; for(const d of sorted){if(d<old)sh++;} ne.add(old-sh); });
+  enabled=ne;
+  saveLevelWords(currentLevel,words); saveLevelEnabled(currentLevel,enabled);
+  manageSelected.clear(); renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel); updateBulkBar();
+  showMsg('suc',`${count} 件の単語を削除しました`);
+});
+function deleteWord(i){
+  const w=words[i]; if(!confirm(`「${w.ja}」を削除しますか？`)) return;
+  words.splice(i,1); saveLevelWords(currentLevel,words);
+  const oe=[...enabled]; enabled=new Set(); oe.forEach(idx=>{ if(idx<i)enabled.add(idx); else if(idx>i)enabled.add(idx-1); });
+  saveLevelEnabled(currentLevel,enabled); manageSelected.clear();
+  renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel); updateBulkBar();
+  showMsg('suc',`「${w.ja}」を削除しました`);
+}
+
+// ══════════════════════════════════════════════
+//  ADD WORD
+// ══════════════════════════════════════════════
+function normalizeEn(s){ return s.replace(/[\u2018\u2019\u2032\u00B4`]/g,"'").replace(/[\u201C\u201D\u2033]/g,'"').replace(/\u2014/g,'-').replace(/\u2013/g,'-'); }
+function addWord(){
+  const ja=$('add-ja').value.trim();
+  let en=normalizeEn($('add-en').value.replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim());
+  clearAddMsg();
+  if(!ja){showMsg('err','日本語を入力してください');return;}
+  if(!en){showMsg('err','英語を入力してください');return;}
+  if(en.length>500){showMsg('err',`英語は500文字以内にしてください（現在 ${en.length} 文字）`);return;}
+  if(!/^[a-zA-Z0-9 '\-!?.,;:/"()]+$/.test(en)){showMsg('err','英語は半角英数字・スペース・基本記号のみ使えます');return;}
+  if(words.some(w=>w.ja===ja)){showMsg('err','同じ日本語がすでに登録されています');return;}
+  words.push({ja,en}); saveLevelWords(currentLevel,words);
+  enabled.add(words.length-1); saveLevelEnabled(currentLevel,enabled);
+  $('add-ja').value=''; $('add-en').value='';
+  renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel);
+  showMsg('suc',`「${ja}」を追加しました（${en.length}文字）`);
+}
+function showMsg(type,text){ const el=$('add-msg'); el.textContent=text; el.className='msg '+type; clearTimeout(el._timer); el._timer=setTimeout(()=>{el.className='msg';el.textContent='';},3000); }
+function clearAddMsg(){ const el=$('add-msg'); el.className='msg'; el.textContent=''; }
+$('add-btn').addEventListener('click',addWord);
+$('add-en').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();addWord();}});
+$('add-ja').addEventListener('keydown',e=>{if(e.key==='Enter')$('add-en').focus();});
+$('count-reset-btn').addEventListener('click',()=>{
+  if(!currentLevel) return;
+  if(!confirm('このレベルの累積出題カウントをリセットしますか？\nタイピング記録がすべて0になります。')) return;
+  resetLevelCounts(currentLevel);
+  updateCumulativeBanner();
+  renderManageList();
+});
+$('reset-btn').addEventListener('click',()=>{
+  if(!confirm('このレベルの単語をすべて削除しますか？')) return;
+  words=[]; saveLevelWords(currentLevel,words); enabled=new Set(); saveLevelEnabled(currentLevel,enabled);
+  manageSelected.clear(); renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel); updateBulkBar();
+  showMsg('suc','単語リストをクリアしました');
+});
+
+// ══════════════════════════════════════════════
+//  CSV
+// ══════════════════════════════════════════════
+function csvEscape(s){ if(/[,"\r\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }
+function showCsvMsg(type,text){ const el=$('csv-msg'); el.textContent=text; el.className='msg '+type; clearTimeout(el._timer); el._timer=setTimeout(()=>{el.className='msg';el.textContent='';},5000); }
+$('csv-export-btn').addEventListener('click',()=>{
+  if(words.length===0){showCsvMsg('err','エクスポートする単語がありません');return;}
+  const lines=['ja,en']; words.forEach(w=>lines.push(csvEscape(w.ja)+','+csvEscape(w.en)));
+  const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  const t=loadLevelTitle(currentLevel).replace(/\s+/g,'_');
+  a.href=url; a.download=`typing_lv${currentLevel}_${t}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showCsvMsg('suc',`${words.length} 件の単語をエクスポートしました`);
+});
+$('csv-import-btn').addEventListener('click',()=>$('csv-file-input').click());
+$('csv-file-input').addEventListener('change',e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try {
+      const imported=parseCSV(ev.target.result);
+      if(imported.length===0){showCsvMsg('err','有効な単語データが見つかりませんでした');return;}
+      let added=0,skipped=0;
+      const ej=new Set(words.map(w=>w.ja));
+      imported.forEach(row=>{ if(ej.has(row.ja)){skipped++;return;} words.push({ja:row.ja,en:row.en}); enabled.add(words.length-1); ej.add(row.ja); added++; });
+      saveLevelWords(currentLevel,words); saveLevelEnabled(currentLevel,enabled);
+      renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel);
+      showCsvMsg('suc',`${added} 件インポートしました`+(skipped>0?`（重複 ${skipped} 件スキップ）`:''));
+    } catch(err){ showCsvMsg('err','CSVの読み込みに失敗しました: '+err.message); }
+  };
+  reader.readAsText(file,'UTF-8'); e.target.value='';
+});
+function parseCSV(text){
+  const results=[], lines=text.split(/\r?\n/); let start=0;
+  if(lines.length>0){const fl=lines[0].trim().toLowerCase();if(fl==='ja,en'||fl==='"ja","en"'||fl.startsWith('ja,')||fl.startsWith('"ja"'))start=1;}
+  for(let i=start;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line) continue;
+    const fields=parseCSVLine(line); if(fields.length<2) continue;
+    const ja=fields[0].trim(), en=normalizeEn(fields[1].replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim());
+    if(!ja||!en||en.length>500) continue;
+    if(!/^[a-zA-Z0-9 '\-!?.,;:/"()]+$/.test(en)) continue;
+    results.push({ja,en});
+  }
+  return results;
+}
+function parseCSVLine(line){
+  const fields=[]; let i=0;
+  while(i<line.length){
+    if(line[i]==='"'){
+      let val=''; i++;
+      while(i<line.length){if(line[i]==='"'){if(i+1<line.length&&line[i+1]==='"'){val+='"';i+=2;}else{i++;break;}}else{val+=line[i];i++;}}
+      fields.push(val); if(i<line.length&&line[i]===',')i++;
+    } else {
+      const ci=line.indexOf(',',i);
+      if(ci===-1){fields.push(line.substring(i));break;}else{fields.push(line.substring(i,ci));i=ci+1;}
+    }
+  }
+  return fields;
+}
+
+// ══════════════════════════════════════════════
+//  ROUNDS
+// ══════════════════════════════════════════════
+document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveSettings({rounds:totalRounds});
+  });
+});
+
+// ══════════════════════════════════════════════
+//  GAME
+// ══════════════════════════════════════════════
+function buildQueue(){
+  const pool=[...enabled].map(i=>words[i]), q=[];
+  let sh=[...pool].sort(()=>Math.random()-0.5);
+  while(q.length<totalRounds){if(!sh.length)sh=[...pool].sort(()=>Math.random()-0.5);q.push(sh.pop());}
+  return q;
+}
+function startGame(){
+  queue=buildQueue(); curIdx=0; misses=0; clears=0;
+  totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
+  comboCount=0; maxCombo=0; milestonesShown=new Set();
+  $('c-clear').textContent=0; $('c-miss').textContent=0; $('c-combo').textContent=0;
+  updateComboBadge(); gameScr.classList.remove('combo-glow','combo-inferno');
+  showScreen('game'); enableCursorHide(); showWord(0); t0=Date.now();
+  setTimeout(()=>forceEnglishInput(), 80);
+}
+$('start-btn').addEventListener('click',startGame);
+
+function showWord(idx){
+  const w=queue[idx], isLong=w.en.length>40;
+  $('word-disp').textContent=w.ja;
+  $('word-disp').classList.toggle('long-text',isLong);
+  currentHintData=generateHint(w.en);
+  const hintEl=$('hint-disp');
+  hintEl.innerHTML=renderHintHtml(currentHintData,0);
+  hintEl.classList.toggle('long-text',isLong);
+  inp.value=''; inp.className='';
+  $('game-prog').textContent=`${idx+1} / ${totalRounds}`;
+  const pct=idx/totalRounds*100;
+  $('bar-fill').style.width=pct+'%';
+  const hero=$('bar-hero');
+  if(hero){
+    hero.style.left=pct+'%';
+    hero.classList.remove('hop'); void hero.offsetWidth; hero.classList.add('hop');
+  }
+}
+
+function updateComboBadge(){
+  const el=$('combo-badge');
+  if(!el) return;
+  if(comboCount<3){ el.classList.remove('show','fire','inferno'); el.textContent=''; return; }
+  el.classList.add('show');
+  if(comboCount>=15){
+    el.classList.remove('fire'); el.classList.add('inferno');
+    el.textContent=`🔥 INFERNO ×${comboCount}`;
+  } else if(comboCount>=8){
+    el.classList.remove('inferno'); el.classList.add('fire');
+    el.textContent=`🔥 COMBO ×${comboCount}`;
+  } else {
+    el.classList.remove('fire','inferno');
+    el.textContent=`COMBO ×${comboCount}`;
+  }
+  gameScr.classList.toggle('combo-glow', comboCount>=8 && comboCount<15);
+  gameScr.classList.toggle('combo-inferno', comboCount>=15);
+}
+
+function showMilestone(text, sub){
+  const el=document.createElement('div');
+  el.className='milestone-flash';
+  el.innerHTML=`<div class="ms-text">${text}${sub?`<div style="font-size:0.7rem;font-weight:600;margin-top:8px;letter-spacing:0.06em">${sub}</div>`:''}</div>`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1200);
+}
+
+inp.addEventListener('input',()=>{
+  if(!queue.length||!gameActive) return;
+  const target=queue[curIdx].en, typed=normalizeEn(inp.value);
+  totalKeystrokes++; inp.value=typed;
+  if(target.startsWith(typed)){
+    correctKeystrokes++; inp.classList.remove('ng');
+    inp.classList.toggle('ok',typed.length>0);
+    $('hint-disp').innerHTML=renderHintHtml(currentHintData,typed.length);
+    // 残り1文字になったら先読み音声（1問1回のみ）
+    if(typed.length===target.length-1&&target.length>1&&!voiceSpeaking){
+      speakEnglish(target);
+    }
+    if(typed===target){
+      incrementWordCount(currentLevel, target);
+      clears++; $('c-clear').textContent=clears;
+      comboCount++; maxCombo=Math.max(maxCombo,comboCount);
+      $('c-combo').textContent=comboCount;
+      updateComboBadge();
+      // コンボマイルストン
+      if((comboCount===8||comboCount===15||comboCount===25) && !milestonesShown.has('combo'+comboCount)){
+        milestonesShown.add('combo'+comboCount);
+        const msg = comboCount>=25?'LEGENDARY CHAIN!':comboCount>=15?'INFERNO CHAIN!':'FIRE CHAIN!';
+        showMilestone(msg, `${comboCount} 連続正解`);
+      }
+      curIdx++;
+      if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
+      else showWord(curIdx);
+    }
+  } else {
+    misses++; $('c-miss').textContent=misses;
+    inp.classList.remove('ok'); inp.classList.add('ng');
+    inp.value=typed.slice(0,-1);
+    // コンボ途切れ
+    if(comboCount>=5){
+      // 5以上で途切れたら軽く揺らす演出（badge消える）
+    }
+    comboCount=0; $('c-combo').textContent=0; updateComboBadge();
+  }
+});
+
+// ══════════════════════════════════════════════
+//  RESULT
+// ══════════════════════════════════════════════
+function getSpeedTier(speed){
+  const s = Math.round(speed * 10) / 10;
+
+  // ── TIER SS: 8.0+ ─────  伝説・神話の章 ────
+  if(s>=9.0) return{tier:'ss',rank:'RANK SS+',emoji:'🌠',title:'次元の裂け目',
+    comment:`${s.toFixed(1)}打/秒――それは、世界が覚えきれない速さ。\n時は止まり、キーは音を失い、あなただけが進んでいる。\nもはや記録の外、ここは新しい地平です。`,anim:'legendary'};
+  if(s>=8.5) return{tier:'ss',rank:'RANK SS',emoji:'🌌',title:'銀河のタイピスト',
+    comment:`${s.toFixed(1)}打/秒――星々があなたの指先に並ぶ。\nこの速度に到達した者はほんの一握り。\nあなたは、夜空に名を刻むに値する存在です。`,anim:'legendary'};
+  if(s>=8.0) return{tier:'ss',rank:'RANK SS',emoji:'🌌',title:'LEGENDARY',
+    comment:`${s.toFixed(1)}打/秒――伝説が始まる音がした。\n鍛え抜いた指先だけが触れられる領域です。\nあなたの名はタイピング史に刻まれました。`,anim:'legendary'};
+
+  // ── TIER S: 7.0～7.9 ──  神速の領域 ────
+  if(s>=7.9) return{tier:'s',rank:'RANK S',emoji:'👑',title:'神の指先',
+    comment:`${s.toFixed(1)}打/秒。この速さで、この正確さ。\nあなたはもう、タイピングの神殿に住んでいる。`,anim:'godlike'};
+  if(s>=7.8) return{tier:'s',rank:'RANK S',emoji:'👑',title:'超神速',
+    comment:`${s.toFixed(1)}打/秒。キーボードが祈りを捧げている。\n人類がまだ見ぬ速度に、今あなたは立っている。`,anim:'godlike'};
+  if(s>=7.7) return{tier:'s',rank:'RANK S',emoji:'👑',title:'爆速の極み',
+    comment:`${s.toFixed(1)}打/秒。誰も追いつけない背中。\nその速さは、あなたが歩いた年月の結晶です。`,anim:'godlike'};
+  if(s>=7.6) return{tier:'s',rank:'RANK S',emoji:'👑',title:'無双',
+    comment:`${s.toFixed(1)}打/秒。キーはあなたの意思を先読みする。\nもう、言葉があなたを追いかけている。`,anim:'godlike'};
+  if(s>=7.5) return{tier:'s',rank:'RANK S',emoji:'👑',title:'MAX SPEED',
+    comment:`${s.toFixed(1)}打/秒。目に映らない、しかし確かに打たれている。\n人類最速の部類――あなたは本物です。`,anim:'godlike'};
+  if(s>=7.4) return{tier:'s',rank:'RANK S',emoji:'👑',title:'光を超える指',
+    comment:`${s.toFixed(1)}打/秒。あなたの指はもはや光そのもの。\nこの速さは、一生あなたの誇りになります。`,anim:'godlike'};
+  if(s>=7.3) return{tier:'s',rank:'RANK S',emoji:'👑',title:'鬼神の速度',
+    comment:`${s.toFixed(1)}打/秒。あなたの前に「不可能」は立てない。\n鬼神の如き速さ――畏敬の念しかありません。`,anim:'godlike'};
+  if(s>=7.2) return{tier:'s',rank:'RANK S',emoji:'👑',title:'INSANE',
+    comment:`${s.toFixed(1)}打/秒。才能という言葉の定義が変わる。\nあなたを知るすべてのキーが静かに敬礼しています。`,anim:'godlike'};
+  if(s>=7.1) return{tier:'s',rank:'RANK S',emoji:'👑',title:'天の采配',
+    comment:`${s.toFixed(1)}打/秒。天が授けた速さが、努力と重なる瞬間。\nキーボードは、あなたのために生まれてきた。`,anim:'godlike'};
+  if(s>=7.0) return{tier:'s',rank:'RANK S',emoji:'👑',title:'神速到達',
+    comment:`${s.toFixed(1)}打/秒。ついに神速の扉をくぐりました。\nここから先は、あなた自身が伝説になっていく旅です。`,anim:'godlike'};
+
+  // ── TIER A: 6.0～6.9 ──  英雄の章 ────
+  if(s>=6.9) return{tier:'a',rank:'RANK A',emoji:'⚡',title:'神の扉、目前',
+    comment:`${s.toFixed(1)}打/秒。RANK Sまで、あと0.1。\nあなたの指は、すでに神の扉をノックしている。`,anim:'fireworks'};
+  if(s>=6.8) return{tier:'a',rank:'RANK A',emoji:'⚡',title:'音速の英雄',
+    comment:`${s.toFixed(1)}打/秒。プロの背中を追い抜いた音がした。\nその速度はもう、称号に値します。`,anim:'fireworks'};
+  if(s>=6.7) return{tier:'a',rank:'RANK A',emoji:'⚡',title:'High Speed',
+    comment:`${s.toFixed(1)}打/秒。疾風のごときキータッチ。\n次の章は――神速。もうすぐ見えてきます。`,anim:'fireworks'};
+  if(s>=6.6) return{tier:'a',rank:'RANK A',emoji:'✨',title:'冒険者の極み',
+    comment:`${s.toFixed(1)}打/秒。実力者の仲間入り、確定です。\nSランクの頂上は、もう霞の向こうに見えている。`,anim:'fireworks'};
+  if(s>=6.5) return{tier:'a',rank:'RANK A',emoji:'✨',title:'研ぎ澄まされた刃',
+    comment:`${s.toFixed(1)}打/秒。一打一打にブレがない。\nその指のキレは、もう才能と呼んでいい領域です。`,anim:'fireworks'};
+  if(s>=6.4) return{tier:'a',rank:'RANK A',emoji:'✨',title:'驚異の速度',
+    comment:`${s.toFixed(1)}打/秒。本当に、本当に速い。\nスペルも完璧にこの速さ――驚異的な達成です。`,anim:'fireworks'};
+  if(s>=6.3) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Amazing',
+    comment:`${s.toFixed(1)}打/秒。上位層の風がもう頬に当たっている。\nこのペースならSランクは射程圏内です。`,anim:'fireworks'};
+  if(s>=6.2) return{tier:'a',rank:'RANK A',emoji:'✨',title:'本物の腕',
+    comment:`${s.toFixed(1)}打/秒。すごい、は飾りじゃない。\nあなたのタイピングは、誰が見ても本物です。`,anim:'fireworks'};
+  if(s>=6.1) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Fantastic',
+    comment:`${s.toFixed(1)}打/秒。上の景色が見えるところまで来ました。\nここからの一歩一歩が、伝説の助走になります。`,anim:'fireworks'};
+  if(s>=6.0) return{tier:'a',rank:'RANK A',emoji:'✨',title:'Excellent',
+    comment:`${s.toFixed(1)}打/秒。安定した高速タイピング、見事。\nRANK S の壁も、あなたならきっと超えられる。`,anim:'fireworks'};
+
+  // ── TIER B: 5.0～5.9 ──  鍛錬の章 ────
+  if(s>=5.9) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Aの扉、目前',
+    comment:`${s.toFixed(1)}打/秒。Aランクまで、あと0.1。\nその努力は、もう次の章の入口に立っています。`,anim:'flames'};
+  if(s>=5.8) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'炎の勢い',
+    comment:`${s.toFixed(1)}打/秒。指先に炎が宿っている。\nAランクの風景が、もう視界の端に映っています。`,anim:'flames'};
+  if(s>=5.7) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Speed',
+    comment:`${s.toFixed(1)}打/秒。実用を軽々と超えたキータッチ。\nリズムが体になじんできましたね。`,anim:'flames'};
+  if(s>=5.6) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'まだ伸びる',
+    comment:`${s.toFixed(1)}打/秒。速さと正確さが両方光っている。\nまだ伸びる――そのポテンシャルがはっきり見えます。`,anim:'flames'};
+  if(s>=5.5) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'折り返しの頂',
+    comment:`${s.toFixed(1)}打/秒。道のりの半分、そのてっぺんに立っています。\nここからの一歩ずつが、あなたを鍛えていく。`,anim:'flames'};
+  if(s>=5.4) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'鍛錬の実り',
+    comment:`${s.toFixed(1)}打/秒。練習の積み重ねが音になって現れています。\nさらに研ぐほど、Aランクが近づいてきます。`,anim:'flames'};
+  if(s>=5.3) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Good Typing',
+    comment:`${s.toFixed(1)}打/秒。反射の速さが武器になってきた。\nスペルが体に染みるほど、一気に伸びていきます。`,anim:'flames'};
+  if(s>=5.2) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'リズムの主',
+    comment:`${s.toFixed(1)}打/秒。指のリズムが歌になっている。\nそのテンポ、ずっと大事にしてください。`,anim:'flames'};
+  if(s>=5.1) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'Great Typing',
+    comment:`${s.toFixed(1)}打/秒。実用の壁を軽やかに飛び越えました。\n手が覚え始めた――それは大きな転機です。`,anim:'flames'};
+  if(s>=5.0) return{tier:'b',rank:'RANK B',emoji:'🔥',title:'実用の頂点へ',
+    comment:`${s.toFixed(1)}打/秒。日々の鍛錬が、明確な形になって返ってきました。\nここから先は、研ぐほどに切れが増す段階です。`,anim:'flames'};
+
+  // ── TIER C: 4.0～4.9 ──  旅人の章 ────
+  if(s>=4.9) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'Bへの道、目前',
+    comment:`${s.toFixed(1)}打/秒。Bランクまであと一歩。\nここまで来たあなたに、届かない約束なんてない。`,anim:'stars'};
+  if(s>=4.8) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'視界が開けた',
+    comment:`${s.toFixed(1)}打/秒。苦手な単語を一つ減らすたびに、扉が近づく。\nBランクは、もうその次の角です。`,anim:'stars'};
+  if(s>=4.7) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'Good+',
+    comment:`${s.toFixed(1)}打/秒。確かな手応え。\n次のステージの景色が、薄く見え始めましたね。`,anim:'stars'};
+  if(s>=4.6) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'加速の予感',
+    comment:`${s.toFixed(1)}打/秒。集中が続くとき、あなたは一気に跳ねる。\nその瞬間が、じきに何度も訪れます。`,anim:'stars'};
+  if(s>=4.5) return{tier:'c',rank:'RANK C',emoji:'⭐',title:'中間を越えて',
+    comment:`${s.toFixed(1)}打/秒。道のりの半分を、自分の足で歩いてきた。\nここから先は、続けた人だけが見る景色です。`,anim:'stars'};
+  if(s>=4.4) return{tier:'c',rank:'RANK C',emoji:'🌟',title:'いいペース',
+    comment:`${s.toFixed(1)}打/秒。着実に積み上がっています。\n苦手な単語を丁寧に抱きしめると、ぐんと伸びます。`,anim:'stars'};
+  if(s>=4.3) return{tier:'c',rank:'RANK C',emoji:'🌟',title:'実力の芯',
+    comment:`${s.toFixed(1)}打/秒。続けた日々が、しっかりした芯になっている。\nその芯は、もう誰にも折れません。`,anim:'stars'};
+  if(s>=4.2) return{tier:'c',rank:'RANK C',emoji:'🌟',title:'上達中',
+    comment:`${s.toFixed(1)}打/秒。毎回、確かに速くなっている。\n正確さを守りながら、テンポを少しずつ上げていこう。`,anim:'stars'};
+  if(s>=4.1) return{tier:'c',rank:'RANK C',emoji:'🌟',title:'Keep it up',
+    comment:`${s.toFixed(1)}打/秒。いいリズム。\nこの感じをずっと、長く続けていきましょう。`,anim:'stars'};
+  if(s>=4.0) return{tier:'c',rank:'RANK C',emoji:'🌟',title:'確かな足跡',
+    comment:`${s.toFixed(1)}打/秒。あなたの足跡が、地面に残っています。\n振り返れば、想像より遠くまで来ていますよ。`,anim:'stars'};
+
+  // ── TIER D: 3.0～3.9 ──  歩みの章 ────
+  if(s>=3.9) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Cへの扉',
+    comment:`${s.toFixed(1)}打/秒。Cランクまであと0.1。\n次のステージは、もう明かりが見えている距離です。`,anim:'bubbles'};
+  if(s>=3.8) return{tier:'d',rank:'RANK D',emoji:'💪',title:'指が慣れてきた',
+    comment:`${s.toFixed(1)}打/秒。指が道を覚え始めました。\nもう少しで、考えずに手が動く瞬間が来ます。`,anim:'bubbles'};
+  if(s>=3.7) return{tier:'d',rank:'RANK D',emoji:'💪',title:'少しずつ、確実に',
+    comment:`${s.toFixed(1)}打/秒。派手じゃないけど、確実な歩み。\n毎日続ければ、Cランクは必ず迎えに来ます。`,anim:'bubbles'};
+  if(s>=3.6) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Keep Going+',
+    comment:`${s.toFixed(1)}打/秒。順調に伸びています。\n正確さを連れて歩けば、スピードは後からついてくる。`,anim:'bubbles'};
+  if(s>=3.5) return{tier:'d',rank:'RANK D',emoji:'💪',title:'半分を越えた',
+    comment:`${s.toFixed(1)}打/秒。中間の峠を越えました。\nここから先の景色は、越えた人にしか見えません。`,anim:'bubbles'};
+  if(s>=3.4) return{tier:'d',rank:'RANK D',emoji:'💪',title:'練習の花が咲く',
+    comment:`${s.toFixed(1)}打/秒。努力がちゃんと花を咲かせています。\n焦らず、あなたの季節を育てていきましょう。`,anim:'bubbles'};
+  if(s>=3.3) return{tier:'d',rank:'RANK D',emoji:'💪',title:'順調',
+    comment:`${s.toFixed(1)}打/秒。いいリズムで進んでいます。\n毎日の一回、それが一番の近道です。`,anim:'bubbles'};
+  if(s>=3.2) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Good Effort',
+    comment:`${s.toFixed(1)}打/秒。ちゃんと速くなっている。\nもうすぐ、指が自然に動く魔法がかかります。`,anim:'bubbles'};
+  if(s>=3.1) return{tier:'d',rank:'RANK D',emoji:'💪',title:'成長の音',
+    comment:`${s.toFixed(1)}打/秒。成長の音が、キーから聞こえる。\n苦手スペルを覚えた日から、あなたは変わります。`,anim:'bubbles'};
+  if(s>=3.0) return{tier:'d',rank:'RANK D',emoji:'💪',title:'Keep Going',
+    comment:`${s.toFixed(1)}打/秒。焦らず、正確に。\n続けた日数だけ、あなたのスピードは確実に増えていきます。`,anim:'bubbles'};
+
+  // ── TIER E: 2.0～2.9 ──  芽生えの章 ────
+  if(s>=2.9) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'Dへの入口',
+    comment:`${s.toFixed(1)}打/秒。Dランクまで、あと少し。\nあきらめない気持ちは、必ず道を作ります。`,anim:'gentle'};
+  if(s>=2.8) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'もう一歩',
+    comment:`${s.toFixed(1)}打/秒。今日の「もう一歩」が、明日のあなたを変える。\n小さな積み重ねが、一番強い武器です。`,anim:'gentle'};
+  if(s>=2.7) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'続けること',
+    comment:`${s.toFixed(1)}打/秒。続ける人にだけ、道は開ける。\n今日の練習は、明日の速さに、必ず届きます。`,anim:'gentle'};
+  if(s>=2.6) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'歩めている',
+    comment:`${s.toFixed(1)}打/秒。ちゃんと歩めている。\nキーの位置が指に馴染めば、一気に景色が変わります。`,anim:'gentle'};
+  if(s>=2.5) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'Keep Trying',
+    comment:`${s.toFixed(1)}打/秒。半分まで来た。\n焦らず、確かに――それが最短の近道です。`,anim:'gentle'};
+  if(s>=2.4) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'努力が見える',
+    comment:`${s.toFixed(1)}打/秒。あなたの努力、ちゃんと伝わっています。\nホームポジションを相棒にすると、もっと遠くへ行ける。`,anim:'gentle'};
+  if(s>=2.3) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'前進',
+    comment:`${s.toFixed(1)}打/秒。確かに、前に進んでいます。\n正確さを手放さなければ、速さは後からついてくる。`,anim:'gentle'};
+  if(s>=2.2) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'やればできる',
+    comment:`${s.toFixed(1)}打/秒。大事な一歩を、もう踏み出している。\n毎日のほんの少しが、未来の景色を変えます。`,anim:'gentle'};
+  if(s>=2.1) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'継続の力',
+    comment:`${s.toFixed(1)}打/秒。急がなくて大丈夫。\nキーの位置を確かめながら、丁寧に歩いていこう。`,anim:'gentle'};
+  if(s>=2.0) return{tier:'e',rank:'RANK E',emoji:'🌱',title:'芽吹きの時',
+    comment:`${s.toFixed(1)}打/秒。まだ芽吹いたばかり。\nでも、芽吹かなかった種は伸びません。あなたは、もう始めている。`,anim:'gentle'};
+
+  // ── TIER F: 1.0～1.9 ──  旅立ちの章 ────
+  if(s>=1.9) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Eへの入口',
+    comment:`${s.toFixed(1)}打/秒。Eランクまで、あと一歩。\n落ち着いて、キーを一つずつ探していけば大丈夫。`,anim:'calm'};
+  if(s>=1.8) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'ゆっくり、確実に',
+    comment:`${s.toFixed(1)}打/秒。速さより、正確さが今日の宝物。\n一つ一つ確かめながら、進んでいきましょう。`,anim:'calm'};
+  if(s>=1.7) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'丁寧に',
+    comment:`${s.toFixed(1)}打/秒。急ぐ必要はありません。\nキーボードを見ながらでも、あなたはちゃんと進んでいる。`,anim:'calm'};
+  if(s>=1.6) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Take It Easy',
+    comment:`${s.toFixed(1)}打/秒。深呼吸して、肩の力を抜いて。\n完走できた――それだけで、今日のあなたは十分に素敵です。`,anim:'calm'};
+  if(s>=1.5) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'焦らなくていい',
+    comment:`${s.toFixed(1)}打/秒。スピードは、いつか勝手についてくるもの。\n今はキーの場所を覚えることに、全部使いましょう。`,anim:'calm'};
+  if(s>=1.4) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'Relax & Type',
+    comment:`${s.toFixed(1)}打/秒。力を抜いて、指に任せて。\n見ながらで大丈夫、確かに打てていれば、それが一番です。`,anim:'calm'};
+  if(s>=1.3) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'ゆっくりでいい',
+    comment:`${s.toFixed(1)}打/秒。焦らなくて大丈夫。\n一文字ずつ丁寧に――それが、一番強い練習です。`,anim:'calm'};
+  if(s>=1.2) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'確実に',
+    comment:`${s.toFixed(1)}打/秒。スピードは今日は忘れて。\n「正しく打てた」を、一回ずつ積み重ねよう。`,anim:'calm'};
+  if(s>=1.1) return{tier:'f',rank:'RANK F',emoji:'🐣',title:'まず慣れよう',
+    comment:`${s.toFixed(1)}打/秒。今日はキーボードと友達になる日。\n毎日ほんの少しでも、必ず指が覚えてくれます。`,anim:'calm'};
+  return{tier:'f',rank:'RANK F',emoji:'🐣',title:'旅立ちの一歩',
+    comment:'完走できました――それが、今日の一番の勝利です。\n焦らなくて大丈夫。一歩ずつ、確かに進んでいきましょう。',anim:'calm'};
+}
+const TIER_ORDER = ['f','e','d','c','b','a','s','ss'];
+function tierRank(t){ const i=TIER_ORDER.indexOf(t); return i<0?0:i; }
+
+function showResult(){
+  pausedElapsed+=Date.now()-t0;
+  const es=pausedElapsed/1000, er=Math.round(es), total=curIdx;
+  const acc=Math.round((correctKeystrokes/Math.max(totalKeystrokes,1))*100);
+  const speed=es>0?correctKeystrokes/es:0;
+  const min=Math.floor(er/60), sec=er%60;
+  const timeStr=min>0?`${min}:${String(sec).padStart(2,'0')}`:`${sec}s`;
+  const tier=getSpeedTier(speed);
+  const lvTitle=loadLevelTitle(currentLevel);
+
+  // ─ 前回スコアと自己ベストの比較 ─
+  const last = loadLastScore(currentLevel);
+  const best = loadLevelBest(currentLevel);
+  const nowRec = { speed:+speed.toFixed(2), rank:tier.rank, tier:tier.tier, acc, maxCombo, date:Date.now() };
+
+  // ランクアップ判定（前回tierと比較）
+  const rankedUp = last && tierRank(tier.tier) > tierRank(last.tier);
+  // 自己ベスト更新
+  const isNewBest = !best || nowRec.speed > best.speed;
+
+  // 表示
+  $('r-emoji').textContent=tier.emoji; $('r-title').textContent=tier.title;
+  $('r-sub').textContent=`Lv.${currentLevel} ${lvTitle}・${total}問完了・正確率 ${acc}%`;
+  const sc=$('speed-card'); sc.className=`speed-card tier-${tier.tier}`;
+  $('r-rank').textContent=tier.rank; $('r-speed').textContent=speed.toFixed(1);
+  $('r-comment').innerHTML=tier.comment.replace(/\n/g,'<br>');
+
+  // 前回比
+  const deltaEl = $('r-delta');
+  if (last) {
+    const d = +(nowRec.speed - last.speed).toFixed(1);
+    if (d > 0)       { deltaEl.className='speed-delta up';   deltaEl.textContent=`前回より +${d.toFixed(1)} 打/秒 ↑`; }
+    else if (d < 0)  { deltaEl.className='speed-delta down'; deltaEl.textContent=`前回より ${d.toFixed(1)} 打/秒`; }
+    else             { deltaEl.className='speed-delta same'; deltaEl.textContent='前回と同じペース'; }
+  } else {
+    deltaEl.className='speed-delta same'; deltaEl.textContent='初めての記録✨';
+  }
+
+  // ランクアップバナー
+  const rub = $('rankup-banner');
+  if (rankedUp) {
+    rub.innerHTML = `🎖️ RANK UP！ <span style="font-family:'JetBrains Mono',monospace">${last.rank}</span> → <span style="font-family:'JetBrains Mono',monospace">${tier.rank}</span>`;
+    rub.classList.add('show');
+  } else {
+    rub.classList.remove('show');
+  }
+  // ベスト更新バナー
+  const bb = $('best-banner');
+  if (isNewBest && last) {
+    bb.innerHTML = `🏆 自己ベスト更新！ <span style="font-family:'JetBrains Mono',monospace">${nowRec.speed.toFixed(1)}</span> 打/秒`;
+    bb.classList.add('show');
+  } else {
+    bb.classList.remove('show');
+  }
+
+  // 自己ベスト表示カード
+  const bc = $('best-card');
+  if (best || isNewBest) {
+    bc.style.display='';
+    const showBest = isNewBest ? nowRec : best;
+    $('best-speed').textContent = showBest.speed.toFixed(1);
+    $('best-rank').textContent  = showBest.rank;
+  } else {
+    bc.style.display='none';
+  }
+
+  // 保存
+  saveLastScore(currentLevel, nowRec);
+  if (isNewBest) saveLevelBest(currentLevel, nowRec);
+
+  $('r-total').textContent=total; $('r-keys').textContent=totalKeystrokes;
+  $('r-time').textContent=timeStr; $('r-correct').textContent=correctKeystrokes;
+  $('r-miss').textContent=misses; $('r-acc').textContent=acc+'%';
+  $('bar-fill').style.width='100%';
+  const hero=$('bar-hero'); if(hero){ hero.style.left='100%'; }
+  showScreen('result');
+  setTimeout(()=>launchResultAnim(tier.anim, speed), 300);
+  // ランクアップ時はゴールドな追加爆発
+  if (rankedUp)  setTimeout(()=>launchResultAnim('fireworks', speed), 600);
+  if (isNewBest) setTimeout(()=>launchResultAnim('stars', speed), 900);
+}
+$('r-retry').addEventListener('click',startGame);
+$('r-back').addEventListener('click',()=>showScreen('setup'));
+
+// ══════════════════════════════════════════════
+//  KEYS
+// ══════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  const scr=currentScreen();
+  if(e.key===' '||e.code==='Space'){
+    if(scr==='setup'&&!$('start-btn').disabled){
+      const ae=document.activeElement;
+      if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
+      e.preventDefault(); startGame(); return;
+    }
+    if(scr==='result'){e.preventDefault();startGame();return;}
+  }
+  if(e.key==='Escape'){
+    if(scr==='game'&&gameActive){e.preventDefault();gameActive=false;disableCursorHide();restoreInput();showScreen('setup');return;}
+    if(scr==='result'){e.preventDefault();showScreen('setup');return;}
+    if(scr==='setup'){e.preventDefault();goHome();return;}
+  }
+});
+document.addEventListener('click',()=>{ if(gameScr.classList.contains('active')&&gameActive) inp.focus(); });
+
+// ══════════════════════════════════════════════
+//  VOICE (Web Speech API)
+// ══════════════════════════════════════════════
+let voiceEnabled = false;
+let voiceRate = 1.0;
+let voiceSpeaking = false;
+let selectedVoiceName = '';
+let enVoices = [];
+
+function loadEnVoices() {
+  const all = window.speechSynthesis.getVoices();
+
+  // Macかどうか判定
+  const isMac = /Mac/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
+
+  if (isMac) {
+    // Macは厳選3つだけ表示（聞き取りやすい順）
+    const macPreferred = ['Samantha', 'Karen', 'Victoria'];
+    enVoices = macPreferred
+      .map(name => all.find(v => v.name === name))
+      .filter(Boolean);
+    // 万が一1つも見つからなければen-USローカルを使う
+    if (enVoices.length === 0) {
+      enVoices = all.filter(v => v.lang === 'en-US' && v.localService && !v.name.includes('compact'));
+    }
+  } else {
+    // Windows・その他はこれまで通り
+    const preferred = ['Microsoft Zira','Microsoft David','Microsoft Mark','Google US English','Google UK English Female','Google UK English Male'];
+    const local = all.filter(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('compact'));
+    const remote = all.filter(v => v.lang.startsWith('en') && !v.localService);
+    const sort = arr => [...arr.filter(v => preferred.some(p => v.name.includes(p))), ...arr.filter(v => !preferred.some(p => v.name.includes(p)))];
+    enVoices = [...sort(local), ...sort(remote)].filter((v,i,a) => a.findIndex(x => x.name === v.name) === i);
+  }
+
+  const sel = $('voice-select');
+  sel.innerHTML = '';
+  enVoices.forEach((v, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    const flag = v.lang==='en-US'?'🇺🇸':v.lang==='en-GB'?'🇬🇧':v.lang==='en-AU'?'🇦🇺':'🌐';
+    opt.textContent = flag + ' ' + v.name;
+    if (v.name === selectedVoiceName) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  if (!selectedVoiceName && enVoices.length > 0) {
+    selectedVoiceName = enVoices[0].name;
+    sel.value = 0;
+  }
+}
+
+function initVoiceSettings() {
+  const settings = loadSettings();
+  voiceEnabled = settings.voiceEnabled === true;
+  voiceRate = settings.voiceRate || 1.0;
+  selectedVoiceName = settings.voiceName || '';
+
+  const toggle = $('voice-toggle');
+  const options = $('voice-options');
+  toggle.checked = voiceEnabled;
+  options.style.display = voiceEnabled ? 'flex' : 'none';
+
+  document.querySelectorAll('.voice-rate-chip').forEach(b => {
+    b.classList.toggle('on', parseFloat(b.dataset.rate) === voiceRate);
+  });
+
+  // 音声リスト読み込み
+  if (window.speechSynthesis) {
+    if (window.speechSynthesis.getVoices().length > 0) loadEnVoices();
+    window.speechSynthesis.onvoiceschanged = loadEnVoices;
+  }
+
+  toggle.addEventListener('change', () => {
+    voiceEnabled = toggle.checked;
+    saveSettings({ voiceEnabled });
+    options.style.display = voiceEnabled ? 'flex' : 'none';
+  });
+
+  $('voice-select').addEventListener('change', e => {
+    const v = enVoices[parseInt(e.target.value)];
+    if (v) { selectedVoiceName = v.name; saveSettings({ voiceName: v.name }); }
+  });
+
+  document.querySelectorAll('.voice-rate-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      voiceRate = parseFloat(btn.dataset.rate);
+      saveSettings({ voiceRate });
+      document.querySelectorAll('.voice-rate-chip').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+    });
+  });
+}
+
+function speakEnglish(text) {
+  if (!voiceEnabled) return;
+  if (!window.speechSynthesis) return;
+  // 毎回キャンセルしてから新しい発音を再生（voiceSpeakingで二重防止しない）
+  window.speechSynthesis.cancel();
+  voiceSpeaking = false;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'en-US';
+  utter.rate = voiceRate;
+  utter.pitch = 1.0;
+  const voice = enVoices.find(v => v.name === selectedVoiceName) || enVoices[0] || null;
+  if (voice) utter.voice = voice;
+  voiceSpeaking = true;
+  utter.onend = () => { voiceSpeaking = false; };
+  utter.onerror = () => { voiceSpeaking = false; };
+  window.speechSynthesis.speak(utter);
+}
+
+// ══════════════════════════════════════════════
+//  RESULT ANIMATIONS
+// ══════════════════════════════════════════════
+function launchResultAnim(type, speed) {
+  const canvas = document.getElementById('anim-canvas');
+  // 追加系エフェクトの場合は既存を消さない
+  if (type === 'legendary' || type === 'godlike' || canvas.childElementCount === 0) {
+    // 以前の一発モノだけクリア
+  }
+
+  const configs = {
+    legendary: { count: 180, duration: 6000, fn: spawnLegendary },
+    godlike:   { count: 100, duration: 4500, fn: spawnGodlike   },
+    fireworks: { count: 60,  duration: 3500, fn: spawnFireworks },
+    flames:    { count: 40,  duration: 3000, fn: spawnFlames    },
+    stars:     { count: 30,  duration: 2500, fn: spawnStars     },
+    bubbles:   { count: 20,  duration: 2000, fn: spawnBubbles   },
+    gentle:    { count: 12,  duration: 1800, fn: spawnGentle    },
+    calm:      { count: 6,   duration: 1500, fn: spawnCalm      },
+  };
+  const cfg = configs[type] || configs.calm;
+
+  // 大型演出：光の柱・画面スウィープ・大型テキスト
+  if (type === 'legendary') {
+    spawnLightPillar(canvas, '#a855f7');
+    spawnScreenSweep(canvas, 'linear-gradient(90deg,rgba(168,85,247,0),rgba(236,72,153,0.45),rgba(168,85,247,0))');
+    spawnGrandText(canvas, 'LEGENDARY', '#f0abfc');
+  } else if (type === 'godlike') {
+    spawnLightPillar(canvas, '#ffd700');
+    spawnScreenSweep(canvas, 'linear-gradient(90deg,rgba(255,215,0,0),rgba(255,180,0,0.35),rgba(255,215,0,0))');
+  } else if (type === 'fireworks') {
+    spawnScreenSweep(canvas, 'linear-gradient(90deg,rgba(255,140,0,0),rgba(255,200,60,0.3),rgba(255,140,0,0))');
+  }
+
+  const interval = cfg.duration / cfg.count;
+  let fired = 0;
+  const timer = setInterval(() => {
+    if (fired >= cfg.count) { clearInterval(timer); return; }
+    cfg.fn(canvas);
+    fired++;
+  }, interval);
+  setTimeout(() => { clearInterval(timer); canvas.innerHTML = ''; }, cfg.duration + 1500);
+}
+
+function spawnLightPillar(canvas, color){
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;top:0;bottom:0;left:50%;width:200px;margin-left:-100px;
+    background:radial-gradient(ellipse at center,${color}44 0%,${color}22 40%,transparent 75%);
+    pointer-events:none;animation:pillarPulse 1.6s ease-out 2;
+    mix-blend-mode:screen;`;
+  canvas.appendChild(el);
+  setTimeout(()=>el.remove(), 3400);
+}
+function spawnScreenSweep(canvas, bg){
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;inset:0;background:${bg};
+    pointer-events:none;opacity:0;animation:sweepAcross 1.2s ease-out;`;
+  canvas.appendChild(el);
+  setTimeout(()=>el.remove(), 1400);
+}
+function spawnGrandText(canvas, text, color){
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono',monospace;font-size:4rem;font-weight:900;
+    color:${color};text-shadow:0 0 30px ${color},0 0 60px ${color},0 0 90px #7c3aed;
+    letter-spacing:0.2em;pointer-events:none;opacity:0;
+    animation:grandText 2.4s ease-out;mix-blend-mode:screen;`;
+  el.textContent = text;
+  canvas.appendChild(el);
+  setTimeout(()=>el.remove(), 2500);
+}
+
+function spawnGodlike(canvas){
+  // 花火 + エンブレム舞い
+  if (Math.random() < 0.4) return spawnFireworks(canvas);
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_GODLIKE[randInt(0, EMOJIS_GODLIKE.length - 1)];
+  const x = rand(W*0.1, W*0.9), y = rand(H*0.1, H*0.8);
+  makeParticle(canvas, emoji, x, y, {
+    size: randInt(28, 52),
+    anim: 'floatUpSpin',
+    dur: rand(1.5, 2.6),
+    extra: `--rot:${rand(-360,360)}deg;filter:drop-shadow(0 0 8px rgba(255,215,0,0.6))`
+  });
+}
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+
+const CONFETTI_COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff','#ff9f1c','#e63946','#2ec4b6'];
+const EMOJIS_GODLIKE = ['👑','🏆','💥','⚡','🌟','🔥','✨','💎','🎆','🎇'];
+const EMOJIS_FIREWORKS = ['🎉','✨','🌟','⭐','💫','🎊','🎈'];
+const EMOJIS_FLAMES = ['🔥','⚡','💪','👍','✊'];
+const EMOJIS_STARS = ['⭐','🌟','💫','✨','👏'];
+const EMOJIS_BUBBLES = ['💧','🫧','🌱','💙','🔵'];
+
+function makeParticle(canvas, content, x, y, style = {}) {
+  const el = document.createElement('div');
+  el.className = 'anim-particle';
+  el.textContent = content;
+  el.style.cssText = `left:${x}px;top:${y}px;font-size:${style.size||20}px;position:absolute;
+    animation:${style.anim||'floatUp'} ${style.dur||1.2}s ease-out forwards;
+    opacity:1;transform-origin:center;${style.extra||''}`;
+  canvas.appendChild(el);
+  setTimeout(() => el.remove(), (style.dur || 1.2) * 1000 + 100);
+}
+
+// Inject keyframes once
+(function injectKeyframes() {
+  if (document.getElementById('anim-keyframes')) return;
+  const style = document.createElement('style');
+  style.id = 'anim-keyframes';
+  style.textContent = `
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)}100%{opacity:0;transform:translateY(-180px) scale(0.4) rotate(var(--rot,30deg))}}
+@keyframes floatUpSpin{0%{opacity:1;transform:translateY(0) scale(1.2) rotate(0deg)}100%{opacity:0;transform:translateY(-220px) scale(0.3) rotate(720deg)}}
+@keyframes burst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx,0px),var(--ty,-150px)) scale(0.2)}}
+@keyframes confettiFall{0%{opacity:1;transform:translateY(-30px) rotate(0deg) scaleX(1)}60%{opacity:1}100%{opacity:0;transform:translateY(100vh) rotate(var(--rot,360deg)) scaleX(-1)}}
+@keyframes sparkle{0%{opacity:0;transform:scale(0) rotate(0deg)}30%{opacity:1;transform:scale(1.4) rotate(180deg)}100%{opacity:0;transform:scale(0.2) rotate(360deg)}}
+@keyframes galaxySpin{0%{opacity:1;transform:scale(1) rotate(0deg) translateY(0)}100%{opacity:0;transform:scale(0.1) rotate(1080deg) translateY(-200px)}}
+@keyframes gentleFloat{0%{opacity:0.8;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-100px) scale(0.6)}}
+@keyframes softPop{0%{opacity:0;transform:scale(0)}40%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(0.5) translateY(-60px)}}
+@keyframes pillarPulse{0%{opacity:0;transform:scaleY(0.3)}30%{opacity:0.9;transform:scaleY(1.1)}60%{opacity:0.7;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.2)}}
+@keyframes sweepAcross{0%{opacity:0;transform:translateX(-100%)}20%{opacity:1}100%{opacity:0;transform:translateX(100%)}}
+@keyframes grandText{0%{opacity:0;transform:translate(-50%,-50%) scale(0.3)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}40%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.2)}}
+  `;
+  document.head.appendChild(style);
+})();
+
+function spawnLegendary(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  // Galaxy particles + confetti rain + big emojis
+  const r = Math.random();
+  if (r < 0.3) {
+    // confetti strip
+    const x = rand(0, W);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const rot = rand(-720, 720);
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:-20px;width:${rand(6,12)}px;height:${rand(14,22)}px;
+      background:${color};border-radius:2px;--rot:${rot}deg;
+      animation:confettiFall ${rand(2.5,4.5)}s ease-in forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 4600);
+  } else if (r < 0.6) {
+    // galaxy spin emoji
+    const emoji = EMOJIS_GODLIKE[randInt(0, EMOJIS_GODLIKE.length - 1)];
+    const x = rand(W*0.1, W*0.9), y = rand(H*0.1, H*0.7);
+    makeParticle(canvas, emoji, x, y, {size: randInt(24,48), anim:'galaxySpin', dur: rand(1.5,3), extra:`--rot:${rand(-360,360)}deg`});
+  } else {
+    // sparkle dot
+    const x = rand(0, W), y = rand(0, H);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${rand(6,16)}px;height:${rand(6,16)}px;
+      border-radius:50%;background:${color};box-shadow:0 0 8px ${color};
+      animation:sparkle ${rand(0.8,1.8)}s ease-out forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 1900);
+  }
+}
+
+function spawnFireworks(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const r = Math.random();
+  if (r < 0.4) {
+    // burst emojis
+    const emoji = EMOJIS_FIREWORKS[randInt(0, EMOJIS_FIREWORKS.length - 1)];
+    const x = rand(W*0.05, W*0.95), y = rand(H*0.05, H*0.65);
+    const tx = rand(-120, 120), ty = rand(-200, -60);
+    makeParticle(canvas, emoji, x, y, {size: randInt(16,36), anim:'burst', dur: rand(1.0,2.0), extra:`--tx:${tx}px;--ty:${ty}px`});
+  } else {
+    // confetti
+    const x = rand(0, W);
+    const color = CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)];
+    const rot = rand(-540, 540);
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:-10px;width:${rand(5,10)}px;height:${rand(12,20)}px;
+      background:${color};border-radius:2px;--rot:${rot}deg;
+      animation:confettiFall ${rand(2,3.5)}s ease-in forwards;`;
+    canvas.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
+  }
+}
+
+function spawnFlames(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_FLAMES[randInt(0, EMOJIS_FLAMES.length - 1)];
+  const x = rand(W*0.05, W*0.95), y = rand(H*0.2, H*0.8);
+  makeParticle(canvas, emoji, x, y, {size: randInt(18,32), anim:'floatUpSpin', dur: rand(1.0,1.8), extra:`--rot:${rand(-60,60)}deg`});
+}
+
+function spawnStars(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_STARS[randInt(0, EMOJIS_STARS.length - 1)];
+  const x = rand(W*0.05, W*0.95), y = rand(H*0.1, H*0.85);
+  makeParticle(canvas, emoji, x, y, {size: randInt(16,28), anim:'sparkle', dur: rand(0.9,1.6)});
+}
+
+function spawnBubbles(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const emoji = EMOJIS_BUBBLES[randInt(0, EMOJIS_BUBBLES.length - 1)];
+  const x = rand(W*0.1, W*0.9), y = rand(H*0.3, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(14,22), anim:'gentleFloat', dur: rand(1.2,2.0)});
+}
+
+function spawnGentle(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const items = ['🌱','💧','🌿','🍀','🌸'];
+  const emoji = items[randInt(0, items.length - 1)];
+  const x = rand(W*0.1, W*0.9), y = rand(H*0.4, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(12,20), anim:'softPop', dur: rand(1.2,1.8)});
+}
+
+function spawnCalm(canvas) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const items = ['🐣','💤','🌙','⭕'];
+  const emoji = items[randInt(0, items.length - 1)];
+  const x = rand(W*0.2, W*0.8), y = rand(H*0.5, H*0.9);
+  makeParticle(canvas, emoji, x, y, {size: randInt(12,18), anim:'softPop', dur: rand(1.0,1.5)});
+}
+
+renderHomeScreen();
+initVoiceSettings();
+window.addEventListener('beforeunload',()=>{ if(currentLevel) saveLevelEnabled(currentLevel,enabled); });
+</script>
+</body>
+</html>
