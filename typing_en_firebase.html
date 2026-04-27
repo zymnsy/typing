@@ -852,6 +852,19 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
+      <div class="sec-label">英語タイピングのモード</div>
+      <div class="voice-row">
+        <div class="voice-info">
+          <div class="voice-title">単語のみ（記号・スペース・数字を含む語を除外）</div>
+          <div class="voice-sub">ON にすると <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">apple</code> のような単語のみ出題。<code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">How are you?</code> 等の文章はスキップ（かな読みの単語には影響しません）</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="words-only-toggle">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
       <div class="sec-label">音声読み上げ</div>
       <div class="voice-row">
         <div class="voice-info">
@@ -1244,6 +1257,101 @@ function matchInput(typed, accepted) {
   return { ok:true, atMora: best.moraIdx, pos: best.pos, completed: best.moraIdx >= accepted.length };
 }
 
+// ── ローマ字 → ひらがな 逆変換 ──
+// 既存 CSV（kanji,en の en がローマ字）のまま動かすため、
+// canonical なローマ字を一旦ひらがなにパースしてから上記 kana エンジンへ。
+const ROMAJI_TO_KANA = (() => {
+  const map = {};
+  // KANA_PATTERNS から逆引き（最初に登場した kana を優先）
+  for (const [kana, patterns] of Object.entries(KANA_PATTERNS)) {
+    for (const p of patterns) {
+      // 拡張入力（lya, xya, hwi, jyi 等）はパースから除外
+      if (/^(l|x)/.test(p)) continue;
+      if (/^(jhi|jhu|jhe|jho|jha)$/.test(p)) continue;
+      if (/^(jyi)$/.test(p)) continue;
+      if (/^(hw|hux)/.test(p)) continue;
+      if (/^(uxi|uxe|uxo|wha|whi|whe|who)$/.test(p)) continue;
+      if (/^(twu|toxu|dwu|doxu)$/.test(p)) continue;
+      if (/^(dexi|texi)$/.test(p)) continue;
+      if (/^(kixya|kixyu|kixyo|kilya|kilyu|kilyo|shilya|shilyu|shilyo)$/.test(p)) continue;
+      if (/^(jya|jyu|jyo|jhi|jhu|jhe|jho|jha|cya|cyu|cyo|dja|dju|djo|dji|sxe)$/.test(p)) continue;
+      if (/^(iye|toxu)$/.test(p)) continue;
+      if (!map[p]) map[p] = kana;
+    }
+  }
+  // 曖昧なケースの優先割当
+  map['shi'] = 'し'; map['si']  = 'し'; map['ci']  = 'し';
+  map['ji']  = 'じ'; map['zi']  = 'じ';
+  map['chi'] = 'ち'; map['ti']  = 'ち';
+  map['tsu'] = 'つ'; map['tu']  = 'つ';
+  map['fu']  = 'ふ'; map['hu']  = 'ふ';
+  map['di']  = 'でぃ'; // ぢ より でぃ を優先
+  map['du']  = 'づ';
+  map['sha'] = 'しゃ'; map['shu'] = 'しゅ'; map['sho'] = 'しょ';
+  map['sya'] = 'しゃ'; map['syu'] = 'しゅ'; map['syo'] = 'しょ';
+  map['cha'] = 'ちゃ'; map['chu'] = 'ちゅ'; map['cho'] = 'ちょ';
+  map['tya'] = 'ちゃ'; map['tyu'] = 'ちゅ'; map['tyo'] = 'ちょ';
+  map['ja']  = 'じゃ'; map['ju']  = 'じゅ'; map['jo']  = 'じょ';
+  map['zya'] = 'じゃ'; map['zyu'] = 'じゅ'; map['zyo'] = 'じょ';
+  map['je']  = 'じぇ'; map['she'] = 'しぇ'; map['che'] = 'ちぇ';
+  map['fa']  = 'ふぁ'; map['fi']  = 'ふぃ'; map['fe']  = 'ふぇ'; map['fo']  = 'ふぉ';
+  map['va']  = 'ゔぁ'; map['vi']  = 'ゔぃ'; map['ve']  = 'ゔぇ'; map['vo']  = 'ゔぉ'; map['vu'] = 'ゔ';
+  map['wi']  = 'うぃ'; map['we']  = 'うぇ';
+  map['thi'] = 'てぃ'; map['dhi'] = 'でぃ'; map['thu'] = 'てゅ'; map['dhu'] = 'でゅ';
+  map['tsa'] = 'つぁ'; map['tsi'] = 'つぃ'; map['tse'] = 'つぇ'; map['tso'] = 'つぉ';
+  return map;
+})();
+
+// ローマ字 → ひらがな （失敗時は null）
+function romajiToKana(romanRaw) {
+  const roman = romanRaw.toLowerCase();
+  let out = '';
+  let i = 0;
+  while (i < roman.length) {
+    const ch = roman[i];
+    const nx = roman[i+1];
+    // 'nn' → ん
+    if (ch === 'n' && nx === 'n') { out += 'ん'; i += 2; continue; }
+    // 'n' 単独 → 次が子音 (n/y/母音以外) または語末
+    if (ch === 'n') {
+      if (i + 1 === roman.length) { out += 'ん'; i++; continue; }
+      if (/[bcdfghjkmpqrstvwxz]/.test(nx)) { out += 'ん'; i++; continue; }
+    }
+    // 子音重ね → っ
+    if (nx === ch && /[bcdfghjklmpqrstvwxyz]/.test(ch)) {
+      out += 'っ'; i++; continue;
+    }
+    // 長音
+    if (ch === '-') { out += 'ー'; i++; continue; }
+    // 句読点
+    if (',.!?'.includes(ch)) { out += ch; i++; continue; }
+    if (ch === ' ') { out += ' '; i++; continue; }
+    // 最長一致 (4 → 1 文字)
+    let matched = null;
+    for (let L = 4; L >= 1; L--) {
+      if (i + L > roman.length) continue;
+      const sub = roman.substring(i, i + L);
+      if (ROMAJI_TO_KANA[sub]) { matched = { k: ROMAJI_TO_KANA[sub], L }; break; }
+    }
+    if (matched) { out += matched.k; i += matched.L; continue; }
+    // 解析不能 → 失敗（呼び出し側で英語モードへフォールバック）
+    return null;
+  }
+  return out;
+}
+
+function tryParseJapaneseRomaji(s) {
+  if (hasKana(s)) return s; // すでに かな
+  if (!/^[a-zA-Z\-\s,.!?]+$/.test(s)) return null;
+  const k = romajiToKana(s);
+  if (!k) return null;
+  // 解析結果に英字が残っていれば失敗
+  if (/[a-zA-Z]/.test(k)) return null;
+  // 1モーラ未満（純粋な英字なし）も拒否しない – かな化されていればOK
+  if (!hasKana(k)) return null;
+  return k;
+}
+
 // かなモーラ列 → ヒント表示HTML
 function renderKanaHintHtml(moras, completedMoraCount, hasPartial) {
   return moras.map((m, idx) => {
@@ -1558,6 +1666,9 @@ function enterLevel(lv) {
   document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
     b.classList.toggle('on', b.dataset.sort === practiceSortMode);
   });
+  // 「単語のみ」トグルを復元
+  const wordsOnlyToggle = $('words-only-toggle');
+  if (wordsOnlyToggle) wordsOnlyToggle.checked = settings.englishWordsOnly === true;
   renderWordList(); updateStartBtn(); showScreen('setup');
 }
 
@@ -2075,14 +2186,34 @@ document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(btn=>{
 // ══════════════════════════════════════════════
 //  GAME
 // ══════════════════════════════════════════════
+// 「単語のみ」フィルタ判定: 純粋な英字のみ（スペース・記号・数字なし）
+function isPureEnglishWord(en) { return /^[a-zA-Z]+$/.test(en); }
+
 function buildQueue(){
-  const pool=[...enabled].map(i=>words[i]), q=[];
-  let sh=[...pool].sort(()=>Math.random()-0.5);
-  while(q.length<totalRounds){if(!sh.length)sh=[...pool].sort(()=>Math.random()-0.5);q.push(sh.pop());}
+  const settings = loadSettings();
+  const wordsOnly = settings.englishWordsOnly === true;
+  let pool = [...enabled].map(i => words[i]);
+  if (wordsOnly) {
+    // かな読みのある語（=日本語タイピング対象）はそのまま、英字のみの語は記号なしのみ通す
+    pool = pool.filter(w => hasKana(w.en) || isPureEnglishWord(w.en));
+  }
+  if (pool.length === 0) return null;
+  const q = [];
+  let sh = [...pool].sort(()=>Math.random()-0.5);
+  while(q.length<totalRounds){
+    if(!sh.length) sh=[...pool].sort(()=>Math.random()-0.5);
+    q.push(sh.pop());
+  }
   return q;
 }
 function startGame(){
-  queue=buildQueue(); curIdx=0; misses=0; clears=0;
+  const q = buildQueue();
+  if (!q) {
+    toast('条件に合う単語がありません（「単語のみ」スイッチを確認してください）','err');
+    return;
+  }
+  queue = q;
+  curIdx=0; misses=0; clears=0;
   totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
   $('c-clear').textContent=0; $('c-miss').textContent=0;
   showScreen('game'); enableCursorHide(); showWord(0); t0=Date.now();
@@ -2095,9 +2226,11 @@ function showWord(idx){
   $('word-disp').textContent=w.ja;
   $('word-disp').classList.toggle('long-text',isLong);
   const hintEl=$('hint-disp');
-  if (hasKana(w.en)) {
+  // モード判定: かな含有 or ローマ字パース可能 → 寿司打スタイル
+  const kanaTarget = tryParseJapaneseRomaji(w.en);
+  if (kanaTarget) {
     currentMode='kana';
-    currentMoras = extractMoras(w.en);
+    currentMoras = extractMoras(kanaTarget);
     currentPatterns = buildAcceptedPatterns(currentMoras);
     currentHintData = null;
     hintEl.innerHTML = renderKanaHintHtml(currentMoras, 0, false);
@@ -3124,6 +3257,12 @@ function toast(msg, type) {
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 2900);
 }
+
+// ── 「単語のみ」トグル ──
+$('words-only-toggle').addEventListener('change', e => {
+  saveSettings({ englishWordsOnly: e.target.checked });
+  toast(e.target.checked ? '単語のみモード ON' : '文章モード ON','suc');
+});
 
 // ── 全記録リセット ──
 $('reset-all-btn').addEventListener('click', async () => {
