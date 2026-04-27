@@ -766,7 +766,15 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   <div class="hint-box">
     <b>使い方</b>　レベル 1〜100 それぞれに独立した単語リストを登録できます。<br>
     レベルをクリック → 設定画面 → <kbd>Space</kbd> でタイピング開始。<br>
-    タイピング中は自動的に <b>英語入力（IMEオフ）</b> に切り替わります。
+    タイピング中は自動的に <b>半角英数（IMEオフ）</b> に切り替わります。<br>
+    かな読み（ひらがな/カタカナ）を入れた単語は <b>寿司打スタイル</b>（ji/zi、shi/si、n/nn、っの子音重ね 等を許容）で判定されます。
+  </div>
+  <div class="card" style="margin-top:4px;">
+    <div class="sec-label">記録の管理</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:0.78rem;color:var(--sub);flex:1;min-width:200px;line-height:1.55;">全レベル（1〜100）のタイピング記録を一括消去します。<br><span style="font-size:0.72rem;color:var(--muted)">対象: 出題回数 / ミスタイプ / 完璧率 / 最速 / 自己ベスト / 前回スコア。単語データは残ります。</span></span>
+      <button class="btn-reset" id="reset-all-btn">すべての記録をリセット</button>
+    </div>
   </div>
 </div>
 
@@ -1065,6 +1073,189 @@ function renderHintHtml(data, typedLen) {
 }
 
 // ══════════════════════════════════════════════
+//  SUSHIDA-STYLE ROMAJI INPUT ENGINE
+//  寿司打と同じ判定基準でローマ字入力を受理
+//  - し: si / shi / ci
+//  - じ: ji / zi
+//  - ち: ti / chi
+//  - つ: tu / tsu
+//  - ふ: hu / fu
+//  - ん: 文脈に応じて n / nn / n'
+//  - っ: 次子音重ね or ltu/xtu/ltsu/xtsu
+//  - 拗音: 複数表記（sya/sha, tya/cha/cya 等）
+// ══════════════════════════════════════════════
+const KANA_PATTERNS = {
+  // 清音
+  'あ':['a'], 'い':['i','yi'], 'う':['u','wu','whu'], 'え':['e'], 'お':['o'],
+  'か':['ka','ca'], 'き':['ki'], 'く':['ku','cu','qu'], 'け':['ke'], 'こ':['ko','co'],
+  'さ':['sa'], 'し':['si','shi','ci'], 'す':['su'], 'せ':['se','ce'], 'そ':['so'],
+  'た':['ta'], 'ち':['ti','chi'], 'つ':['tu','tsu'], 'て':['te'], 'と':['to'],
+  'な':['na'], 'に':['ni'], 'ぬ':['nu'], 'ね':['ne'], 'の':['no'],
+  'は':['ha'], 'ひ':['hi'], 'ふ':['hu','fu'], 'へ':['he'], 'ほ':['ho'],
+  'ま':['ma'], 'み':['mi'], 'む':['mu'], 'め':['me'], 'も':['mo'],
+  'や':['ya'], 'ゆ':['yu'], 'よ':['yo'],
+  'ら':['ra'], 'り':['ri'], 'る':['ru'], 'れ':['re'], 'ろ':['ro'],
+  'わ':['wa'], 'を':['wo'],
+  // 濁音
+  'が':['ga'], 'ぎ':['gi'], 'ぐ':['gu'], 'げ':['ge'], 'ご':['go'],
+  'ざ':['za'], 'じ':['ji','zi','jyi'], 'ず':['zu'], 'ぜ':['ze'], 'ぞ':['zo'],
+  'だ':['da'], 'ぢ':['di','dji'], 'づ':['du','dzu'], 'で':['de'], 'ど':['do'],
+  'ば':['ba'], 'び':['bi'], 'ぶ':['bu'], 'べ':['be'], 'ぼ':['bo'],
+  'ぱ':['pa'], 'ぴ':['pi'], 'ぷ':['pu'], 'ぺ':['pe'], 'ぽ':['po'],
+  'ゔ':['vu'],
+  // 拗音
+  'きゃ':['kya','kilya','kixya'], 'きゅ':['kyu','kilyu','kixyu'], 'きょ':['kyo','kilyo','kixyo'],
+  'しゃ':['sya','sha','shilya'], 'しゅ':['syu','shu','shilyu'], 'しょ':['syo','sho','shilyo'],
+  'ちゃ':['tya','cha','cya'], 'ちゅ':['tyu','chu','cyu'], 'ちょ':['tyo','cho','cyo'],
+  'にゃ':['nya'], 'にゅ':['nyu'], 'にょ':['nyo'],
+  'ひゃ':['hya'], 'ひゅ':['hyu'], 'ひょ':['hyo'],
+  'みゃ':['mya'], 'みゅ':['myu'], 'みょ':['myo'],
+  'りゃ':['rya'], 'りゅ':['ryu'], 'りょ':['ryo'],
+  'ぎゃ':['gya'], 'ぎゅ':['gyu'], 'ぎょ':['gyo'],
+  'じゃ':['ja','zya','jya','jha'], 'じゅ':['ju','zyu','jyu','jhu'], 'じょ':['jo','zyo','jyo','jho'],
+  'ぢゃ':['dya','dja'], 'ぢゅ':['dyu','dju'], 'ぢょ':['dyo','djo'],
+  'びゃ':['bya'], 'びゅ':['byu'], 'びょ':['byo'],
+  'ぴゃ':['pya'], 'ぴゅ':['pyu'], 'ぴょ':['pyo'],
+  // 外来音
+  'ふぁ':['fa','fha','hwa','huxa'], 'ふぃ':['fi','fyi','fhi','hwi','huxi'],
+  'ふぇ':['fe','fye','fhe','hwe','huxe'], 'ふぉ':['fo','fho','hwo','huxo'],
+  'ふゅ':['fyu'],
+  'うぁ':['wha'], 'うぃ':['wi','whi','uxi'], 'うぇ':['we','whe','uxe'], 'うぉ':['who','uxo'],
+  'ゔぁ':['va'], 'ゔぃ':['vi','vyi'], 'ゔぇ':['ve','vye'], 'ゔぉ':['vo'],
+  'ゔゃ':['vya'], 'ゔゅ':['vyu'], 'ゔょ':['vyo'],
+  'てぃ':['thi','texi'], 'でぃ':['dhi','dexi'],
+  'てゅ':['thu'], 'でゅ':['dhu'],
+  'とぅ':['twu','toxu'], 'どぅ':['dwu','doxu'],
+  'しぇ':['she','sye','sxe'], 'じぇ':['je','zye','jye'],
+  'ちぇ':['che','tye','cye'],
+  'つぁ':['tsa'], 'つぃ':['tsi'], 'つぇ':['tse'], 'つぉ':['tso'],
+  'いぇ':['ye','iye'], 'きぇ':['kye'], 'ぎぇ':['gye'],
+  'にぇ':['nye'], 'ひぇ':['hye'], 'みぇ':['mye'], 'りぇ':['rye'], 'びぇ':['bye'], 'ぴぇ':['pye'],
+  // 小書き単独
+  'ぁ':['la','xa'], 'ぃ':['li','xi','lyi','xyi'],
+  'ぅ':['lu','xu'], 'ぇ':['le','xe','lye','xye'], 'ぉ':['lo','xo'],
+  'ゃ':['lya','xya'], 'ゅ':['lyu','xyu'], 'ょ':['lyo','xyo'],
+  // 句読点・記号 (ローマ字入力でそのまま)
+  'ー':['-'], '、':[','], '。':['.'],
+  '！':['!'], '？':['?'], '!':['!'], '?':['?'],
+  '・':['/'], '「':['['], '」':[']'],
+};
+
+// カタカナ → ひらがな
+function toHira(s) {
+  return s.replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+function hasKana(s) { return /[ぁ-ゖァ-ヶ]/.test(s); }
+
+// かな → モーラ列
+function extractMoras(kanaRaw) {
+  const kana = toHira(kanaRaw);
+  const moras = [];
+  let i = 0;
+  while (i < kana.length) {
+    const ch = kana[i];
+    if (ch === 'っ') { moras.push({type:'sokuon', display:'っ'}); i++; continue; }
+    if (ch === 'ん') { moras.push({type:'n', display:'ん'}); i++; continue; }
+    // 拗音 / 外来音 (2 文字結合)
+    if (i + 1 < kana.length) {
+      const combo = ch + kana[i+1];
+      if (KANA_PATTERNS[combo]) { moras.push({type:'mora', kana:combo, display:combo}); i+=2; continue; }
+    }
+    if (KANA_PATTERNS[ch]) { moras.push({type:'mora', kana:ch, display:ch}); i++; continue; }
+    // 未知 (英字や記号など) はそのまま
+    moras.push({type:'literal', text:ch, display:ch}); i++;
+  }
+  return moras;
+}
+
+// モーラ列 → 受理パターン列（文脈考慮）
+function buildAcceptedPatterns(moras) {
+  return moras.map((m, idx) => {
+    if (m.type === 'mora') {
+      return { patterns: [...(KANA_PATTERNS[m.kana] || [m.kana])] };
+    }
+    if (m.type === 'n') {
+      // ん: 単独 'n' は次が母音/y/n または語末でない場合のみ可
+      const next = moras[idx+1];
+      let allowSingleN = true;
+      if (!next) allowSingleN = false;
+      else if (next.type === 'n') allowSingleN = false;
+      else if (next.type === 'sokuon') allowSingleN = false;
+      else if (next.type === 'mora') {
+        const np = KANA_PATTERNS[next.kana] || [];
+        if (np.some(p => /^[aiueoyn]/.test(p))) allowSingleN = false;
+      }
+      const pats = ['nn', "n'", 'xn'];
+      if (allowSingleN) pats.unshift('n');
+      return { patterns: pats };
+    }
+    if (m.type === 'sokuon') {
+      // っ: 単独 ltu/xtu/ltsu/xtsu または 次子音重ね（次の単音子音1文字）
+      let pats = ['ltu','xtu','ltsu','xtsu'];
+      const next = moras[idx+1];
+      if (next && next.type === 'mora') {
+        const np = KANA_PATTERNS[next.kana] || [];
+        const firstChars = new Set();
+        np.forEach(p => {
+          if (p.length > 0 && !/^[aiueon]/.test(p[0])) firstChars.add(p[0]);
+        });
+        firstChars.forEach(c => pats.push(c));
+      }
+      return { patterns: [...new Set(pats)] };
+    }
+    // literal
+    return { patterns: [m.text] };
+  });
+}
+
+// マッチング: typed が patterns 列に従って受理可能かを判定
+// 戻り値: { ok, atMora, completed }
+function matchInput(typed, accepted) {
+  if (!accepted.length) return { ok:true, atMora:0, completed:true };
+  let states = [{moraIdx:0, pos:0, active: accepted[0].patterns.slice()}];
+  for (let i = 0; i < typed.length; i++) {
+    const ch = typed[i];
+    const next = [];
+    for (const st of states) {
+      const remaining = st.active.filter(p => p.length > st.pos && p[st.pos] === ch);
+      if (!remaining.length) continue;
+      const completed = remaining.filter(p => p.length === st.pos + 1);
+      const stillActive = remaining.filter(p => p.length > st.pos + 1);
+      if (stillActive.length) {
+        next.push({moraIdx: st.moraIdx, pos: st.pos+1, active: stillActive});
+      }
+      if (completed.length) {
+        const ni = st.moraIdx + 1;
+        if (ni >= accepted.length) {
+          next.push({moraIdx: ni, pos: 0, active: []});
+        } else {
+          next.push({moraIdx: ni, pos: 0, active: accepted[ni].patterns.slice()});
+        }
+      }
+    }
+    if (!next.length) return { ok:false, atMora:0, completed:false };
+    states = next;
+  }
+  let best = states[0];
+  for (const s of states) {
+    if (s.moraIdx > best.moraIdx) best = s;
+    else if (s.moraIdx === best.moraIdx && s.pos > best.pos) best = s;
+  }
+  return { ok:true, atMora: best.moraIdx, pos: best.pos, completed: best.moraIdx >= accepted.length };
+}
+
+// かなモーラ列 → ヒント表示HTML
+function renderKanaHintHtml(moras, completedMoraCount, hasPartial) {
+  return moras.map((m, idx) => {
+    const ch = m.display || '';
+    let cls = 'hint-char';
+    if (idx < completedMoraCount) cls += ' hint-typed';
+    else if (idx === completedMoraCount && hasPartial) cls += ' hint-partial';
+    return `<span class="${cls}">${escHtml(ch)}</span>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
 //  STORAGE
 // ══════════════════════════════════════════════
 const P = 'typing-en-v2-';
@@ -1129,7 +1320,7 @@ function loadLevelWordStats(lv) {
   return {};
 }
 function saveLevelWordStats(lv, obj) { localStorage.setItem(lvWordStatsKey(lv), JSON.stringify(obj)); }
-function recordWordStat(lv, enKey, missCount, durationMs) {
+function recordWordStat(lv, enKey, missCount, durationMs, typedLen) {
   if (!enKey) return;
   const stats = loadLevelWordStats(lv);
   const cur = stats[enKey] || { attempts:0, mistypes:0, perfect:0, bestCps:0 };
@@ -1137,7 +1328,9 @@ function recordWordStat(lv, enKey, missCount, durationMs) {
   cur.mistypes += missCount;
   if (missCount === 0) cur.perfect++;
   if (durationMs > 0) {
-    const cps = enKey.length / (durationMs / 1000);
+    // 打鍵数 / 秒（実際にタイプした文字数で算出 - 言語問わず公平）
+    const len = typedLen || enKey.length;
+    const cps = len / (durationMs / 1000);
     if (cps > (cur.bestCps || 0)) cur.bestCps = +cps.toFixed(2);
   }
   stats[enKey] = cur;
@@ -1168,6 +1361,8 @@ let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
 let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
+let currentMode='en';                   // 'en' | 'kana'
+let currentMoras=null, currentPatterns=null;
 let manageSelected=new Set();
 
 // ══════════════════════════════════════════════
@@ -1899,9 +2094,19 @@ function showWord(idx){
   const w=queue[idx], isLong=w.en.length>40;
   $('word-disp').textContent=w.ja;
   $('word-disp').classList.toggle('long-text',isLong);
-  currentHintData=generateHint(w.en);
   const hintEl=$('hint-disp');
-  hintEl.innerHTML=renderHintHtml(currentHintData,0);
+  if (hasKana(w.en)) {
+    currentMode='kana';
+    currentMoras = extractMoras(w.en);
+    currentPatterns = buildAcceptedPatterns(currentMoras);
+    currentHintData = null;
+    hintEl.innerHTML = renderKanaHintHtml(currentMoras, 0, false);
+  } else {
+    currentMode='en';
+    currentMoras=null; currentPatterns=null;
+    currentHintData = generateHint(w.en);
+    hintEl.innerHTML = renderHintHtml(currentHintData,0);
+  }
   hintEl.classList.toggle('long-text',isLong);
   inp.value=''; inp.className='';
   currentWordMisses = 0;
@@ -1914,6 +2119,30 @@ inp.addEventListener('input',()=>{
   if(!queue.length||!gameActive) return;
   const target=queue[curIdx].en, typed=normalizeEn(inp.value);
   totalKeystrokes++; inp.value=typed;
+
+  if (currentMode === 'kana') {
+    // 寿司打スタイル: マルチパターン受理
+    const r = matchInput(typed, currentPatterns);
+    if (r.ok) {
+      correctKeystrokes++; inp.classList.remove('ng');
+      inp.classList.toggle('ok', typed.length>0);
+      $('hint-disp').innerHTML = renderKanaHintHtml(currentMoras, r.atMora, r.pos>0);
+      if (r.completed) {
+        incrementWordCount(currentLevel, target);
+        recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
+        clears++; $('c-clear').textContent=clears; curIdx++;
+        if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
+        else showWord(curIdx);
+      }
+    } else {
+      misses++; currentWordMisses++; $('c-miss').textContent=misses;
+      inp.classList.remove('ok'); inp.classList.add('ng');
+      inp.value = typed.slice(0,-1);
+    }
+    return;
+  }
+
+  // 英語モード（既存ロジック）
   if(target.startsWith(typed)){
     correctKeystrokes++; inp.classList.remove('ng');
     inp.classList.toggle('ok',typed.length>0);
@@ -1923,7 +2152,7 @@ inp.addEventListener('input',()=>{
     }
     if(typed===target){
       incrementWordCount(currentLevel, target);
-      recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart);
+      recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
       clears++; $('c-clear').textContent=clears; curIdx++;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
@@ -2895,6 +3124,24 @@ function toast(msg, type) {
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 2900);
 }
+
+// ── 全記録リセット ──
+$('reset-all-btn').addEventListener('click', async () => {
+  const ok = await customConfirm({
+    title:'すべての記録をリセット',
+    desc:'全レベル（1〜100）のタイピング記録（出題回数・ミスタイプ・完璧率・最速・自己ベスト・前回スコア）をすべて消去します。\n\n単語データそのものは削除されません。\nこの操作は取り消せません。',
+    okText:'すべてリセット', danger:true
+  });
+  if (!ok) return;
+  for (let lv = 1; lv <= NUM_LEVELS; lv++) {
+    localStorage.removeItem('typing-en-v2-counts-lv'+lv);
+    localStorage.removeItem('typing-en-v2-wordstats-lv'+lv);
+    localStorage.removeItem('typing-en-v2-best-lv'+lv);
+    localStorage.removeItem('typing-en-v2-last-lv'+lv);
+  }
+  renderHomeScreen();
+  toast('すべての記録をリセットしました','suc');
+});
 
 renderHomeScreen();
 initVoiceSettings();
