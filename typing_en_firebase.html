@@ -347,6 +347,49 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .msg{font-size:0.8rem;padding:9px 13px;border-radius:var(--r-sm);margin-top:10px;display:none;font-weight:500;}
 .msg.err{background:var(--ng-bg);color:var(--ng);display:block;border-left:3px solid var(--ng);}
 .msg.suc{background:var(--ok-bg);color:var(--ok);display:block;border-left:3px solid var(--ok);}
+/* 練習設定: 並び替え＆クイック選択 */
+.filter-block{display:flex;flex-direction:column;gap:8px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px dashed var(--border);}
+.filter-block:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+.filter-label{font-size:0.7rem;font-weight:700;color:var(--sub);letter-spacing:0.04em;display:flex;align-items:center;gap:6px;}
+.filter-label .filter-hint{font-weight:500;color:var(--muted);font-size:0.66rem;letter-spacing:0;}
+.filter-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.filter-chip{padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;font-family:'Noto Sans JP',sans-serif;font-size:0.76rem;font-weight:600;color:var(--sub);cursor:pointer;transition:all 0.15s var(--ease);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
+.filter-chip:hover{border-color:var(--border2);color:var(--text);background:var(--surface-alt);}
+.filter-chip:active{transform:scale(0.97);}
+.filter-chip.on{background:var(--on-bg);border-color:var(--on);color:var(--on);box-shadow:0 0 0 3px rgba(201,100,66,0.08);}
+.filter-chip .chip-num{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.78rem;}
+.filter-chip .chip-pop{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--surface-alt);color:var(--muted);border:1px solid var(--border);line-height:1.4;}
+.filter-chip.on .chip-pop{background:#fff;color:var(--on);border-color:var(--on-soft);}
+.filter-chip.disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+.preset-chip{padding:7px 14px;font-size:0.78rem;font-weight:700;}
+.preset-chip.preset-quick{background:linear-gradient(180deg,var(--surface) 0%,var(--surface-alt) 100%);}
+.sel-stats{font-size:0.74rem;color:var(--sub);padding:6px 10px;background:var(--surface-alt);border-radius:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--border);transition:all 0.18s var(--ease);}
+.sel-stats b{font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:700;}
+.sel-stats.warn{background:var(--ng-bg);color:var(--ng);border-color:#f3cdcd;}
+.sel-stats.warn b{color:var(--ng);}
+.sel-stats .sel-empty{color:var(--ng);font-weight:600;}
+/* 練習設定の単語行：統計を右側にインライン表示 */
+.word-row .word-stats{display:flex;gap:4px;flex-wrap:wrap;align-items:center;justify-content:flex-end;flex-shrink:0;}
+.word-row .word-en{flex:0 1 auto;max-width:36%;}
+.word-row .word-ja{flex:1 1 auto;}
+.mini-stat{font-family:'JetBrains Mono',monospace;font-size:0.62rem;font-weight:700;padding:1px 6px;border-radius:8px;letter-spacing:0.02em;line-height:1.45;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;border:1px solid transparent;}
+.mini-stat .ml{font-family:'Noto Sans JP',sans-serif;font-size:0.58rem;font-weight:600;opacity:0.8;letter-spacing:0;}
+.ms-fresh{background:#f3f2ee;color:var(--muted);border-color:#e4e1d8;}
+.ms-zero{background:var(--ok-bg);color:var(--ok);border-color:#b8dcc5;}
+.ms-low{background:var(--gold-bg);color:var(--gold);border-color:#e6d5a0;}
+.ms-high{background:var(--ng-bg);color:var(--ng);border-color:#f3cdcd;}
+.ps-good{background:#eaf5ee;color:var(--ok);border-color:#b8dcc5;}
+.ps-mid{background:#f9f4ec;color:var(--gold);border-color:#e6d5a0;}
+.ps-low{background:#fdeaea;color:var(--ng);border-color:#f3cdcd;}
+.sp-fast{background:linear-gradient(135deg,#fdf6e3,#fff8e1);color:var(--gold);border-color:#e6d5a0;}
+.sp-mid{background:#eef5fb;color:#2563eb;border-color:#c7daf5;}
+.sp-slow{background:#f5f0f0;color:#8a7070;border-color:#ddd;}
+@media(max-width:600px){
+  .word-row .word-en{max-width:100%;flex:1 0 100%;font-size:0.7rem;text-align:left;}
+  .word-row .word-ja{flex:1 0 60%;}
+  .word-row .word-stats{flex:1 0 100%;justify-content:flex-start;margin-left:48px;}
+  .filter-chip{font-size:0.72rem;padding:5px 10px;}
+}
 /* round */
 .round-row{display:flex;gap:6px;flex-wrap:wrap}
 .round-chip{flex:1;min-width:54px;padding:10px 0;text-align:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:600;color:var(--sub);transition:all 0.18s var(--ease);}
@@ -742,12 +785,51 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   </div>
   <div id="pane-practice" style="display:flex;flex-direction:column;gap:16px">
     <div class="card">
-      <div class="sec-label">練習する単語（個別に ON / OFF）</div>
-      <div class="select-actions">
-        <button class="link-btn" id="all-on-btn">すべて ON</button>
-        <button class="link-btn" id="all-off-btn">すべて OFF</button>
+      <div class="sec-label">練習する単語</div>
+
+      <div class="filter-block">
+        <div class="filter-label">並び替え <span class="filter-hint">— 苦手な単語を上に集めて選びやすく</span></div>
+        <div class="filter-chips" id="sort-chips">
+          <button class="filter-chip on" data-sort="default">登録順</button>
+          <button class="filter-chip" data-sort="miss-desc">ミス多い順</button>
+          <button class="filter-chip" data-sort="perf-asc">完璧率 低い順</button>
+          <button class="filter-chip" data-sort="speed-asc">最速 遅い順</button>
+          <button class="filter-chip" data-sort="speed-desc">最速 速い順</button>
+          <button class="filter-chip" data-sort="attempts-desc">出題回数 多い順</button>
+          <button class="filter-chip" data-sort="fresh-first">未挑戦を上に</button>
+        </div>
       </div>
-      <div class="word-scroll" id="word-list"></div>
+
+      <div class="filter-block">
+        <div class="filter-label">クイック選択 <span class="filter-hint">— 条件に合う単語だけ ON にする</span></div>
+        <div class="filter-chips" id="preset-chips">
+          <button class="filter-chip preset-chip preset-quick" data-preset="all">すべて選択</button>
+          <button class="filter-chip preset-chip preset-quick" data-preset="none">すべて解除</button>
+          <button class="filter-chip preset-chip" data-preset="fresh">未挑戦のみ <span class="chip-pop" id="pp-fresh">0</span></button>
+          <button class="filter-chip preset-chip" data-preset="miss">ミスありのみ <span class="chip-pop" id="pp-miss">0</span></button>
+        </div>
+        <div class="filter-label" style="margin-top:4px">速度しきい値 <span class="filter-hint">— この速度未満の単語を ON</span></div>
+        <div class="filter-chips" id="speed-chips">
+          <button class="filter-chip preset-chip" data-speed="2">&lt; 2 打/秒 <span class="chip-pop" id="sp-2">0</span></button>
+          <button class="filter-chip preset-chip" data-speed="3">&lt; 3 打/秒 <span class="chip-pop" id="sp-3">0</span></button>
+          <button class="filter-chip preset-chip" data-speed="4">&lt; 4 打/秒 <span class="chip-pop" id="sp-4">0</span></button>
+          <button class="filter-chip preset-chip" data-speed="5">&lt; 5 打/秒 <span class="chip-pop" id="sp-5">0</span></button>
+          <button class="filter-chip preset-chip" data-speed="6">&lt; 6 打/秒 <span class="chip-pop" id="sp-6">0</span></button>
+        </div>
+        <div class="filter-label" style="margin-top:4px">完璧率しきい値 <span class="filter-hint">— この完璧率未満の単語を ON</span></div>
+        <div class="filter-chips" id="perf-chips">
+          <button class="filter-chip preset-chip" data-perf="30">&lt; 30%  <span class="chip-pop" id="pf-30">0</span></button>
+          <button class="filter-chip preset-chip" data-perf="50">&lt; 50%  <span class="chip-pop" id="pf-50">0</span></button>
+          <button class="filter-chip preset-chip" data-perf="70">&lt; 70%  <span class="chip-pop" id="pf-70">0</span></button>
+          <button class="filter-chip preset-chip" data-perf="90">&lt; 90%  <span class="chip-pop" id="pf-90">0</span></button>
+        </div>
+      </div>
+
+      <div class="sel-stats" id="sel-stats">
+        選択中 <b id="sel-count">0</b> / <b id="sel-total">0</b> 語
+      </div>
+
+      <div class="word-scroll" id="word-list" style="margin-top:10px"></div>
     </div>
     <div class="card">
       <div class="sec-label">出題数</div>
@@ -1276,6 +1358,11 @@ function enterLevel(lv) {
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
+  // 並び替えモードを復元
+  practiceSortMode = settings.practiceSortMode || 'default';
+  document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
+    b.classList.toggle('on', b.dataset.sort === practiceSortMode);
+  });
   renderWordList(); updateStartBtn(); showScreen('setup');
 }
 
@@ -1315,13 +1402,96 @@ $('level-title-save-btn').addEventListener('click',()=>{
 // ══════════════════════════════════════════════
 //  PRACTICE LIST
 // ══════════════════════════════════════════════
+let practiceSortMode = 'default';
+
+// 単語ごとの算出済み統計（ソート・フィルタで使用）
+function computeWordMetrics(idx) {
+  if (!words[idx]) return { idx, attempts:0, miss:0, perfect:0, bestCps:0, perfRate:null, hasStat:false, count:0 };
+  const en = words[idx].en;
+  const lvCounts = currentLevel ? loadLevelCounts(currentLevel) : {};
+  const lvStats  = currentLevel ? loadLevelWordStats(currentLevel) : {};
+  const s = lvStats[en];
+  const count = lvCounts[en] || 0;
+  if (!s || !s.attempts) {
+    return { idx, attempts:0, miss:0, perfect:0, bestCps:0, perfRate:null, hasStat:false, count };
+  }
+  const a = s.attempts;
+  const m = s.mistypes || 0;
+  const p = s.perfect  || 0;
+  return { idx, attempts:a, miss:m, perfect:p, bestCps:s.bestCps||0, perfRate: a>0 ? Math.round(p/a*100) : null, hasStat:true, count };
+}
+
+function getSortedIndices() {
+  const arr = words.map((_,i)=>computeWordMetrics(i));
+  const cmpDefault = (a,b) => a.idx - b.idx;
+  switch (practiceSortMode) {
+    case 'miss-desc':
+      arr.sort((a,b) => (b.miss - a.miss) || (b.attempts - a.attempts) || cmpDefault(a,b));
+      break;
+    case 'perf-asc':
+      // 未挑戦は末尾に
+      arr.sort((a,b) => {
+        if (a.perfRate===null && b.perfRate===null) return cmpDefault(a,b);
+        if (a.perfRate===null) return 1;
+        if (b.perfRate===null) return -1;
+        return (a.perfRate - b.perfRate) || (b.miss - a.miss) || cmpDefault(a,b);
+      });
+      break;
+    case 'speed-asc':
+      arr.sort((a,b) => {
+        // bestCps===0(未測定) は末尾
+        const av = a.bestCps || Infinity;
+        const bv = b.bestCps || Infinity;
+        return (av - bv) || cmpDefault(a,b);
+      });
+      break;
+    case 'speed-desc':
+      arr.sort((a,b) => (b.bestCps - a.bestCps) || cmpDefault(a,b));
+      break;
+    case 'attempts-desc':
+      arr.sort((a,b) => (b.attempts - a.attempts) || (b.count - a.count) || cmpDefault(a,b));
+      break;
+    case 'fresh-first':
+      arr.sort((a,b) => {
+        const af = (!a.hasStat && a.count===0) ? 0 : 1;
+        const bf = (!b.hasStat && b.count===0) ? 0 : 1;
+        return (af - bf) || cmpDefault(a,b);
+      });
+      break;
+    default:
+      arr.sort(cmpDefault);
+  }
+  return arr;
+}
+
+function buildMiniStatHtml(m) {
+  if (!m.hasStat) {
+    const lbl = m.count > 0 ? '記録なし' : '未挑戦';
+    return `<span class="mini-stat ms-fresh">${lbl}</span>`;
+  }
+  const missCls = m.miss === 0 ? 'ms-zero' : (m.miss <= 3 ? 'ms-low' : 'ms-high');
+  const perfCls = m.perfRate >= 80 ? 'ps-good' : (m.perfRate >= 50 ? 'ps-mid' : 'ps-low');
+  const spdCls  = m.bestCps >= 5 ? 'sp-fast' : (m.bestCps >= 3 ? 'sp-mid' : 'sp-slow');
+  const spdTxt  = m.bestCps > 0 ? m.bestCps.toFixed(1) : '—';
+  return `
+    <span class="mini-stat ${missCls}" title="累計ミス"><span class="ml">ミス</span>${m.miss}</span>
+    <span class="mini-stat ${perfCls}" title="完璧率（ミス0回 / 挑戦数）"><span class="ml">完璧</span>${m.perfRate}%</span>
+    <span class="mini-stat ${spdCls}" title="この単語の最速"><span class="ml">最速</span>${spdTxt}</span>
+  `;
+}
+
 function renderWordList() {
   const list=$('word-list'); list.innerHTML='';
+  updateSelStats();
   if(words.length===0){
     list.innerHTML='<div class="empty">単語がありません。「単語管理」タブから追加またはCSVインポートしてください。</div>';
+    updatePresetCounts();
     return;
   }
-  words.forEach((w,i)=>{
+  const sorted = getSortedIndices();
+  sorted.forEach(m=>{
+    const i = m.idx;
+    const w = words[i];
     const uid='tw'+i;
     const row=document.createElement('div');
     row.className='word-row';
@@ -1332,22 +1502,101 @@ function renderWordList() {
       </label>
       <span class="word-ja">${escHtml(w.ja)}</span>
       <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
+      <span class="word-stats">${buildMiniStatHtml(m)}</span>
     `;
     row.addEventListener('click',()=>{
       const cb=$(uid); cb.checked=!cb.checked;
       if(cb.checked) enabled.add(i); else enabled.delete(i);
-      saveLevelEnabled(currentLevel,enabled); updateStartBtn();
+      saveLevelEnabled(currentLevel,enabled); updateStartBtn(); updateSelStats();
     });
     row.querySelector('input').addEventListener('change',e=>{
       if(e.target.checked) enabled.add(i); else enabled.delete(i);
-      saveLevelEnabled(currentLevel,enabled); updateStartBtn(); e.stopPropagation();
+      saveLevelEnabled(currentLevel,enabled); updateStartBtn(); updateSelStats(); e.stopPropagation();
     });
     list.appendChild(row);
   });
+  updatePresetCounts();
 }
+
+function updateSelStats() {
+  $('sel-count').textContent = enabled.size;
+  $('sel-total').textContent = words.length;
+  const ss = $('sel-stats');
+  if (enabled.size === 0) ss.classList.add('warn');
+  else ss.classList.remove('warn');
+}
+
+// ── 各クイック選択ボタンの該当件数を更新 ──
+function updatePresetCounts() {
+  if (!words.length) {
+    ['pp-fresh','pp-miss','sp-2','sp-3','sp-4','sp-5','sp-6','pf-30','pf-50','pf-70','pf-90']
+      .forEach(id => { const el=$(id); if(el) el.textContent='0'; });
+    return;
+  }
+  const all = words.map((_,i)=>computeWordMetrics(i));
+  const cnt = pred => all.filter(pred).length;
+  const setText = (id,n) => { const el=$(id); if(el) el.textContent=String(n); };
+  setText('pp-fresh', cnt(m => !m.hasStat && m.count===0));
+  setText('pp-miss',  cnt(m => m.hasStat && m.miss > 0));
+  [2,3,4,5,6].forEach(t => setText('sp-'+t, cnt(m => m.hasStat && m.bestCps > 0 && m.bestCps < t)));
+  [30,50,70,90].forEach(t => setText('pf-'+t, cnt(m => m.hasStat && m.perfRate !== null && m.perfRate < t)));
+}
+
+// ── プリセット適用：条件に合う単語のみ ON ──
+function applyPreset(predicate) {
+  enabled.clear();
+  words.forEach((_,i)=>{
+    const m = computeWordMetrics(i);
+    if (predicate(m)) enabled.add(i);
+  });
+  saveLevelEnabled(currentLevel, enabled);
+  renderWordList(); updateStartBtn();
+}
+
+// 並び替えチップ
+document.querySelectorAll('#sort-chips .filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#sort-chips .filter-chip').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    practiceSortMode = btn.dataset.sort || 'default';
+    saveSettings({ practiceSortMode });
+    renderWordList();
+  });
+});
+
+function applyPresetWithToast(predicate, successMsg) {
+  applyPreset(predicate);
+  if (enabled.size === 0) toast('該当する単語がありません','err');
+  else toast(`${successMsg}（${enabled.size}語）`,'suc');
+}
+
+// プリセットチップ
+document.querySelectorAll('#preset-chips .filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = btn.dataset.preset;
+    if (p === 'all')   { applyPreset(() => true); toast(`すべて選択（${enabled.size}語）`,'suc'); }
+    else if (p === 'none') { applyPreset(() => false); toast('すべて解除しました'); }
+    else if (p === 'fresh') applyPresetWithToast(m => !m.hasStat && m.count === 0, '未挑戦の単語のみ選択');
+    else if (p === 'miss')  applyPresetWithToast(m => m.hasStat && m.miss > 0, 'ミスありの単語のみ選択');
+  });
+});
+
+// 速度しきい値チップ
+document.querySelectorAll('#speed-chips .filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = parseFloat(btn.dataset.speed);
+    applyPresetWithToast(m => m.hasStat && m.bestCps > 0 && m.bestCps < t, `最速 ${t} 打/秒未満`);
+  });
+});
+
+// 完璧率しきい値チップ
+document.querySelectorAll('#perf-chips .filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = parseInt(btn.dataset.perf,10);
+    applyPresetWithToast(m => m.hasStat && m.perfRate !== null && m.perfRate < t, `完璧率 ${t}% 未満`);
+  });
+});
 function updateStartBtn(){ $('start-btn').disabled=enabled.size===0; }
-$('all-on-btn').addEventListener('click',()=>{ words.forEach((_,i)=>enabled.add(i)); saveLevelEnabled(currentLevel,enabled); renderWordList(); updateStartBtn(); });
-$('all-off-btn').addEventListener('click',()=>{ enabled.clear(); saveLevelEnabled(currentLevel,enabled); renderWordList(); updateStartBtn(); });
 
 // ══════════════════════════════════════════════
 //  MANAGE LIST
@@ -1938,7 +2187,11 @@ function showResult(){
   if (isNewBest) setTimeout(()=>launchResultAnim('stars', speed), 900);
 }
 $('r-retry').addEventListener('click',startGame);
-$('r-back').addEventListener('click',()=>showScreen('setup'));
+$('r-back').addEventListener('click',()=>{
+  // ゲームで更新された統計を練習設定にも反映
+  if (currentLevel && $('pane-practice').style.display !== 'none') renderWordList();
+  showScreen('setup');
+});
 
 // ══════════════════════════════════════════════
 //  KEYS
@@ -1954,8 +2207,8 @@ document.addEventListener('keydown',e=>{
     if(scr==='result'){e.preventDefault();startGame();return;}
   }
   if(e.key==='Escape'){
-    if(scr==='game'&&gameActive){e.preventDefault();gameActive=false;disableCursorHide();restoreInput();showScreen('setup');return;}
-    if(scr==='result'){e.preventDefault();showScreen('setup');return;}
+    if(scr==='game'&&gameActive){e.preventDefault();gameActive=false;disableCursorHide();restoreInput();if(currentLevel) renderWordList();showScreen('setup');return;}
+    if(scr==='result'){e.preventDefault();if(currentLevel) renderWordList();showScreen('setup');return;}
     if(scr==='setup'){e.preventDefault();goHome();return;}
   }
 });
