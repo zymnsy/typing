@@ -1553,6 +1553,15 @@ $('csv-export-btn').addEventListener('click',()=>{
   showCsvMsg('suc',`${words.length} 件の単語をエクスポートしました`);
 });
 $('csv-import-btn').addEventListener('click',()=>$('csv-file-input').click());
+function deriveTitleFromFilename(name) {
+  // 拡張子削除
+  let t = name.replace(/\.[^.]+$/, '');
+  // 既存エクスポート命名（typing_lv12_xxx）からの再インポート時はレベル番号部分を除去
+  t = t.replace(/^typing_lv\d+_/i, '');
+  // アンダースコア・連続空白を整える
+  t = t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return t;
+}
 $('csv-file-input').addEventListener('change',e=>{
   const file=e.target.files[0]; if(!file) return;
   const reader=new FileReader();
@@ -1564,8 +1573,19 @@ $('csv-file-input').addEventListener('change',e=>{
       const ej=new Set(words.map(w=>w.ja));
       imported.forEach(row=>{ if(ej.has(row.ja)){skipped++;return;} words.push({ja:row.ja,en:row.en}); enabled.add(words.length-1); ej.add(row.ja); added++; });
       saveLevelWords(currentLevel,words); saveLevelEnabled(currentLevel,enabled);
+      // ファイル名からレベルタイトルを設定
+      let titleMsg = '';
+      const newTitle = deriveTitleFromFilename(file.name);
+      if (newTitle) {
+        saveLevelTitle(currentLevel, newTitle);
+        const cycle=((currentLevel-1)%5)+1;
+        $('setup-badge').textContent = `Lv.${currentLevel}  ${newTitle}`;
+        $('game-badge').textContent  = `Lv.${currentLevel}  ${newTitle}`;
+        const ti = $('level-title-input'); if (ti) ti.value = newTitle;
+        titleMsg = `／タイトル「${newTitle}」を適用`;
+      }
       renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel);
-      showCsvMsg('suc',`${added} 件インポートしました`+(skipped>0?`（重複 ${skipped} 件スキップ）`:''));
+      showCsvMsg('suc',`${added} 件インポートしました`+(skipped>0?`（重複 ${skipped} 件スキップ）`:'')+titleMsg);
     } catch(err){ showCsvMsg('err','CSVの読み込みに失敗しました: '+err.message); }
   };
   reader.readAsText(file,'UTF-8'); e.target.value='';
