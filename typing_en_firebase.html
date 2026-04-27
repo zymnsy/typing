@@ -58,8 +58,10 @@ async function saveAllToCloud() {
     if (c != null) payload['counts_lv'+lv]  = JSON.parse(c);
     const b = localStorage.getItem('typing-en-v2-best-lv'+lv);
     const ls = localStorage.getItem('typing-en-v2-last-lv'+lv);
+    const ws = localStorage.getItem('typing-en-v2-wordstats-lv'+lv);
     if (b != null)  payload['best_lv'+lv]  = JSON.parse(b);
     if (ls != null) payload['last_lv'+lv]  = JSON.parse(ls);
+    if (ws != null) payload['wordstats_lv'+lv] = JSON.parse(ws);
   }
   payload['settings'] = JSON.parse(localStorage.getItem('typing-en-v2-settings') || 'null');
   payload['updatedAt'] = Date.now();
@@ -82,6 +84,7 @@ async function loadFromCloud() {
       if (d['counts_lv'+lv]  != null) localStorage.setItem('typing-en-v2-counts-lv'+lv,  JSON.stringify(d['counts_lv'+lv]));
       if (d['best_lv'+lv]    != null) localStorage.setItem('typing-en-v2-best-lv'+lv,    JSON.stringify(d['best_lv'+lv]));
       if (d['last_lv'+lv]    != null) localStorage.setItem('typing-en-v2-last-lv'+lv,    JSON.stringify(d['last_lv'+lv]));
+      if (d['wordstats_lv'+lv] != null) localStorage.setItem('typing-en-v2-wordstats-lv'+lv, JSON.stringify(d['wordstats_lv'+lv]));
     }
     if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
   } catch(e) { console.warn('Cloud load failed:', e); }
@@ -303,6 +306,21 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .count-badge{flex-shrink:0;min-width:34px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:10px;background:#e8f0fe;color:#2563eb;border:1px solid #c7daf5;}
 .count-badge[data-zero="1"]{background:#f3f2ee;color:var(--muted);border-color:#e4e1d8;}
 .manage-cb{flex-shrink:0;width:17px;height:17px;accent-color:var(--ng);cursor:pointer;}
+/* 単語ごとの統計バッジ */
+.manage-row{flex-wrap:wrap;}
+.manage-row .word-en{flex:0 1 auto;}
+.stat-row{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:6px;margin-left:54px;margin-top:2px;align-items:center;}
+.stat-badge{font-family:'JetBrains Mono',monospace;font-size:0.66rem;font-weight:700;padding:2px 7px;border-radius:9px;letter-spacing:0.02em;line-height:1.4;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+.stat-badge .sl{font-family:'Noto Sans JP',sans-serif;font-size:0.62rem;font-weight:600;opacity:0.75;letter-spacing:0;}
+.sb-fresh{background:#f3f2ee;color:var(--muted);border:1px solid #e4e1d8;}
+.sb-miss-zero{background:var(--ok-bg);color:var(--ok);border:1px solid #b8dcc5;}
+.sb-miss-low{background:var(--gold-bg);color:var(--gold);border:1px solid #e6d5a0;}
+.sb-miss-high{background:var(--ng-bg);color:var(--ng);border:1px solid #f3cdcd;}
+.sb-perf-good{background:#eaf5ee;color:var(--ok);border:1px solid #b8dcc5;}
+.sb-perf-mid{background:#f9f4ec;color:var(--gold);border:1px solid #e6d5a0;}
+.sb-perf-low{background:#fdeaea;color:var(--ng);border:1px solid #f3cdcd;}
+.sb-speed{background:#eef5fb;color:#2563eb;border:1px solid #c7daf5;}
+.sb-speed-fast{background:linear-gradient(135deg,#fdf6e3,#fff8e1);color:var(--gold);border:1px solid #e6d5a0;}
 /* bulk bar */
 .bulk-bar{display:none;align-items:center;gap:10px;padding:11px 14px;background:var(--ng-bg);border:1px solid #f3cdcd;border-radius:var(--r-sm);margin-bottom:12px;animation:fadeSlideIn 0.22s var(--ease);box-shadow:var(--sh-xs);}
 .bulk-bar.show{display:flex}
@@ -1017,6 +1035,34 @@ function resetLevelCounts(lv) {
   localStorage.removeItem(lvCountsKey(lv));
 }
 
+// ── 単語ごとの統計（レベル毎） ──
+// 構造: { [enKey]: { attempts, mistypes, perfect, bestCps } }
+//   attempts : この単語をクリアした回数
+//   mistypes : この単語で出たミスタイプの累計
+//   perfect  : ミス0でクリアした回数（完璧）
+//   bestCps  : この単語の最高速度（打/秒）
+const lvWordStatsKey = lv => P+'wordstats-lv'+lv;
+function loadLevelWordStats(lv) {
+  try { const r=localStorage.getItem(lvWordStatsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
+  return {};
+}
+function saveLevelWordStats(lv, obj) { localStorage.setItem(lvWordStatsKey(lv), JSON.stringify(obj)); }
+function recordWordStat(lv, enKey, missCount, durationMs) {
+  if (!enKey) return;
+  const stats = loadLevelWordStats(lv);
+  const cur = stats[enKey] || { attempts:0, mistypes:0, perfect:0, bestCps:0 };
+  cur.attempts++;
+  cur.mistypes += missCount;
+  if (missCount === 0) cur.perfect++;
+  if (durationMs > 0) {
+    const cps = enKey.length / (durationMs / 1000);
+    if (cps > (cur.bestCps || 0)) cur.bestCps = +cps.toFixed(2);
+  }
+  stats[enKey] = cur;
+  saveLevelWordStats(lv, stats);
+}
+function resetLevelWordStats(lv) { localStorage.removeItem(lvWordStatsKey(lv)); }
+
 // ── 自己ベスト（レベル毎） ──
 const lvBestKey = lv => P+'best-lv'+lv;
 function loadLevelBest(lv) {
@@ -1039,6 +1085,7 @@ function saveSettings(obj){ const c=loadSettings(); Object.assign(c,obj); localS
 let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
 let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
+let currentWordMisses=0, currentWordStart=0;
 let manageSelected=new Set();
 
 // ══════════════════════════════════════════════
@@ -1321,11 +1368,37 @@ function updateCumulativeBanner() {
   goal.textContent = remaining > 0 ? `目標 ${GOAL.toLocaleString()} まであと ${remaining.toLocaleString()}` : '🎉 目標達成！';
 }
 
+function buildStatRow(stat, oldCount) {
+  // stat = {attempts, mistypes, perfect, bestCps} | undefined
+  if (!stat || !stat.attempts) {
+    const label = (oldCount && oldCount > 0) ? '詳細記録なし' : '未挑戦';
+    return `<div class="stat-row"><span class="stat-badge sb-fresh">${label}</span></div>`;
+  }
+  const a = stat.attempts;
+  const m = stat.mistypes || 0;
+  const p = stat.perfect || 0;
+  const bps = stat.bestCps || 0;
+  // ミス badge: 0なら緑、3以下黄、それ以上赤
+  const missCls = m === 0 ? 'sb-miss-zero' : (m <= 3 ? 'sb-miss-low' : 'sb-miss-high');
+  // 完璧率
+  const perfRate = a > 0 ? Math.round(p/a*100) : 0;
+  const perfCls = perfRate >= 80 ? 'sb-perf-good' : (perfRate >= 50 ? 'sb-perf-mid' : 'sb-perf-low');
+  // 速度
+  const spdCls = bps >= 5 ? 'sb-speed-fast' : 'sb-speed';
+  const spdTxt = bps > 0 ? bps.toFixed(1) : '—';
+  return `<div class="stat-row">
+    <span class="stat-badge ${missCls}" title="累計ミスタイプ"><span class="sl">ミス</span>${m}</span>
+    <span class="stat-badge ${perfCls}" title="ミス0でクリアした回数 / 累計挑戦回数"><span class="sl">完璧</span>${p}/${a}（${perfRate}%）</span>
+    <span class="stat-badge ${spdCls}" title="この単語の最高速度"><span class="sl">最速</span>${spdTxt}<span class="sl">打/秒</span></span>
+  </div>`;
+}
+
 function renderManageList() {
   const list=$('manage-list'), empty=$('manage-empty');
   list.innerHTML='';
   $('word-count-label').textContent=`（${words.length}件）`;
   const lvCounts = currentLevel ? loadLevelCounts(currentLevel) : {};
+  const lvStats = currentLevel ? loadLevelWordStats(currentLevel) : {};
   updateCumulativeBanner();
   if(words.length===0){ empty.style.display='block'; $('manage-select-actions').style.display='none'; return; }
   empty.style.display='none'; $('manage-select-actions').style.display='flex';
@@ -1341,6 +1414,7 @@ function renderManageList() {
       <span class="word-en" title="${escHtml(w.en)}">${escHtml(w.en)}</span>
       <span class="count-badge" title="累積出題回数" data-zero="${(lvCounts[w.en]||0)===0?1:0}">${(lvCounts[w.en]||0).toLocaleString()}</span>
       <button class="del-btn" title="削除" data-i="${i}">✕</button>
+      ${buildStatRow(lvStats[w.en], lvCounts[w.en])}
     `;
     row.querySelector('.manage-cb').addEventListener('change',e=>{
       const idx=parseInt(e.target.dataset.i);
@@ -1446,17 +1520,19 @@ $('add-en').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.met
 $('add-ja').addEventListener('keydown',e=>{if(e.key==='Enter')$('add-en').focus();});
 $('count-reset-btn').addEventListener('click',async ()=>{
   if(!currentLevel) return;
-  const ok=await customConfirm({title:'累積カウントをリセット',desc:'このレベルのタイピング記録がすべて0になります。\n単語そのものは削除されません。',okText:'リセット',danger:true});
+  const ok=await customConfirm({title:'累積カウントをリセット',desc:'このレベルのタイピング記録（出題回数・ミスタイプ・最速・完璧率）がすべて0になります。\n単語そのものは削除されません。',okText:'リセット',danger:true});
   if(!ok) return;
   resetLevelCounts(currentLevel);
+  resetLevelWordStats(currentLevel);
   updateCumulativeBanner();
   renderManageList();
   toast('累積カウントをリセットしました','suc');
 });
 $('reset-btn').addEventListener('click',async ()=>{
-  const ok=await customConfirm({title:'単語をすべて削除',desc:`このレベル（${words.length} 語）の単語リストをまるごとクリアします。\nこの操作は取り消せません。`,okText:'すべて削除',danger:true});
+  const ok=await customConfirm({title:'単語をすべて削除',desc:`このレベル（${words.length} 語）の単語リストをまるごとクリアします。\nタイピング記録も合わせてリセットされます。\nこの操作は取り消せません。`,okText:'すべて削除',danger:true});
   if(!ok) return;
   words=[]; saveLevelWords(currentLevel,words); enabled=new Set(); saveLevelEnabled(currentLevel,enabled);
+  resetLevelCounts(currentLevel); resetLevelWordStats(currentLevel);
   manageSelected.clear(); renderManageList(); renderWordList(); updateStartBtn(); refreshHomeCard(currentLevel); updateBulkBar();
   toast('単語リストをクリアしました','suc');
 });
@@ -1559,6 +1635,8 @@ function showWord(idx){
   hintEl.innerHTML=renderHintHtml(currentHintData,0);
   hintEl.classList.toggle('long-text',isLong);
   inp.value=''; inp.className='';
+  currentWordMisses = 0;
+  currentWordStart = Date.now();
   $('game-prog').innerHTML=`${idx+1}<span class="prog-sep">/</span><span class="prog-total">${totalRounds}</span>`;
   $('bar-fill').style.width=(idx/totalRounds*100)+'%';
 }
@@ -1576,12 +1654,13 @@ inp.addEventListener('input',()=>{
     }
     if(typed===target){
       incrementWordCount(currentLevel, target);
+      recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart);
       clears++; $('c-clear').textContent=clears; curIdx++;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
     }
   } else {
-    misses++; $('c-miss').textContent=misses;
+    misses++; currentWordMisses++; $('c-miss').textContent=misses;
     inp.classList.remove('ok'); inp.classList.add('ng');
     inp.value=typed.slice(0,-1);
   }
