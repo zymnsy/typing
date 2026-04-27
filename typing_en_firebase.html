@@ -1136,7 +1136,7 @@ const KANA_PATTERNS = {
   'うぁ':['wha'], 'うぃ':['wi','whi','uxi'], 'うぇ':['we','whe','uxe'], 'うぉ':['who','uxo'],
   'ゔぁ':['va'], 'ゔぃ':['vi','vyi'], 'ゔぇ':['ve','vye'], 'ゔぉ':['vo'],
   'ゔゃ':['vya'], 'ゔゅ':['vyu'], 'ゔょ':['vyo'],
-  'てぃ':['thi','texi'], 'でぃ':['dhi','dexi'],
+  'てぃ':['thi','texi'], 'でぃ':['di','dhi','dexi'],  // 'di' は ROMAJI_TO_KANA で でぃ に割当てているため受理
   'てゅ':['thu'], 'でゅ':['dhu'],
   'とぅ':['twu','toxu'], 'どぅ':['dwu','doxu'],
   'しぇ':['she','sye','sxe'], 'じぇ':['je','zye','jye'],
@@ -1302,42 +1302,85 @@ const ROMAJI_TO_KANA = (() => {
   return map;
 })();
 
-// ローマ字 → ひらがな （失敗時は null）
-function romajiToKana(romanRaw) {
+// ローマ字 → モーラ列＋元ローマ字の範囲 （失敗時は null）
+// 戻り値: [{ moraKana, segStart, segEnd }] — segStart/End は roman 内インデックス
+function parseRomajiToMoraSegments(romanRaw) {
   const roman = romanRaw.toLowerCase();
-  let out = '';
+  const out = [];
   let i = 0;
   while (i < roman.length) {
+    const start = i;
     const ch = roman[i];
     const nx = roman[i+1];
-    // 'nn' → ん
-    if (ch === 'n' && nx === 'n') { out += 'ん'; i += 2; continue; }
-    // 'n' 単独 → 次が子音 (n/y/母音以外) または語末
+    if (ch === 'n' && nx === 'n') { out.push({ moraKana:'ん', segStart:start, segEnd:i+2 }); i += 2; continue; }
     if (ch === 'n') {
-      if (i + 1 === roman.length) { out += 'ん'; i++; continue; }
-      if (/[bcdfghjkmpqrstvwxz]/.test(nx)) { out += 'ん'; i++; continue; }
+      if (i + 1 === roman.length) { out.push({ moraKana:'ん', segStart:start, segEnd:i+1 }); i++; continue; }
+      if (/[bcdfghjkmpqrstvwxz]/.test(nx)) { out.push({ moraKana:'ん', segStart:start, segEnd:i+1 }); i++; continue; }
     }
-    // 子音重ね → っ
     if (nx === ch && /[bcdfghjklmpqrstvwxyz]/.test(ch)) {
-      out += 'っ'; i++; continue;
+      out.push({ moraKana:'っ', segStart:start, segEnd:i+1 }); i++; continue;
     }
-    // 長音
-    if (ch === '-') { out += 'ー'; i++; continue; }
-    // 句読点
-    if (',.!?'.includes(ch)) { out += ch; i++; continue; }
-    if (ch === ' ') { out += ' '; i++; continue; }
-    // 最長一致 (4 → 1 文字)
+    if (ch === '-') { out.push({ moraKana:'ー', segStart:start, segEnd:i+1 }); i++; continue; }
+    if (',.!?'.includes(ch)) { out.push({ moraKana:ch, segStart:start, segEnd:i+1 }); i++; continue; }
+    if (ch === ' ') { out.push({ moraKana:' ', segStart:start, segEnd:i+1 }); i++; continue; }
     let matched = null;
     for (let L = 4; L >= 1; L--) {
       if (i + L > roman.length) continue;
       const sub = roman.substring(i, i + L);
       if (ROMAJI_TO_KANA[sub]) { matched = { k: ROMAJI_TO_KANA[sub], L }; break; }
     }
-    if (matched) { out += matched.k; i += matched.L; continue; }
-    // 解析不能 → 失敗（呼び出し側で英語モードへフォールバック）
+    if (matched) {
+      out.push({ moraKana: matched.k, segStart: start, segEnd: start + matched.L });
+      i += matched.L;
+      continue;
+    }
     return null;
   }
   return out;
+}
+
+// 後方互換: ローマ字 → かな文字列のみ
+function romajiToKana(romanRaw) {
+  const segs = parseRomajiToMoraSegments(romanRaw);
+  return segs ? segs.map(s => s.moraKana).join('') : null;
+}
+
+// モーラ列（type/kana 等）からノーマライズされた canonical ローマ字を生成
+// 戻り値: { roman, segments }  segments[i] = [start,end] in roman
+function deriveCanonicalRomaji(moras) {
+  let roman = '';
+  const segments = [];
+  for (let i = 0; i < moras.length; i++) {
+    const m = moras[i];
+    const start = roman.length;
+    let chunk = '';
+    if (m.type === 'mora') {
+      chunk = (KANA_PATTERNS[m.kana] || [m.kana])[0];
+    } else if (m.type === 'n') {
+      const next = moras[i+1];
+      let needsNn = !next || next.type === 'n' || next.type === 'sokuon';
+      if (next && next.type === 'mora') {
+        const np = KANA_PATTERNS[next.kana] || [];
+        if (np.some(p => /^[aiueoyn]/.test(p))) needsNn = true;
+      }
+      chunk = needsNn ? 'nn' : 'n';
+    } else if (m.type === 'sokuon') {
+      const next = moras[i+1];
+      if (next && next.type === 'mora') {
+        const np = KANA_PATTERNS[next.kana] || [];
+        const fp = np[0] || '';
+        if (fp.length > 0 && !/^[aiueon]/.test(fp[0])) chunk = fp[0];
+        else chunk = 'ltu';
+      } else {
+        chunk = 'ltu';
+      }
+    } else {
+      chunk = m.text || '';
+    }
+    roman += chunk;
+    segments.push([start, start + chunk.length]);
+  }
+  return { roman, segments };
 }
 
 function tryParseJapaneseRomaji(s) {
@@ -1352,6 +1395,51 @@ function tryParseJapaneseRomaji(s) {
   const moras = extractMoras(k);
   if (moras.length < 3) return null;
   return k;
+}
+
+// 出題用のモーラ＋表示ローマ字＋セグメント情報を返す
+//  - en がローマ字: 元の en をそのまま表示（ユーザの慣習を尊重）
+//  - en がかな   : KANA_PATTERNS の最初のパターンから canonical ローマ字を生成
+function buildPracticeDisplay(en) {
+  if (hasKana(en)) {
+    const moras = extractMoras(en);
+    if (!moras.length) return null;
+    const d = deriveCanonicalRomaji(moras);
+    return { moras, displayRoman: d.roman, segments: d.segments };
+  }
+  if (!/^[a-zA-Z\-\s,.!?]+$/.test(en)) return null;
+  const segs = parseRomajiToMoraSegments(en);
+  if (!segs) return null;
+  if (segs.length < 3) return null;
+  const moras = segs.map(s => {
+    if (s.moraKana === 'っ') return { type:'sokuon', display:'っ' };
+    if (s.moraKana === 'ん') return { type:'n', display:'ん' };
+    if (KANA_PATTERNS[s.moraKana]) return { type:'mora', kana: s.moraKana, display: s.moraKana };
+    return { type:'literal', text: s.moraKana, display: s.moraKana };
+  });
+  return {
+    moras,
+    displayRoman: en,
+    segments: segs.map(s => [s.segStart, s.segEnd])
+  };
+}
+
+// ローマ字を、モーラ完了数に応じて緑にハイライト
+function renderRomajiHintHtml(roman, segments, atMora) {
+  const completedEnd = atMora <= 0 ? 0 : segments[Math.min(atMora, segments.length) - 1][1];
+  const out = [];
+  for (let i = 0; i < roman.length; i++) {
+    const c = roman[i];
+    if (c === ' ') {
+      out.push(i < completedEnd
+        ? '<span class="hint-space-typed"></span>'
+        : '<span class="hint-space"></span>');
+    } else {
+      const cls = i < completedEnd ? 'hint-char hint-typed' : 'hint-char';
+      out.push(`<span class="${cls}">${escHtml(c)}</span>`);
+    }
+  }
+  return out.join('');
 }
 
 // かなモーラ列 → ヒント表示HTML
@@ -1473,6 +1561,7 @@ let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
 let currentMode='en';                   // 'en' | 'kana'
 let currentMoras=null, currentPatterns=null;
+let currentRoman='', currentSegments=null; // kana モードでのローマ字表示用
 let manageSelected=new Set();
 
 // ══════════════════════════════════════════════
@@ -2224,25 +2313,31 @@ function startGame(){
 $('start-btn').addEventListener('click',startGame);
 
 function showWord(idx){
-  const w=queue[idx], isLong=w.en.length>40;
+  const w=queue[idx];
   $('word-disp').textContent=w.ja;
-  $('word-disp').classList.toggle('long-text',isLong);
   const hintEl=$('hint-disp');
-  // モード判定: かな含有 or ローマ字パース可能 → 寿司打スタイル
-  const kanaTarget = tryParseJapaneseRomaji(w.en);
-  if (kanaTarget) {
+  // モード判定: かな含有 or ローマ字パース可能(3モーラ以上) → 寿司打スタイル
+  const display = buildPracticeDisplay(w.en);
+  if (display) {
     currentMode='kana';
-    currentMoras = extractMoras(kanaTarget);
+    currentMoras    = display.moras;
     currentPatterns = buildAcceptedPatterns(currentMoras);
+    currentRoman    = display.displayRoman;
+    currentSegments = display.segments;
     currentHintData = null;
-    hintEl.innerHTML = renderKanaHintHtml(currentMoras, 0, false);
+    const isLong = currentRoman.length > 40;
+    $('word-disp').classList.toggle('long-text', isLong);
+    hintEl.classList.toggle('long-text', isLong);
+    hintEl.innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, 0);
   } else {
     currentMode='en';
-    currentMoras=null; currentPatterns=null;
+    currentMoras=null; currentPatterns=null; currentSegments=null;
     currentHintData = generateHint(w.en);
+    const isLong = w.en.length > 40;
+    $('word-disp').classList.toggle('long-text', isLong);
+    hintEl.classList.toggle('long-text', isLong);
     hintEl.innerHTML = renderHintHtml(currentHintData,0);
   }
-  hintEl.classList.toggle('long-text',isLong);
   inp.value=''; inp.className='';
   currentWordMisses = 0;
   currentWordStart = Date.now();
@@ -2279,7 +2374,7 @@ inp.addEventListener('input',()=>{
       clearTimeout(inp._ngTimer);
       inp.classList.remove('ng');
       inp.classList.toggle('ok', typed.length>0);
-      $('hint-disp').innerHTML = renderKanaHintHtml(currentMoras, r.atMora, r.pos>0);
+      $('hint-disp').innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, r.atMora);
       if (r.completed) {
         incrementWordCount(currentLevel, target);
         recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
