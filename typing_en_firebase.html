@@ -911,7 +911,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
           </div>
           <div class="cum-bar-wrap"><div id="cumulative-bar" class="cum-bar"></div></div>
         </div>
-        <button id="count-reset-btn" class="btn-count-reset">カウントリセット</button>
+        <button id="count-reset-btn" class="btn-count-reset">このレベルの記録をリセット</button>
       </div>
       <div class="sec-label">登録済み単語 <span id="word-count-label"></span></div>
       <div class="bulk-bar" id="bulk-bar">
@@ -1424,18 +1424,26 @@ function buildPracticeDisplay(en) {
   };
 }
 
-// ローマ字を、モーラ完了数に応じて緑にハイライト
-function renderRomajiHintHtml(roman, segments, atMora) {
-  const completedEnd = atMora <= 0 ? 0 : segments[Math.min(atMora, segments.length) - 1][1];
+// ローマ字を 1 文字ごとに緑にハイライト
+//  atMora: 完了したモーラ数（前モーラまでは全部緑）
+//  posInMora: 現モーラ内で打鍵済みの文字数（部分ハイライト）
+function renderRomajiHintHtml(roman, segments, atMora, posInMora) {
+  let highlightEnd = atMora <= 0 ? 0 : segments[Math.min(atMora, segments.length) - 1][1];
+  // 現モーラ内の部分ハイライト
+  if (posInMora > 0 && atMora < segments.length) {
+    const segStart = segments[atMora][0];
+    const segEnd   = segments[atMora][1];
+    highlightEnd = Math.max(highlightEnd, Math.min(segStart + posInMora, segEnd));
+  }
   const out = [];
   for (let i = 0; i < roman.length; i++) {
     const c = roman[i];
     if (c === ' ') {
-      out.push(i < completedEnd
+      out.push(i < highlightEnd
         ? '<span class="hint-space-typed"></span>'
         : '<span class="hint-space"></span>');
     } else {
-      const cls = i < completedEnd ? 'hint-char hint-typed' : 'hint-char';
+      const cls = i < highlightEnd ? 'hint-char hint-typed' : 'hint-char';
       out.push(`<span class="${cls}">${escHtml(c)}</span>`);
     }
   }
@@ -2166,13 +2174,20 @@ $('add-en').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.met
 $('add-ja').addEventListener('keydown',e=>{if(e.key==='Enter')$('add-en').focus();});
 $('count-reset-btn').addEventListener('click',async ()=>{
   if(!currentLevel) return;
-  const ok=await customConfirm({title:'累積カウントをリセット',desc:'このレベルのタイピング記録（出題回数・ミスタイプ・最速・完璧率）がすべて0になります。\n単語そのものは削除されません。',okText:'リセット',danger:true});
+  const ok=await customConfirm({
+    title:'このレベルの記録をリセット',
+    desc:`Lv.${currentLevel}「${loadLevelTitle(currentLevel)}」の以下の記録をすべて消去します。\n\n・出題回数 / ミスタイプ / 完璧率 / 最速（単語ごと）\n・自己ベスト・前回スコア（レベル全体）\n\n単語そのものは削除されません。\nこの操作は取り消せません。`,
+    okText:'リセット', danger:true
+  });
   if(!ok) return;
   resetLevelCounts(currentLevel);
   resetLevelWordStats(currentLevel);
+  localStorage.removeItem('typing-en-v2-best-lv'+currentLevel);
+  localStorage.removeItem('typing-en-v2-last-lv'+currentLevel);
   updateCumulativeBanner();
   renderManageList();
-  toast('累積カウントをリセットしました','suc');
+  refreshHomeCard(currentLevel);
+  toast(`Lv.${currentLevel} の記録をリセットしました`,'suc');
 });
 $('reset-btn').addEventListener('click',async ()=>{
   const ok=await customConfirm({title:'単語をすべて削除',desc:`このレベル（${words.length} 語）の単語リストをまるごとクリアします。\nタイピング記録も合わせてリセットされます。\nこの操作は取り消せません。`,okText:'すべて削除',danger:true});
@@ -2328,7 +2343,7 @@ function showWord(idx){
     const isLong = currentRoman.length > 40;
     $('word-disp').classList.toggle('long-text', isLong);
     hintEl.classList.toggle('long-text', isLong);
-    hintEl.innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, 0);
+    hintEl.innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, 0, 0);
   } else {
     currentMode='en';
     currentMoras=null; currentPatterns=null; currentSegments=null;
@@ -2374,7 +2389,7 @@ inp.addEventListener('input',()=>{
       clearTimeout(inp._ngTimer);
       inp.classList.remove('ng');
       inp.classList.toggle('ok', typed.length>0);
-      $('hint-disp').innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, r.atMora);
+      $('hint-disp').innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, r.atMora, r.pos || 0);
       if (r.completed) {
         incrementWordCount(currentLevel, target);
         recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
