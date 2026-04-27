@@ -1345,10 +1345,12 @@ function tryParseJapaneseRomaji(s) {
   if (!/^[a-zA-Z\-\s,.!?]+$/.test(s)) return null;
   const k = romajiToKana(s);
   if (!k) return null;
-  // 解析結果に英字が残っていれば失敗
   if (/[a-zA-Z]/.test(k)) return null;
-  // 1モーラ未満（純粋な英字なし）も拒否しない – かな化されていればOK
   if (!hasKana(k)) return null;
+  // 短い英単語の誤判定回避: モーラ数が3未満なら英語モードへ
+  // 例: "ten"→てん, "in"→いん, "on"→おん 等は英語として扱う
+  const moras = extractMoras(k);
+  if (moras.length < 3) return null;
   return k;
 }
 
@@ -2253,11 +2255,29 @@ inp.addEventListener('input',()=>{
   const target=queue[curIdx].en, typed=normalizeEn(inp.value);
   totalKeystrokes++; inp.value=typed;
 
+  // 誤入力リジェクトを視覚化して、shake後に有効プレフィックスへ戻す共通処理
+  function flashMissAndRevert(revertTo) {
+    inp.classList.remove('ok');
+    // shake を再トリガするためにクラスを一旦外して reflow → 付け直す
+    inp.classList.remove('ng');
+    void inp.offsetWidth;
+    inp.classList.add('ng');
+    inp.value = revertTo;
+    clearTimeout(inp._ngTimer);
+    inp._ngTimer = setTimeout(() => {
+      inp.classList.remove('ng');
+      if (inp.value.length > 0) inp.classList.add('ok');
+      else inp.classList.remove('ok');
+    }, 220);
+  }
+
   if (currentMode === 'kana') {
     // 寿司打スタイル: マルチパターン受理
     const r = matchInput(typed, currentPatterns);
     if (r.ok) {
-      correctKeystrokes++; inp.classList.remove('ng');
+      correctKeystrokes++;
+      clearTimeout(inp._ngTimer);
+      inp.classList.remove('ng');
       inp.classList.toggle('ok', typed.length>0);
       $('hint-disp').innerHTML = renderKanaHintHtml(currentMoras, r.atMora, r.pos>0);
       if (r.completed) {
@@ -2269,15 +2289,16 @@ inp.addEventListener('input',()=>{
       }
     } else {
       misses++; currentWordMisses++; $('c-miss').textContent=misses;
-      inp.classList.remove('ok'); inp.classList.add('ng');
-      inp.value = typed.slice(0,-1);
+      flashMissAndRevert(typed.slice(0,-1));
     }
     return;
   }
 
   // 英語モード（既存ロジック）
   if(target.startsWith(typed)){
-    correctKeystrokes++; inp.classList.remove('ng');
+    correctKeystrokes++;
+    clearTimeout(inp._ngTimer);
+    inp.classList.remove('ng');
     inp.classList.toggle('ok',typed.length>0);
     $('hint-disp').innerHTML=renderHintHtml(currentHintData,typed.length);
     if(typed.length===target.length-1&&target.length>1&&!voiceSpeaking){
@@ -2292,8 +2313,7 @@ inp.addEventListener('input',()=>{
     }
   } else {
     misses++; currentWordMisses++; $('c-miss').textContent=misses;
-    inp.classList.remove('ok'); inp.classList.add('ng');
-    inp.value=typed.slice(0,-1);
+    flashMissAndRevert(typed.slice(0,-1));
   }
 });
 
