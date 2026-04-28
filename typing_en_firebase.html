@@ -815,6 +815,9 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
           <button class="filter-chip preset-chip preset-quick" data-preset="none">すべて解除</button>
           <button class="filter-chip preset-chip" data-preset="fresh">未挑戦のみ <span class="chip-pop" id="pp-fresh">0</span></button>
           <button class="filter-chip preset-chip" data-preset="miss">ミスありのみ <span class="chip-pop" id="pp-miss">0</span></button>
+          <button class="filter-chip preset-chip preset-quick" data-top-n="10">上位10のみ</button>
+          <button class="filter-chip preset-chip preset-quick" data-top-n="20">上位20のみ</button>
+          <button class="filter-chip preset-chip preset-quick" data-top-n="30">上位30のみ</button>
         </div>
         <div class="filter-label" style="margin-top:4px">速度しきい値 <span class="filter-hint">— この速度未満の単語を ON</span></div>
         <div class="filter-chips" id="speed-chips">
@@ -1417,11 +1420,32 @@ function buildPracticeDisplay(en) {
     if (KANA_PATTERNS[s.moraKana]) return { type:'mora', kana: s.moraKana, display: s.moraKana };
     return { type:'literal', text: s.moraKana, display: s.moraKana };
   });
-  return {
-    moras,
-    displayRoman: en,
-    segments: segs.map(s => [s.segStart, s.segEnd])
-  };
+  // 「ん」が単独 'n' で書かれているが 'nn' が必須（語末・次が母音/y/n・次が促音/ん）の場合、
+  // 表示上に 'n' を補って 'nn' に揃える（実際の打鍵に合わせる）
+  let displayRoman = en;
+  const segments = segs.map(s => [s.segStart, s.segEnd]);
+  let offset = 0;
+  for (let i = 0; i < segs.length; i++) {
+    const adjStart = segs[i].segStart + offset;
+    const adjEnd = segs[i].segEnd + offset;
+    segments[i] = [adjStart, adjEnd];
+    if (segs[i].moraKana === 'ん' && (segs[i].segEnd - segs[i].segStart) === 1) {
+      const next = moras[i+1];
+      let needsNn = false;
+      if (!next) needsNn = true;
+      else if (next.type === 'n' || next.type === 'sokuon') needsNn = true;
+      else if (next.type === 'mora') {
+        const np = KANA_PATTERNS[next.kana] || [];
+        if (np.some(p => /^[aiueoyn]/.test(p))) needsNn = true;
+      }
+      if (needsNn) {
+        displayRoman = displayRoman.slice(0, adjEnd) + 'n' + displayRoman.slice(adjEnd);
+        segments[i] = [adjStart, adjEnd + 1];
+        offset++;
+      }
+    }
+  }
+  return { moras, displayRoman, segments };
 }
 
 // ローマ字を 1 文字ごとに緑にハイライト
@@ -1978,6 +2002,18 @@ function applyPresetWithToast(predicate, successMsg) {
 // プリセットチップ
 document.querySelectorAll('#preset-chips .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.dataset.topN) {
+      const n = parseInt(btn.dataset.topN, 10);
+      const sorted = getSortedIndices();
+      enabled.clear();
+      sorted.slice(0, n).forEach(m => enabled.add(m.idx));
+      saveLevelEnabled(currentLevel, enabled);
+      renderWordList();
+      updateStartBtn();
+      if (enabled.size === 0) toast('該当する単語がありません','err');
+      else toast(`現在の並び順で上位${enabled.size}件を選択`,'suc');
+      return;
+    }
     const p = btn.dataset.preset;
     if (p === 'all')   { applyPreset(() => true); toast(`すべて選択（${enabled.size}語）`,'suc'); }
     else if (p === 'none') { applyPreset(() => false); toast('すべて解除しました'); }
