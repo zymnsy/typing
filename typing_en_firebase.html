@@ -594,19 +594,19 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 }
 @keyframes imeShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
 
-/* ── ランクアップ／ベストバナー ── */
-.rankup-banner,.best-banner{
+/* ── ランクアップ／ベスト／マイルストーンバナー ── */
+.rankup-banner,.best-banner,.milestone-banner{
   display:none;padding:14px 18px;border-radius:12px;font-weight:700;
   text-align:center;font-size:0.95rem;animation:bannerIn 0.5s cubic-bezier(.34,1.56,.64,1);
   position:relative;overflow:hidden;
 }
-.rankup-banner.show,.best-banner.show{display:block}
+.rankup-banner.show,.best-banner.show,.milestone-banner.show{display:block}
 .rankup-banner{
   background:linear-gradient(90deg,#ffd700,#ffb347,#ff6b35);
   color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.25);
   box-shadow:0 4px 18px rgba(255,140,60,0.4);
 }
-.rankup-banner::before{
+.rankup-banner::before,.milestone-banner::before{
   content:'';position:absolute;inset:0;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);
   animation:shimmer 2s infinite;
@@ -615,6 +615,11 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   background:linear-gradient(90deg,#6ec1e4,#5b8def);
   color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.2);
   box-shadow:0 4px 14px rgba(91,141,239,0.35);
+}
+.milestone-banner{
+  background:linear-gradient(90deg,#34d399,#10b981,#059669);
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.2);
+  box-shadow:0 4px 14px rgba(16,185,129,0.4);
 }
 @keyframes bannerIn{0%{opacity:0;transform:translateY(-12px) scale(0.92)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
@@ -985,6 +990,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
 <!-- RESULT -->
 <div id="result-screen" class="screen">
+  <div id="milestone-banner" class="milestone-banner"></div>
   <div id="rankup-banner" class="rankup-banner"></div>
   <div id="best-banner" class="best-banner"></div>
   <div class="card">
@@ -1595,6 +1601,7 @@ let currentMode='en';                   // 'en' | 'kana'
 let currentMoras=null, currentPatterns=null;
 let currentRoman='', currentSegments=null; // kana モードでのローマ字表示用
 let manageSelected=new Set();
+let prevMinCps=0;                        // ゲーム開始時の最遅 bestCps スナップショット（マイルストーン判定用）
 
 // ══════════════════════════════════════════════
 //  CURSOR
@@ -2348,6 +2355,21 @@ function buildQueue(){
   }
   return q;
 }
+// 全単語の最遅 bestCps を取得（記録のある単語のみ対象。0 は未測定として除外）
+// 全単語が記録あり&bestCps>0 のときに最小値を返す。未挑戦が残っている場合は 0 を返す。
+function computeMinBestCpsAllWords(){
+  if (!currentLevel) return 0;
+  const stats = loadLevelWordStats(currentLevel);
+  if (!words.length) return 0;
+  let mn = Infinity;
+  for (const w of words) {
+    const s = stats[w.en];
+    if (!s || !s.bestCps || s.bestCps <= 0) return 0; // 未挑戦/未測定が残っているうちは 0
+    if (s.bestCps < mn) mn = s.bestCps;
+  }
+  return mn === Infinity ? 0 : mn;
+}
+
 function startGame(){
   const q = buildQueue();
   if (!q) {
@@ -2357,6 +2379,7 @@ function startGame(){
   queue = q;
   curIdx=0; misses=0; clears=0;
   totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
+  prevMinCps = computeMinBestCpsAllWords();
   $('c-clear').textContent=0; $('c-miss').textContent=0;
   showScreen('game'); enableCursorHide(); showWord(0); t0=Date.now();
   setTimeout(()=>forceEnglishInput(), 80);
@@ -2704,6 +2727,39 @@ function showResult(){
   saveLastScore(currentLevel, nowRec);
   if (isNewBest) saveLevelBest(currentLevel, nowRec);
 
+  // ─ 全単語マイルストーン判定（最遅 bestCps が整数閾値を跨いだか） ─
+  const newMinCps = computeMinBestCpsAllWords();
+  const mb = $('milestone-banner');
+  let milestoneFired = false;
+  if (newMinCps > 0) {
+    const prevFloor = prevMinCps > 0 ? Math.floor(prevMinCps) : 0;
+    const newFloor = Math.floor(newMinCps);
+    if (newFloor > prevFloor) {
+      const t = newFloor;
+      mb.innerHTML = `🌟 全単語が <span style="font-family:'JetBrains Mono',monospace">${t}</span> 打/秒 を突破！<br><span style="font-size:0.8rem;font-weight:600;opacity:0.9">最遅: ${newMinCps.toFixed(1)} 打/秒</span>`;
+      mb.classList.add('show');
+      milestoneFired = true;
+    } else {
+      mb.classList.remove('show');
+    }
+  } else {
+    mb.classList.remove('show');
+  }
+
+  // ─ 次回練習のためにオート並び替え＆ワーストN選択 ─
+  // 最速 遅い順 にソートして、N=出題数 件のみ ON にする（既存選択は解除）
+  practiceSortMode = 'speed-asc';
+  saveSettings({ practiceSortMode });
+  document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
+    b.classList.toggle('on', b.dataset.sort === practiceSortMode);
+  });
+  if (currentLevel && words.length > 0) {
+    const sorted = getSortedIndices();
+    enabled.clear();
+    sorted.slice(0, totalRounds).forEach(m => enabled.add(m.idx));
+    saveLevelEnabled(currentLevel, enabled);
+  }
+
   $('r-total').textContent=total; $('r-keys').textContent=totalKeystrokes;
   $('r-time').textContent=timeStr; $('r-correct').textContent=correctKeystrokes;
   $('r-miss').textContent=misses; $('r-acc').textContent=acc+'%';
@@ -2713,6 +2769,7 @@ function showResult(){
   // ランクアップ時はゴールドな追加爆発
   if (rankedUp)  setTimeout(()=>launchResultAnim('fireworks', speed), 600);
   if (isNewBest) setTimeout(()=>launchResultAnim('stars', speed), 900);
+  if (milestoneFired) setTimeout(()=>launchResultAnim('stars', speed), 1100);
 }
 $('r-retry').addEventListener('click',startGame);
 $('r-back').addEventListener('click',()=>{
