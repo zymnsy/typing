@@ -860,6 +860,19 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
+      <div class="sec-label">リザルト後 自動再選択</div>
+      <div class="voice-row">
+        <div class="voice-info">
+          <div class="voice-title">遅い順 上位N件を自動で次回出題に設定</div>
+          <div class="voice-sub">ON にするとゲーム終了時に「最速 遅い順」へ並び替え、上位N件をシャッフルで毎回入れ替えて出題します（同じ語ばかり出続けるのを防止）</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="auto-rotate-toggle">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
       <div class="sec-label">英語タイピングのモード</div>
       <div class="voice-row">
         <div class="voice-info">
@@ -1799,6 +1812,9 @@ function enterLevel(lv) {
   // 「単語のみ」トグルを復元
   const wordsOnlyToggle = $('words-only-toggle');
   if (wordsOnlyToggle) wordsOnlyToggle.checked = settings.englishWordsOnly === true;
+  // 「自動再選択」トグルを復元（デフォルト ON）
+  const autoRotToggle = $('auto-rotate-toggle');
+  if (autoRotToggle) autoRotToggle.checked = settings.autoRotateWorst !== false;
   renderWordList(); updateStartBtn(); showScreen('setup');
 }
 
@@ -2376,6 +2392,13 @@ function startGame(){
     toast('条件に合う単語がありません（「単語のみ」スイッチを確認してください）','err');
     return;
   }
+  // 前回リザルトの紙吹雪・花火等が残っていたら即停止して画面クリア
+  try { _stopAnim(); } catch(e) {}
+  // バナー類も次のゲームには持ち込まない
+  ['rankup-banner','best-banner','milestone-banner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+  });
   queue = q;
   curIdx=0; misses=0; clears=0;
   totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
@@ -2727,16 +2750,18 @@ function showResult(){
   saveLastScore(currentLevel, nowRec);
   if (isNewBest) saveLevelBest(currentLevel, nowRec);
 
-  // ─ 全単語マイルストーン判定（最遅 bestCps が整数閾値を跨いだか） ─
+  // ─ 全単語マイルストーン判定（最遅 bestCps が 0.1 刻みの閾値を跨いだか） ─
   const newMinCps = computeMinBestCpsAllWords();
   const mb = $('milestone-banner');
   let milestoneFired = false;
   if (newMinCps > 0) {
-    const prevFloor = prevMinCps > 0 ? Math.floor(prevMinCps) : 0;
-    const newFloor = Math.floor(newMinCps);
-    if (newFloor > prevFloor) {
-      const t = newFloor;
-      mb.innerHTML = `🌟 全単語が <span style="font-family:'JetBrains Mono',monospace">${t}</span> 打/秒 を突破！<br><span style="font-size:0.8rem;font-weight:600;opacity:0.9">最遅: ${newMinCps.toFixed(1)} 打/秒</span>`;
+    // 浮動小数の誤差で 5.10 が 5.0999... になるのを防ぐため微小な ε を足してから 0.1 刻みに丸める
+    const stepFloor = (v) => Math.floor((v + 1e-9) * 10) / 10;
+    const prevStep = prevMinCps > 0 ? stepFloor(prevMinCps) : 0;
+    const newStep = stepFloor(newMinCps);
+    if (newStep > prevStep + 1e-9) {
+      const t = newStep.toFixed(1);
+      mb.innerHTML = `🌟 全単語が <span style="font-family:'JetBrains Mono',monospace">${t}</span> 打/秒 を突破！<br><span style="font-size:0.8rem;font-weight:600;opacity:0.9">最遅: ${newMinCps.toFixed(2)} 打/秒</span>`;
       mb.classList.add('show');
       milestoneFired = true;
     } else {
@@ -2747,17 +2772,30 @@ function showResult(){
   }
 
   // ─ 次回練習のためにオート並び替え＆ワーストN選択 ─
-  // 最速 遅い順 にソートして、N=出題数 件のみ ON にする（既存選択は解除）
-  practiceSortMode = 'speed-asc';
-  saveSettings({ practiceSortMode });
-  document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
-    b.classList.toggle('on', b.dataset.sort === practiceSortMode);
-  });
-  if (currentLevel && words.length > 0) {
-    const sorted = getSortedIndices();
-    enabled.clear();
-    sorted.slice(0, totalRounds).forEach(m => enabled.add(m.idx));
-    saveLevelEnabled(currentLevel, enabled);
+  // 「自動再選択」ON のときのみ実行。
+  // 同じ語ばかり出続けないように、ワースト N の 2〜3 倍の候補からシャッフルで N 件選ぶ。
+  const settingsAR = loadSettings();
+  const autoRotateOn = settingsAR.autoRotateWorst !== false; // 既定 ON
+  if (autoRotateOn) {
+    practiceSortMode = 'speed-asc';
+    saveSettings({ practiceSortMode });
+    document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
+      b.classList.toggle('on', b.dataset.sort === practiceSortMode);
+    });
+    if (currentLevel && words.length > 0) {
+      const sorted = getSortedIndices(); // 遅い順、未測定は末尾
+      // 候補プール: 出題数の3倍、最低でも N+10、最大は語数
+      const poolSize = Math.min(words.length, Math.max(totalRounds * 3, totalRounds + 10));
+      const pool = sorted.slice(0, poolSize).map(m => m.idx);
+      // Fisher-Yates シャッフル
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      enabled.clear();
+      pool.slice(0, totalRounds).forEach(idx => enabled.add(idx));
+      saveLevelEnabled(currentLevel, enabled);
+    }
   }
 
   $('r-total').textContent=total; $('r-keys').textContent=totalKeystrokes;
@@ -3485,6 +3523,12 @@ function toast(msg, type) {
 $('words-only-toggle').addEventListener('change', e => {
   saveSettings({ englishWordsOnly: e.target.checked });
   toast(e.target.checked ? '単語のみモード ON' : '文章モード ON','suc');
+});
+
+// ── 「自動再選択（遅い順 上位N シャッフル）」トグル ──
+$('auto-rotate-toggle').addEventListener('change', e => {
+  saveSettings({ autoRotateWorst: e.target.checked });
+  toast(e.target.checked ? '自動再選択 ON（リザルト後に毎回入れ替え）' : '自動再選択 OFF','suc');
 });
 
 // ── 全記録リセット ──
