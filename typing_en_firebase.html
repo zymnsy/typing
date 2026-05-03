@@ -2022,6 +2022,15 @@ function applyPresetWithToast(predicate, successMsg) {
   else toast(`${successMsg}（${enabled.size}語）`,'suc');
 }
 
+// クイック選択／速度しきい値／完璧率しきい値の「最後に押したチップ」を視覚的に強調
+function highlightActionChip(btn){
+  if (!btn) return;
+  ['#preset-chips','#speed-chips','#perf-chips'].forEach(sel => {
+    document.querySelectorAll(sel + ' .filter-chip').forEach(b => b.classList.remove('on'));
+  });
+  btn.classList.add('on');
+}
+
 // プリセットチップ
 document.querySelectorAll('#preset-chips .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2033,15 +2042,16 @@ document.querySelectorAll('#preset-chips .filter-chip').forEach(btn => {
       saveLevelEnabled(currentLevel, enabled);
       renderWordList();
       updateStartBtn();
+      highlightActionChip(btn);
       if (enabled.size === 0) toast('該当する単語がありません','err');
       else toast(`現在の並び順で上位${enabled.size}件を選択`,'suc');
       return;
     }
     const p = btn.dataset.preset;
-    if (p === 'all')   { applyPreset(() => true); toast(`すべて選択（${enabled.size}語）`,'suc'); }
-    else if (p === 'none') { applyPreset(() => false); toast('すべて解除しました'); }
-    else if (p === 'fresh') applyPresetWithToast(m => !m.hasStat && m.count === 0, '未挑戦の単語のみ選択');
-    else if (p === 'miss')  applyPresetWithToast(m => m.hasStat && m.miss > 0, 'ミスありの単語のみ選択');
+    if (p === 'all')   { applyPreset(() => true); highlightActionChip(btn); toast(`すべて選択（${enabled.size}語）`,'suc'); }
+    else if (p === 'none') { applyPreset(() => false); highlightActionChip(btn); toast('すべて解除しました'); }
+    else if (p === 'fresh') { applyPresetWithToast(m => !m.hasStat && m.count === 0, '未挑戦の単語のみ選択'); highlightActionChip(btn); }
+    else if (p === 'miss')  { applyPresetWithToast(m => m.hasStat && m.miss > 0, 'ミスありの単語のみ選択'); highlightActionChip(btn); }
   });
 });
 
@@ -2050,6 +2060,7 @@ document.querySelectorAll('#speed-chips .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     const t = parseFloat(btn.dataset.speed);
     applyPresetWithToast(m => m.hasStat && m.bestCps > 0 && m.bestCps < t, `最速 ${t} 打/秒未満`);
+    highlightActionChip(btn);
   });
 });
 
@@ -2058,6 +2069,7 @@ document.querySelectorAll('#perf-chips .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     const t = parseInt(btn.dataset.perf,10);
     applyPresetWithToast(m => m.hasStat && m.perfRate !== null && m.perfRate < t, `完璧率 ${t}% 未満`);
+    highlightActionChip(btn);
   });
 });
 function updateStartBtn(){ $('start-btn').disabled=enabled.size===0; }
