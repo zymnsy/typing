@@ -363,6 +363,19 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .filter-chip.disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
 .preset-chip{padding:7px 14px;font-size:0.78rem;font-weight:700;}
 .preset-chip.preset-quick{background:linear-gradient(180deg,var(--surface) 0%,var(--surface-alt) 100%);}
+.preset-chip.preset-quick.on{background:var(--on-bg);}
+/* 並び替え：1行に収めるためのコンパクトサイズ */
+.compact-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;}
+.compact-chips::-webkit-scrollbar{height:4px;}
+.compact-chips::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.compact-chips .filter-chip{padding:5px 10px;font-size:0.7rem;flex-shrink:0;}
+/* しきい値の畳み形式 */
+.collapse-row{display:flex;align-items:center;gap:12px;}
+.collapse-row .filter-label{flex:1;margin:0;}
+/* 単語検索 */
+.word-search-input{width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:9px;font-family:'Noto Sans JP',sans-serif;font-size:0.84rem;color:var(--text);background:var(--surface);outline:none;transition:all 0.15s var(--ease);box-sizing:border-box;}
+.word-search-input:focus{border-color:var(--on-soft);box-shadow:0 0 0 3px rgba(201,100,66,0.1);}
+.word-search-input::placeholder{color:var(--muted);}
 .sel-stats{font-size:0.74rem;color:var(--sub);padding:6px 10px;background:var(--surface-alt);border-radius:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--border);transition:all 0.18s var(--ease);}
 .sel-stats b{font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:700;}
 .sel-stats.warn{background:var(--ng-bg);color:var(--ng);border-color:#f3cdcd;}
@@ -802,13 +815,12 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
       <div class="filter-block">
         <div class="filter-label">並び替え <span class="filter-hint">— 苦手な単語を上に集めて選びやすく</span></div>
-        <div class="filter-chips" id="sort-chips">
+        <div class="filter-chips compact-chips" id="sort-chips">
           <button class="filter-chip on" data-sort="default">登録順</button>
           <button class="filter-chip" data-sort="miss-desc">ミス多い順</button>
           <button class="filter-chip" data-sort="perf-asc">完璧率 低い順</button>
           <button class="filter-chip" data-sort="speed-asc">最速 遅い順</button>
           <button class="filter-chip" data-sort="speed-desc">最速 速い順</button>
-          <button class="filter-chip" data-sort="attempts-desc">出題回数 多い順</button>
           <button class="filter-chip" data-sort="fresh-first">未挑戦を上に</button>
         </div>
       </div>
@@ -821,27 +833,51 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
           <button class="filter-chip preset-chip" data-preset="fresh">未挑戦のみ <span class="chip-pop" id="pp-fresh">0</span></button>
           <button class="filter-chip preset-chip" data-preset="miss">ミスありのみ <span class="chip-pop" id="pp-miss">0</span></button>
           <button class="filter-chip preset-chip preset-quick" data-top-n="10">上位10のみ</button>
-          <button class="filter-chip preset-chip preset-quick" data-top-n="20">上位20のみ</button>
-          <button class="filter-chip preset-chip preset-quick" data-top-n="30">上位30のみ</button>
-        </div>
-        <div class="filter-label" style="margin-top:4px">速度しきい値 <span class="filter-hint">— この速度未満の単語を ON</span></div>
-        <div class="filter-chips" id="speed-chips">
-          <button class="filter-chip preset-chip" data-speed="2">&lt; 2 打/秒 <span class="chip-pop" id="sp-2">0</span></button>
-          <button class="filter-chip preset-chip" data-speed="3">&lt; 3 打/秒 <span class="chip-pop" id="sp-3">0</span></button>
-          <button class="filter-chip preset-chip" data-speed="4">&lt; 4 打/秒 <span class="chip-pop" id="sp-4">0</span></button>
-          <button class="filter-chip preset-chip" data-speed="5">&lt; 5 打/秒 <span class="chip-pop" id="sp-5">0</span></button>
-          <button class="filter-chip preset-chip" data-speed="6">&lt; 6 打/秒 <span class="chip-pop" id="sp-6">0</span></button>
-        </div>
-        <div class="filter-label" style="margin-top:4px">完璧率しきい値 <span class="filter-hint">— この完璧率未満の単語を ON</span></div>
-        <div class="filter-chips" id="perf-chips">
-          <button class="filter-chip preset-chip" data-perf="30">&lt; 30%  <span class="chip-pop" id="pf-30">0</span></button>
-          <button class="filter-chip preset-chip" data-perf="50">&lt; 50%  <span class="chip-pop" id="pf-50">0</span></button>
-          <button class="filter-chip preset-chip" data-perf="70">&lt; 70%  <span class="chip-pop" id="pf-70">0</span></button>
-          <button class="filter-chip preset-chip" data-perf="90">&lt; 90%  <span class="chip-pop" id="pf-90">0</span></button>
         </div>
       </div>
 
-      <div class="sel-stats" id="sel-stats">
+      <div class="filter-block">
+        <div class="collapse-row">
+          <div class="filter-label">速度しきい値</div>
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" class="collapse-toggle" id="speed-collapse" data-target="speed-section">
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+        <div id="speed-section" style="display:none;flex-direction:column;gap:6px;margin-top:8px;">
+          <div class="filter-hint" style="font-size:0.66rem;color:var(--muted)">— この速度未満の単語を ON</div>
+          <div class="filter-chips" id="speed-chips">
+            <button class="filter-chip preset-chip" data-speed="2">&lt; 2 打/秒 <span class="chip-pop" id="sp-2">0</span></button>
+            <button class="filter-chip preset-chip" data-speed="3">&lt; 3 打/秒 <span class="chip-pop" id="sp-3">0</span></button>
+            <button class="filter-chip preset-chip" data-speed="4">&lt; 4 打/秒 <span class="chip-pop" id="sp-4">0</span></button>
+            <button class="filter-chip preset-chip" data-speed="5">&lt; 5 打/秒 <span class="chip-pop" id="sp-5">0</span></button>
+            <button class="filter-chip preset-chip" data-speed="6">&lt; 6 打/秒 <span class="chip-pop" id="sp-6">0</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-block">
+        <div class="collapse-row">
+          <div class="filter-label">完璧率しきい値</div>
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" class="collapse-toggle" id="perf-collapse" data-target="perf-section">
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+        <div id="perf-section" style="display:none;flex-direction:column;gap:6px;margin-top:8px;">
+          <div class="filter-hint" style="font-size:0.66rem;color:var(--muted)">— この完璧率未満の単語を ON</div>
+          <div class="filter-chips" id="perf-chips">
+            <button class="filter-chip preset-chip" data-perf="30">&lt; 30%  <span class="chip-pop" id="pf-30">0</span></button>
+            <button class="filter-chip preset-chip" data-perf="50">&lt; 50%  <span class="chip-pop" id="pf-50">0</span></button>
+            <button class="filter-chip preset-chip" data-perf="70">&lt; 70%  <span class="chip-pop" id="pf-70">0</span></button>
+            <button class="filter-chip preset-chip" data-perf="90">&lt; 90%  <span class="chip-pop" id="pf-90">0</span></button>
+          </div>
+        </div>
+      </div>
+
+      <input type="text" class="word-search-input" id="word-search" placeholder="🔍 単語を検索（英語・日本語）" style="margin-top:4px">
+
+      <div class="sel-stats" id="sel-stats" style="margin-top:10px">
         選択中 <b id="sel-count">0</b> / <b id="sel-total">0</b> 語
       </div>
 
@@ -864,7 +900,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">遅い順 上位N件を自動で次回出題に設定</div>
-          <div class="voice-sub">ON にするとゲーム終了時に「最速 遅い順」へ並び替え、上位N件をシャッフルで毎回入れ替えて出題します（同じ語ばかり出続けるのを防止）</div>
+          <div class="voice-sub" id="auto-rotate-sub" style="display:none">ON にするとゲーム終了時に「最速 遅い順」へ並び替え、上位N件をシャッフルで毎回入れ替えて出題します（同じ語ばかり出続けるのを防止）</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="auto-rotate-toggle">
@@ -877,7 +913,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">単語のみ（記号・スペース・数字を含む語を除外）</div>
-          <div class="voice-sub">ON にすると <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">apple</code> のような単語のみ出題。<code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">How are you?</code> 等の文章はスキップ（かな読みの単語には影響しません）</div>
+          <div class="voice-sub" id="words-only-sub" style="display:none">ON にすると <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">apple</code> のような単語のみ出題。<code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">How are you?</code> 等の文章はスキップ（かな読みの単語には影響しません）</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="words-only-toggle">
@@ -890,7 +926,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">英語を読み上げる</div>
-          <div class="voice-sub">残り1文字のタイミングで発音を再生します</div>
+          <div class="voice-sub" id="voice-sub" style="display:none">残り1文字のタイミングで発音を再生します</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="voice-toggle">
@@ -1811,11 +1847,36 @@ function enterLevel(lv) {
   });
   // 「単語のみ」トグルを復元
   const wordsOnlyToggle = $('words-only-toggle');
-  if (wordsOnlyToggle) wordsOnlyToggle.checked = settings.englishWordsOnly === true;
+  if (wordsOnlyToggle) {
+    wordsOnlyToggle.checked = settings.englishWordsOnly === true;
+    syncSubVisibility(wordsOnlyToggle, 'words-only-sub');
+  }
   // 「自動再選択」トグルを復元（デフォルト ON）
   const autoRotToggle = $('auto-rotate-toggle');
-  if (autoRotToggle) autoRotToggle.checked = settings.autoRotateWorst !== false;
+  if (autoRotToggle) {
+    autoRotToggle.checked = settings.autoRotateWorst !== false;
+    syncSubVisibility(autoRotToggle, 'auto-rotate-sub');
+  }
+  // しきい値セクションの開閉状態を復元
+  restoreCollapseState('speed-collapse', 'speed-section', !!settings.speedCollapseOpen);
+  restoreCollapseState('perf-collapse', 'perf-section', !!settings.perfCollapseOpen);
+  // 単語検索クリア
+  const ws = $('word-search'); if (ws) ws.value = '';
   renderWordList(); updateStartBtn(); showScreen('setup');
+}
+
+// サブ説明文の表示/非表示をトグル状態に合わせる
+function syncSubVisibility(toggleEl, subId) {
+  const sub = document.getElementById(subId);
+  if (sub) sub.style.display = toggleEl.checked ? '' : 'none';
+}
+
+function restoreCollapseState(toggleId, targetId, open) {
+  const t = document.getElementById(toggleId);
+  const tgt = document.getElementById(targetId);
+  if (!t || !tgt) return;
+  t.checked = open;
+  tgt.style.display = open ? 'flex' : 'none';
 }
 
 function goHome() {
@@ -1947,6 +2008,8 @@ function renderWordList() {
     const uid='tw'+i;
     const row=document.createElement('div');
     row.className='word-row';
+    row.dataset.en=w.en||'';
+    row.dataset.ja=w.ja||'';
     row.innerHTML=`
       <label class="toggle" onclick="event.stopPropagation()">
         <input type="checkbox" id="${uid}" ${enabled.has(i)?'checked':''}>
@@ -1968,6 +2031,16 @@ function renderWordList() {
     list.appendChild(row);
   });
   updatePresetCounts();
+  // 検索クエリを再適用
+  const ws = $('word-search');
+  if (ws && ws.value) {
+    const q = ws.value.trim().toLowerCase();
+    document.querySelectorAll('#word-list .word-row').forEach(row => {
+      const en = (row.dataset.en || '').toLowerCase();
+      const ja = (row.dataset.ja || '').toLowerCase();
+      row.style.display = (!q || en.includes(q) || ja.includes(q)) ? '' : 'none';
+    });
+  }
 }
 
 function updateSelStats() {
@@ -2910,6 +2983,7 @@ function initVoiceSettings() {
   const options = $('voice-options');
   toggle.checked = voiceEnabled;
   options.style.display = voiceEnabled ? 'flex' : 'none';
+  syncSubVisibility(toggle, 'voice-sub');
 
   document.querySelectorAll('.voice-rate-chip').forEach(b => {
     b.classList.toggle('on', parseFloat(b.dataset.rate) === voiceRate);
@@ -2925,6 +2999,7 @@ function initVoiceSettings() {
     voiceEnabled = toggle.checked;
     saveSettings({ voiceEnabled });
     options.style.display = voiceEnabled ? 'flex' : 'none';
+    syncSubVisibility(toggle, 'voice-sub');
   });
 
   $('voice-select').addEventListener('change', e => {
@@ -3534,13 +3609,35 @@ function toast(msg, type) {
 // ── 「単語のみ」トグル ──
 $('words-only-toggle').addEventListener('change', e => {
   saveSettings({ englishWordsOnly: e.target.checked });
+  syncSubVisibility(e.target, 'words-only-sub');
   toast(e.target.checked ? '単語のみモード ON' : '文章モード ON','suc');
 });
 
 // ── 「自動再選択（遅い順 上位N シャッフル）」トグル ──
 $('auto-rotate-toggle').addEventListener('change', e => {
   saveSettings({ autoRotateWorst: e.target.checked });
+  syncSubVisibility(e.target, 'auto-rotate-sub');
   toast(e.target.checked ? '自動再選択 ON（リザルト後に毎回入れ替え）' : '自動再選択 OFF','suc');
+});
+
+// ── しきい値セクションの開閉トグル ──
+document.querySelectorAll('.collapse-toggle').forEach(t => {
+  t.addEventListener('change', () => {
+    const tgt = document.getElementById(t.dataset.target);
+    if (tgt) tgt.style.display = t.checked ? 'flex' : 'none';
+    if (t.id === 'speed-collapse') saveSettings({ speedCollapseOpen: t.checked });
+    if (t.id === 'perf-collapse')  saveSettings({ perfCollapseOpen: t.checked });
+  });
+});
+
+// ── 単語検索 ──
+$('word-search').addEventListener('input', () => {
+  const q = ($('word-search').value || '').trim().toLowerCase();
+  document.querySelectorAll('#word-list .word-row').forEach(row => {
+    const en = (row.dataset.en || '').toLowerCase();
+    const ja = (row.dataset.ja || '').toLowerCase();
+    row.style.display = (!q || en.includes(q) || ja.includes(q)) ? '' : 'none';
+  });
 });
 
 // ── 全記録リセット ──
