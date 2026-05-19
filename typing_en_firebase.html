@@ -2532,6 +2532,11 @@ inp.addEventListener('input',()=>{
   const target=queue[curIdx].en, typed=normalizeEn(inp.value);
   totalKeystrokes++; inp.value=typed;
 
+  // 実際に半角英字が入力されている＝もう英語入力モードに切り替え済み、と判定。
+  // ゲーム開始直後に表示している「英語入力モードで打ってください」ヒントを消す。
+  // ここで composition 中だった場合は showImeWarn 側が既に警告に切り替えているので触らない。
+  if (typed.length > 0) hideImeHint();
+
   // 誤入力リジェクトを視覚化して、shake後に有効プレフィックスへ戻す共通処理
   function flashMissAndRevert(revertTo) {
     inp.classList.remove('ok');
