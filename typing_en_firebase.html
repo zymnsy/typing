@@ -900,7 +900,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">遅い順 上位N件を自動で次回出題に設定</div>
-          <div class="voice-sub" id="auto-rotate-sub" style="display:none">ON にするとゲーム終了時に「最速 遅い順」へ並び替え、上位N件をシャッフルで毎回入れ替えて出題します（同じ語ばかり出続けるのを防止）</div>
+          <div class="voice-sub" id="auto-rotate-sub" style="display:none">ON にするとゲーム終了時に「最速 遅い順」へ並び替え、最も遅い語を必ず確保したうえで、同値ティアの境界だけシャッフル抽選します（最遅語を取りこぼさずに固定化も防止）</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="auto-rotate-toggle">
@@ -2869,16 +2869,40 @@ function showResult(){
     });
     if (currentLevel && words.length > 0) {
       const sorted = getSortedIndices(); // 遅い順、未測定は末尾
-      // 候補プール: 出題数の3倍、最低でも N+10、最大は語数
-      const poolSize = Math.min(words.length, Math.max(totalRounds * 3, totalRounds + 10));
-      const pool = sorted.slice(0, poolSize).map(m => m.idx);
-      // Fisher-Yates シャッフル
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-      }
+      const N = totalRounds;
       enabled.clear();
-      pool.slice(0, totalRounds).forEach(idx => enabled.add(idx));
+      if (sorted.length <= N) {
+        sorted.forEach(m => enabled.add(m.idx));
+      } else {
+        // 速度値ごとにグルーピング（未測定は Infinity 扱い＝最後尾）。
+        // 遅いティアから順に確定枠へ入れていき、最後にあふれるティアだけランダム抽選。
+        // これで「最も遅い数値の語」は必ず出題に含まれる。
+        const speedOf = m => (m.bestCps && m.bestCps > 0) ? m.bestCps : Infinity;
+        const tiers = []; // [{ cps, idxs:[...] }] 遅い順
+        for (const m of sorted) {
+          const cps = speedOf(m);
+          const last = tiers[tiers.length - 1];
+          if (last && last.cps === cps) last.idxs.push(m.idx);
+          else tiers.push({ cps, idxs: [m.idx] });
+        }
+        let need = N;
+        for (const t of tiers) {
+          if (need <= 0) break;
+          if (t.idxs.length <= need) {
+            t.idxs.forEach(idx => enabled.add(idx));
+            need -= t.idxs.length;
+          } else {
+            // 同値ティアからのみシャッフル抽選（境界のみランダム）
+            const pool = t.idxs.slice();
+            for (let i = pool.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+            pool.slice(0, need).forEach(idx => enabled.add(idx));
+            need = 0;
+          }
+        }
+      }
       saveLevelEnabled(currentLevel, enabled);
     }
   }
