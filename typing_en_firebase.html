@@ -511,6 +511,29 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .res-cell .rv.ng-c{color:var(--ng)}
 .res-btns{display:flex;gap:10px}
 .res-btns .btn-primary{flex:2}.res-btns .btn-ghost{flex:1}
+/* ── 自己ベストリセット行 ── */
+.best-reset-row{display:flex;align-items:center;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.btn-best-reset{font-size:0.74rem;color:var(--ng);background:transparent;border:1px solid var(--ng);padding:5px 12px;border-radius:var(--r-sm);cursor:pointer;transition:all 0.15s var(--ease);font-weight:600;}
+.btn-best-reset:hover{background:var(--ng);color:#fff;box-shadow:0 2px 8px rgba(192,53,53,0.2);}
+/* ── 単語ごとの速度 ── */
+.word-speed-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;cursor:pointer;background:none;border:none;padding:0;font-family:'Noto Sans JP',sans-serif;color:var(--sub);}
+.word-speed-toggle:hover{color:var(--on);}
+.word-speed-toggle .ws-label{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:inherit;}
+.word-speed-toggle .ws-arrow{font-size:0.72rem;font-weight:700;transition:transform 0.2s var(--ease);}
+.word-speed-toggle.open .ws-arrow{transform:rotate(180deg);}
+.word-speed-body{display:none;margin-top:12px;}
+.word-speed-body.open{display:block;}
+.word-speed-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-alt);margin-bottom:6px;}
+.word-speed-row:last-child{margin-bottom:0;}
+.ws-num{font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--muted);min-width:20px;text-align:right;}
+.ws-ja{font-size:0.82rem;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ws-en{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ws-cps{font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;min-width:56px;text-align:right;white-space:nowrap;}
+.ws-cps.ws-fast{color:var(--ok);}
+.ws-cps.ws-mid{color:var(--gold);}
+.ws-cps.ws-slow{color:var(--ng);}
+.ws-miss{font-size:0.68rem;font-weight:700;min-width:28px;text-align:right;color:var(--ng);}
+.ws-miss.ws-zero{color:var(--ok);}
 .empty{text-align:center;padding:28px 0;font-size:0.85rem;color:var(--muted)}
 .back-link{display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--sub);cursor:pointer;background:transparent;border:none;padding:5px 10px 5px 6px;margin-left:-6px;transition:all 0.15s var(--ease);border-radius:6px;font-weight:500;}
 .back-link:hover{color:var(--on);background:var(--on-bg);}
@@ -811,10 +834,8 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   </div>
   <div id="pane-practice" style="display:flex;flex-direction:column;gap:16px">
     <div class="card">
-      <div class="sec-label">練習する単語</div>
-
       <div class="filter-block">
-        <div class="filter-label">並び替え <span class="filter-hint">— 苦手な単語を上に集めて選びやすく</span></div>
+
         <div class="filter-chips compact-chips" id="sort-chips">
           <button class="filter-chip on" data-sort="default">登録順</button>
           <button class="filter-chip" data-sort="miss-desc">ミス多い順</button>
@@ -826,7 +847,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
 
       <div class="filter-block">
-        <div class="filter-label">クイック選択 <span class="filter-hint">— 条件に合う単語だけ ON にする</span></div>
         <div class="filter-chips" id="preset-chips">
           <button class="filter-chip preset-chip preset-quick" data-preset="all">すべて選択</button>
           <button class="filter-chip preset-chip preset-quick" data-preset="none">すべて解除</button>
@@ -836,7 +856,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         </div>
       </div>
 
-      <div class="filter-block">
+      <div class="filter-block" style="display:none">
         <div class="collapse-row">
           <div class="filter-label">速度しきい値</div>
           <label class="toggle" onclick="event.stopPropagation()">
@@ -856,7 +876,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         </div>
       </div>
 
-      <div class="filter-block">
+      <div class="filter-block" style="display:none">
         <div class="collapse-row">
           <div class="filter-label">完璧率しきい値</div>
           <label class="toggle" onclick="event.stopPropagation()">
@@ -896,7 +916,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
-      <div class="sec-label">リザルト後 自動再選択</div>
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">遅い順 上位N件を自動で次回出題に設定</div>
@@ -909,7 +928,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
-      <div class="sec-label">英語タイピングのモード</div>
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">単語のみ（記号・スペース・数字を含む語を除外）</div>
@@ -922,7 +940,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
-      <div class="sec-label">音声読み上げ</div>
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">英語を読み上げる</div>
@@ -1068,17 +1085,27 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         <div class="best-v"><span id="best-rank">—</span></div>
       </div>
     </div>
+    <div class="best-reset-row">
+      <button class="btn-best-reset" id="btn-best-reset">このレベルのベストをリセット</button>
+    </div>
   </div>
   <div class="card">
     <div class="sec-label">詳細データ</div>
     <div class="res-grid">
-      <div class="res-cell"><div class="rl">出題数</div><div class="rv" id="r-total">—</div></div>
       <div class="res-cell"><div class="rl">総打鍵数</div><div class="rv" id="r-keys">—</div></div>
       <div class="res-cell"><div class="rl">経過時間</div><div class="rv" id="r-time">—</div></div>
-      <div class="res-cell"><div class="rl">正確打鍵</div><div class="rv ok-c" id="r-correct">—</div></div>
       <div class="res-cell"><div class="rl">ミス打鍵</div><div class="rv ng-c" id="r-miss">—</div></div>
       <div class="res-cell"><div class="rl">正確率</div><div class="rv" id="r-acc">—</div></div>
+      <div class="res-cell"><div class="rl">最低速度</div><div class="rv" id="r-min-speed">—</div></div>
+      <div class="res-cell"><div class="rl">最高速度</div><div class="rv" id="r-max-speed">—</div></div>
     </div>
+  </div>
+  <div class="card" id="word-speed-card">
+    <button class="word-speed-toggle" id="word-speed-toggle">
+      <span class="ws-label">単語ごとの速度</span>
+      <span class="ws-arrow">▼</span>
+    </button>
+    <div class="word-speed-body" id="word-speed-body"></div>
   </div>
   <div class="res-btns">
     <button class="btn-ghost" id="r-back">← 設定</button>
@@ -1646,6 +1673,7 @@ let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
 let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
+let sessionWordResults=[];              // 今セッションの単語ごとの速度ログ
 let currentMode='en';                   // 'en' | 'kana'
 let currentMoras=null, currentPatterns=null;
 let currentRoman='', currentSegments=null; // kana モードでのローマ字表示用
@@ -1840,8 +1868,8 @@ function enterLevel(lv) {
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
-  // 並び替えモードを復元
-  practiceSortMode = settings.practiceSortMode || 'default';
+  // 並び替えモードを復元（デフォルト: 最速 遅い順）
+  practiceSortMode = settings.practiceSortMode || 'speed-asc';
   document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
     b.classList.toggle('on', b.dataset.sort === practiceSortMode);
   });
@@ -1862,7 +1890,10 @@ function enterLevel(lv) {
   restoreCollapseState('perf-collapse', 'perf-section', !!settings.perfCollapseOpen);
   // 単語検索クリア
   const ws = $('word-search'); if (ws) ws.value = '';
-  renderWordList(); updateStartBtn(); showScreen('setup');
+  // デフォルトで「上位10のみ」を適用し、ボタンを強調
+  const top10Btn = document.querySelector('[data-top-n="10"]');
+  if (top10Btn) top10Btn.click();
+  updateStartBtn(); showScreen('setup');
 }
 
 // サブ説明文の表示/非表示をトグル状態に合わせる
@@ -2487,6 +2518,7 @@ function startGame(){
   queue = q;
   curIdx=0; misses=0; clears=0;
   totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
+  sessionWordResults=[];
   prevMinCps = computeMinBestCpsAllWords();
   $('c-clear').textContent=0; $('c-miss').textContent=0;
   showScreen('game'); enableCursorHide(); showWord(0); t0=Date.now();
@@ -2563,8 +2595,11 @@ inp.addEventListener('input',()=>{
       inp.classList.toggle('ok', typed.length>0);
       $('hint-disp').innerHTML = renderRomajiHintHtml(currentRoman, currentSegments, r.atMora, r.pos || 0);
       if (r.completed) {
+        const _dur = Date.now()-currentWordStart;
+        const _cps = _dur > 0 ? +(typed.length / (_dur/1000)).toFixed(2) : 0;
         incrementWordCount(currentLevel, target);
-        recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
+        recordWordStat(currentLevel, target, currentWordMisses, _dur, typed.length);
+        sessionWordResults.push({ja:queue[curIdx].ja, en:target, cps:_cps, misses:currentWordMisses});
         clears++; $('c-clear').textContent=clears; curIdx++;
         if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
         else showWord(curIdx);
@@ -2587,8 +2622,11 @@ inp.addEventListener('input',()=>{
       speakEnglish(target);
     }
     if(typed===target){
+      const _dur = Date.now()-currentWordStart;
+      const _cps = _dur > 0 ? +(typed.length / (_dur/1000)).toFixed(2) : 0;
       incrementWordCount(currentLevel, target);
-      recordWordStat(currentLevel, target, currentWordMisses, Date.now()-currentWordStart, typed.length);
+      recordWordStat(currentLevel, target, currentWordMisses, _dur, typed.length);
+      sessionWordResults.push({ja:queue[curIdx].ja, en:target, cps:_cps, misses:currentWordMisses});
       clears++; $('c-clear').textContent=clears; curIdx++;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
@@ -2912,9 +2950,31 @@ function showResult(){
     }
   }
 
-  $('r-total').textContent=total; $('r-keys').textContent=totalKeystrokes;
-  $('r-time').textContent=timeStr; $('r-correct').textContent=correctKeystrokes;
+  $('r-keys').textContent=totalKeystrokes;
+  $('r-time').textContent=timeStr;
   $('r-miss').textContent=misses; $('r-acc').textContent=acc+'%';
+
+  // 最低・最高速度（今セッション単語ごとのcps）
+  if (sessionWordResults.length > 0) {
+    const cpsList = sessionWordResults.map(r => r.cps).filter(c => c > 0);
+    if (cpsList.length > 0) {
+      const minCps = Math.min(...cpsList);
+      const maxCps = Math.max(...cpsList);
+      $('r-min-speed').textContent = minCps.toFixed(1);
+      $('r-max-speed').textContent = maxCps.toFixed(1);
+    } else {
+      $('r-min-speed').textContent='—'; $('r-max-speed').textContent='—';
+    }
+  } else {
+    $('r-min-speed').textContent='—'; $('r-max-speed').textContent='—';
+  }
+
+  // 単語ごとの速度リスト描画（トグルをリセットして閉じる）
+  const _wst = $('word-speed-toggle'), _wsb = $('word-speed-body');
+  if (_wst) _wst.classList.remove('open');
+  if (_wsb) _wsb.classList.remove('open');
+  renderWordSpeedList();
+
   $('bar-fill').style.width='100%';
   showScreen('result');
   setTimeout(()=>launchResultAnim(tier.anim, speed), 300);
@@ -2923,6 +2983,58 @@ function showResult(){
   if (isNewBest) setTimeout(()=>launchResultAnim('stars', speed), 900);
   if (milestoneFired) setTimeout(()=>launchResultAnim('stars', speed), 1100);
 }
+// ── 単語ごとの速度リスト描画 ──
+function renderWordSpeedList() {
+  const body = $('word-speed-body');
+  if (!body) return;
+  if (!sessionWordResults.length) { body.innerHTML='<div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:10px 0">データなし</div>'; return; }
+
+  // 平均cpsを基準にfast/mid/slow分類
+  const cpsList = sessionWordResults.map(r => r.cps).filter(c => c > 0);
+  const avgCps = cpsList.length ? cpsList.reduce((a,b)=>a+b,0)/cpsList.length : 0;
+
+  body.innerHTML = sessionWordResults.map((r, i) => {
+    let cls = 'ws-mid';
+    if (r.cps >= avgCps * 1.15) cls = 'ws-fast';
+    else if (r.cps < avgCps * 0.85) cls = 'ws-slow';
+    const missHtml = r.misses > 0
+      ? `<span class="ws-miss">${r.misses}miss</span>`
+      : `<span class="ws-miss ws-zero">✓</span>`;
+    return `<div class="word-speed-row">
+      <span class="ws-num">${i+1}</span>
+      <span class="ws-ja">${escHtml(r.ja)}</span>
+      <span class="ws-en">${escHtml(r.en)}</span>
+      ${missHtml}
+      <span class="ws-cps ${cls}">${r.cps.toFixed(1)}<span style="font-size:0.62rem;font-weight:600;opacity:0.7;margin-left:2px">打/秒</span></span>
+    </div>`;
+  }).join('');
+}
+
+// ── 単語ごとの速度 展開トグル ──
+$('word-speed-toggle').addEventListener('click', () => {
+  const toggle = $('word-speed-toggle');
+  const body   = $('word-speed-body');
+  const open   = toggle.classList.toggle('open');
+  body.classList.toggle('open', open);
+});
+
+// ── 自己ベストリセット ──
+$('btn-best-reset').addEventListener('click', async () => {
+  if (!currentLevel) return;
+  const ok = await customConfirm({
+    title: 'ベスト記録をリセット',
+    desc: `Lv.${currentLevel}「${loadLevelTitle(currentLevel)}」の\n最速記録とランクをリセットします。\n単語ごとの統計は残ります。\nこの操作は取り消せません。`,
+    okText: 'リセット', danger: true
+  });
+  if (!ok) return;
+  localStorage.removeItem('typing-en-v2-best-lv'+currentLevel);
+  localStorage.removeItem('typing-en-v2-last-lv'+currentLevel);
+  if (typeof window._fbSaveAll === 'function') window._fbSaveAll();
+  $('best-card').style.display='none';
+  refreshHomeCard(currentLevel);
+  toast(`Lv.${currentLevel} のベスト記録をリセットしました`, 'suc');
+});
+
 $('r-retry').addEventListener('click',startGame);
 $('r-back').addEventListener('click',()=>{
   // ゲームで更新された統計を練習設定にも反映
