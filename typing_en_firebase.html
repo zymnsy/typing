@@ -482,7 +482,7 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .speed-mini-unit{font-size:0.6rem;opacity:0.6;font-weight:600;}
 .tier-ss .res-hero-compact{border-bottom-color:rgba(255,255,255,0.15);}
 .tier-ss .speed-mini-stats{border-left-color:rgba(255,255,255,0.2);}
-.res-grid-4{grid-template-columns:1fr 1fr!important;}
+.res-grid-4{grid-template-columns:1fr 1fr 1fr 1fr!important;}
 .speed-card.tier-s{background:linear-gradient(135deg,#fdf6e3,#fff8e1);border:1px solid #e6d5a0}
 .tier-s .speed-label,.tier-s .speed-value{color:var(--gold)}
 .tier-s .speed-comment{color:#8b6914}
@@ -529,9 +529,11 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .res-btns{display:flex;gap:10px}
 .res-btns .btn-primary{flex:2}.res-btns .btn-ghost{flex:1}
 /* ── 自己ベストリセット行 ── */
-.best-reset-row{display:flex;align-items:center;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
-.btn-best-reset{font-size:0.74rem;color:var(--ng);background:transparent;border:1px solid var(--ng);padding:5px 12px;border-radius:var(--r-sm);cursor:pointer;transition:all 0.15s var(--ease);font-weight:600;}
+.best-reset-row{display:none;}
+.btn-best-reset{font-size:0.74rem;color:var(--ng);background:transparent;border:1px solid var(--ng);padding:5px 12px;border-radius:var(--r-sm);cursor:pointer;transition:all 0.15s var(--ease);font-weight:600;white-space:nowrap;align-self:center;flex-shrink:0;}
 .btn-best-reset:hover{background:var(--ng);color:#fff;box-shadow:0 2px 8px rgba(192,53,53,0.2);}
+/* 自己ベストカード */
+.best-row{display:flex;gap:10px;align-items:center;}
 /* ── 単語ごとの速度 ── */
 .word-speed-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;cursor:pointer;background:none;border:none;padding:0;font-family:'Noto Sans JP',sans-serif;color:var(--sub);}
 .word-speed-toggle:hover{color:var(--on);}
@@ -687,7 +689,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 .speed-delta.same{color:var(--muted)}
 
 /* 自己ベストカード */
-.best-row{display:flex;gap:10px}
 .best-item{flex:1;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-sm);text-align:center;}
 .best-l{font-size:0.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px;font-weight:700;}
 .best-v{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--text);letter-spacing:-0.01em;}
@@ -751,6 +752,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   .level-card .level-title{font-size:0.76rem;}
   .round-chip{min-width:48px;padding:9px 0;font-size:0.82rem;}
   .res-grid{grid-template-columns:1fr 1fr;}
+  .res-grid-4{grid-template-columns:1fr 1fr!important;}
   #word-disp{font-size:1.25rem;margin-bottom:14px;}
   #hint-disp{font-size:1.1rem;}
   #inp{font-size:1.05rem;padding:14px 16px;}
@@ -1116,8 +1118,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         <div class="best-l">ランク</div>
         <div class="best-v"><span id="best-rank">—</span></div>
       </div>
-    </div>
-    <div class="best-reset-row">
       <button class="btn-best-reset" id="btn-best-reset">このレベルのベストをリセット</button>
     </div>
   </div>
