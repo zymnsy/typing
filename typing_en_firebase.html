@@ -1760,6 +1760,8 @@ function disableCursorHide(){ showCursor(); clearTimeout(cursorHideTimer); docum
 // ゲーム開始時に英語入力に強制、終了時に日本語入力へ復帰。
 // 日本語が混じった場合は視覚警告バッジを表示。
 let imeWarnTimer = null;
+let _preImeKey = ''; // compositionstart が奪う前に keydown で先取りした文字
+
 function forceEnglishInput() {
   inp.style.imeMode = 'disabled';
   inp.setAttribute('inputmode','latin');
@@ -1768,31 +1770,37 @@ function forceEnglishInput() {
   inp.setAttribute('autocorrect','off');
   inp.setAttribute('autocapitalize','none');
   inp.setAttribute('spellcheck','false');
+  // compositionstart のみ（compositionupdate は compositionstart 後に blur するため不要）
   inp.addEventListener('compositionstart', abortComposition);
-  inp.addEventListener('compositionupdate', abortComposition);
-  // document全体にも英語ヒントを出してIMEに「今は英語」と示す
   document.documentElement.lang = 'en';
-  // focusを剥がして再度当てるとIMEの変換モードがリセットされやすい
   inp.blur();
   setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
   showImeHint();
 }
+// IME が横取りする前に keydown キャプチャフェーズでキーを保存
+inp.addEventListener('keydown', e => {
+  _preImeKey = (e.key && e.key.length === 1 && /^[\x20-\x7E]$/.test(e.key)) ? e.key : '';
+}, true);
+
 function abortComposition(e) {
-  // 変換を中止：一瞬blurしてfocusしなおすとIMEが解除される
+  const savedKey = _preImeKey; // blur する前に退避
+  _preImeKey = '';
   try { e && e.preventDefault && e.preventDefault(); } catch(_){}
   const v = inp.value;
   inp.blur();
   showImeWarn();
   setTimeout(()=>{
     inp.focus();
-    // 合成途中の文字列が残っている可能性を消す
-    inp.value = v.replace(/[^\x20-\x7E]/g,'');
+    const cleaned = v.replace(/[^\x20-\x7E]/g,'');
+    // compositionstart を引き起こした ASCII キーを復元
+    const restore = /^[\x20-\x7E]$/.test(savedKey) ? savedKey : '';
+    inp.value = cleaned + restore;
+    if (restore) inp.dispatchEvent(new Event('input', { bubbles: true }));
   }, 10);
 }
 function restoreInput() {
   inp.style.imeMode = '';
   inp.removeEventListener('compositionstart', abortComposition);
-  inp.removeEventListener('compositionupdate', abortComposition);
   document.documentElement.lang = 'ja';
   inp.blur();
   hideImeHint();
@@ -1951,9 +1959,17 @@ function enterLevel(lv) {
   restoreCollapseState('perf-collapse', 'perf-section', !!settings.perfCollapseOpen);
   // 単語検索クリア
   const ws = $('word-search'); if (ws) ws.value = '';
-  // デフォルトで「上位10のみ」を適用し、ボタンを強調
-  const top10Btn = document.querySelector('[data-top-n="10"]');
-  if (top10Btn) top10Btn.click();
+  // 初回（全件ON）のみ現在のソート順で上位N件を自動選択。
+  // 2回目以降（auto-rotate 等で保存済み）はそのまま使う。
+  if (enabled.size === words.length && words.length > 0) {
+    const sorted = getSortedIndices();
+    enabled.clear();
+    sorted.slice(0, totalRounds).forEach(m => enabled.add(m.idx));
+    saveLevelEnabled(currentLevel, enabled);
+    const top10Btn = document.querySelector('[data-top-n="10"]');
+    if (top10Btn) highlightActionChip(top10Btn);
+  }
+  renderWordList();
   updateStartBtn(); showScreen('setup');
 }
 
@@ -2536,17 +2552,12 @@ function buildQueue(){
   const wordsOnly = settings.englishWordsOnly === true;
   let pool = [...enabled].map(i => words[i]);
   if (wordsOnly) {
-    // かな読みのある語（=日本語タイピング対象）はそのまま、英字のみの語は記号なしのみ通す
     pool = pool.filter(w => hasKana(w.en) || isPureEnglishWord(w.en));
   }
   if (pool.length === 0) return null;
-  const q = [];
-  let sh = [...pool].sort(()=>Math.random()-0.5);
-  while(q.length<totalRounds){
-    if(!sh.length) sh=[...pool].sort(()=>Math.random()-0.5);
-    q.push(sh.pop());
-  }
-  return q;
+  // シャッフルして重複なしで出題（pool < totalRounds の場合は pool 件数で打ち切り）
+  const shuffled = [...pool].sort(()=>Math.random()-0.5);
+  return shuffled.slice(0, Math.min(totalRounds, pool.length));
 }
 // 全単語の最遅 bestCps を取得（記録のある単語のみ対象。0 は未測定として除外）
 // 全単語が記録あり&bestCps>0 のときに最小値を返す。未挑戦が残っている場合は 0 を返す。
@@ -2577,6 +2588,7 @@ function startGame(){
     if (el) el.classList.remove('show');
   });
   queue = q;
+  totalRounds = q.length; // 実際の出題数に合わせる（重複なし保証）
   curIdx=0; misses=0; clears=0;
   totalKeystrokes=0; correctKeystrokes=0; pausedElapsed=0; gameActive=true;
   sessionWordResults=[];
@@ -3018,9 +3030,24 @@ function showResult(){
       // 未挑戦を優先: 未挑戦をすべて入れ、足りなければ挑戦済みから補充
       const unplayed = sorted.filter(m => !m.hasStat && m.count === 0);
       const played   = sorted.filter(m =>  m.hasStat || m.count > 0);
-      const pick = unplayed.slice(0, N);
-      if (pick.length < N) played.slice(0, N - pick.length).forEach(m => pick.push(m));
-      pick.forEach(m => enabled.add(m.idx));
+      if (unplayed.length === 0) {
+        // 全語挑戦済み → speed-asc（遅い順）に自動移行
+        practiceSortMode = 'speed-asc';
+        saveSettings({ practiceSortMode });
+        document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
+          b.classList.toggle('on', b.dataset.sort === 'speed-asc');
+        });
+        const bySlow = [...played].sort((a,b) => {
+          const av = (a.bestCps && a.bestCps > 0) ? a.bestCps : Infinity;
+          const bv = (b.bestCps && b.bestCps > 0) ? b.bestCps : Infinity;
+          return av - bv || a.idx - b.idx;
+        });
+        bySlow.slice(0, N).forEach(m => enabled.add(m.idx));
+      } else {
+        const pick = unplayed.slice(0, N);
+        if (pick.length < N) played.slice(0, N - pick.length).forEach(m => pick.push(m));
+        pick.forEach(m => enabled.add(m.idx));
+      }
     } else {
       // speed-asc / miss-desc / perf-asc など: ソートキーごとにグルーピングして確定+ランダム境界
       const keyOf = m => {
