@@ -1925,7 +1925,7 @@ function enterLevel(lv) {
   switchTab('practice');
   const settings=loadSettings();
   const sr=settings.rounds||20;
-  document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
@@ -2518,9 +2518,9 @@ function parseCSVLine(line){
 // ══════════════════════════════════════════════
 //  ROUNDS
 // ══════════════════════════════════════════════
-document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(btn=>{
+document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.round-chip:not(.voice-rate-chip)').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveSettings({rounds:totalRounds});
   });
 });
