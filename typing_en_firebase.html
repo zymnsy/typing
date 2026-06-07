@@ -1772,15 +1772,15 @@ function forceEnglishInput() {
   inp.setAttribute('spellcheck','false');
   // compositionstart のみ（compositionupdate は compositionstart 後に blur するため不要）
   inp.addEventListener('compositionstart', abortComposition);
+  inp.addEventListener('keydown', _capturePreImeKey, true);
   document.documentElement.lang = 'en';
   inp.blur();
   setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
   showImeHint();
 }
-// IME が横取りする前に keydown キャプチャフェーズでキーを保存
-inp.addEventListener('keydown', e => {
+function _capturePreImeKey(e) {
   _preImeKey = (e.key && e.key.length === 1 && /^[\x20-\x7E]$/.test(e.key)) ? e.key : '';
-}, true);
+}
 
 function abortComposition(e) {
   const savedKey = _preImeKey; // blur する前に退避
@@ -1801,6 +1801,7 @@ function abortComposition(e) {
 function restoreInput() {
   inp.style.imeMode = '';
   inp.removeEventListener('compositionstart', abortComposition);
+  inp.removeEventListener('keydown', _capturePreImeKey, true);
   document.documentElement.lang = 'ja';
   inp.blur();
   hideImeHint();
