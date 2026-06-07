@@ -1136,23 +1136,13 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <div id="r-delta" class="speed-delta"></div>
     <div class="speed-comment" id="r-comment"></div>
   </div>
-  <div class="card" id="best-card" style="display:none">
-    <div class="sec-label">自己ベスト</div>
-    <div class="best-row">
-      <div class="best-item">
-        <div class="best-l">このレベルの最速</div>
-        <div class="best-v"><span id="best-speed">—</span><span class="best-u">打/秒</span></div>
-      </div>
-      <div class="best-item">
-        <div class="best-l">ランク</div>
-        <div class="best-v"><span id="best-rank">—</span></div>
-      </div>
-      <button class="btn-best-reset" id="btn-best-reset">このレベルのベストをリセット</button>
-    </div>
-  </div>
   <div class="card">
-    <div class="sec-label">詳細データ</div>
+    <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between">
+      詳細データ
+      <button class="btn-best-reset" id="btn-best-reset" style="display:none">ベストをリセット</button>
+    </div>
     <div class="res-grid res-grid-4">
+      <div class="res-cell"><div class="rl">自己ベスト最速</div><div class="rv" id="best-speed">—</div></div>
       <div class="res-cell"><div class="rl">総打鍵数</div><div class="rv" id="r-keys">—</div></div>
       <div class="res-cell"><div class="rl">経過時間</div><div class="rv" id="r-time">—</div></div>
       <div class="res-cell"><div class="rl">ミス打鍵</div><div class="rv ng-c" id="r-miss">—</div></div>
@@ -1634,6 +1624,7 @@ const lvWordsKey   = lv => P+'words-lv'+lv;
 const lvEnabledKey = lv => P+'enabled-lv'+lv;
 const lvTitleKey   = lv => P+'title-lv'+lv;
 const settingsKey  = ()  => P+'settings';
+const lvSettingsKey = lv => P+'settings-lv'+lv;
 
 function loadLevelWords(lv) {
   try { const r=localStorage.getItem(lvWordsKey(lv)); if(r) return JSON.parse(r); } catch(e){}
@@ -1724,6 +1715,8 @@ function saveLastScore(lv, rec) { localStorage.setItem(P+'last-lv'+lv, JSON.stri
 
 function loadSettings() { try { const r=localStorage.getItem(settingsKey()); if(r) return JSON.parse(r); } catch(e){} return {}; }
 function saveSettings(obj){ const c=loadSettings(); Object.assign(c,obj); localStorage.setItem(settingsKey(),JSON.stringify(c)); }
+function loadLevelSettings(lv) { try { const r=localStorage.getItem(lvSettingsKey(lv)); if(r) return JSON.parse(r); } catch(e){} return {}; }
+function saveLevelSettings(lv, obj){ const c=loadLevelSettings(lv); Object.assign(c,obj); localStorage.setItem(lvSettingsKey(lv),JSON.stringify(c)); }
 
 // ══════════════════════════════════════════════
 //  STATE
@@ -1932,32 +1925,33 @@ function enterLevel(lv) {
   gb.className=`game-lv-badge lv${cycle}`;
   gb.textContent=`Lv.${lv}  ${title}`;
   switchTab('practice');
-  const settings=loadSettings();
-  const sr=settings.rounds||20;
+  const settings=loadSettings();        // グローバル（音声設定など）
+  const lvs=loadLevelSettings(lv);      // レベル別（ソート・出題数・トグル）
+  const sr = lvs.rounds ?? settings.rounds ?? 20;
   document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
   // 並び替えモードを復元（デフォルト: 最速 遅い順）
-  practiceSortMode = settings.practiceSortMode || 'speed-asc';
+  practiceSortMode = lvs.practiceSortMode ?? settings.practiceSortMode ?? 'speed-asc';
   document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
     b.classList.toggle('on', b.dataset.sort === practiceSortMode);
   });
   // 「単語のみ」トグルを復元
   const wordsOnlyToggle = $('words-only-toggle');
   if (wordsOnlyToggle) {
-    wordsOnlyToggle.checked = settings.englishWordsOnly === true;
+    wordsOnlyToggle.checked = (lvs.englishWordsOnly ?? settings.englishWordsOnly) === true;
     syncSubVisibility(wordsOnlyToggle, 'words-only-sub');
   }
   // 「自動再選択」トグルを復元（デフォルト ON）
   const autoRotToggle = $('auto-rotate-toggle');
   if (autoRotToggle) {
-    autoRotToggle.checked = settings.autoRotateWorst !== false;
+    autoRotToggle.checked = (lvs.autoRotateWorst ?? settings.autoRotateWorst) !== false;
     syncSubVisibility(autoRotToggle, 'auto-rotate-sub');
   }
   // しきい値セクションの開閉状態を復元
-  restoreCollapseState('speed-collapse', 'speed-section', !!settings.speedCollapseOpen);
-  restoreCollapseState('perf-collapse', 'perf-section', !!settings.perfCollapseOpen);
+  restoreCollapseState('speed-collapse', 'speed-section', !!(lvs.speedCollapseOpen ?? settings.speedCollapseOpen));
+  restoreCollapseState('perf-collapse', 'perf-section', !!(lvs.perfCollapseOpen ?? settings.perfCollapseOpen));
   // 単語検索クリア
   const ws = $('word-search'); if (ws) ws.value = '';
   // 初回（全件ON）のみ現在のソート順で上位N件を自動選択。
@@ -2193,7 +2187,7 @@ document.querySelectorAll('#sort-chips .filter-chip').forEach(btn => {
     document.querySelectorAll('#sort-chips .filter-chip').forEach(b => b.classList.remove('on'));
     btn.classList.add('on');
     practiceSortMode = btn.dataset.sort || 'default';
-    saveSettings({ practiceSortMode });
+    saveLevelSettings(currentLevel, { practiceSortMode });
     renderWordList();
   });
 });
@@ -2538,7 +2532,7 @@ function parseCSVLine(line){
 document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
-    btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveSettings({rounds:totalRounds});
+    btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveLevelSettings(currentLevel, {rounds:totalRounds});
   });
 });
 
@@ -2550,7 +2544,8 @@ function isPureEnglishWord(en) { return /^[a-zA-Z]+$/.test(en); }
 
 function buildQueue(){
   const settings = loadSettings();
-  const wordsOnly = settings.englishWordsOnly === true;
+  const lvs = loadLevelSettings(currentLevel);
+  const wordsOnly = (lvs.englishWordsOnly ?? settings.englishWordsOnly) === true;
   let pool = [...enabled].map(i => words[i]);
   if (wordsOnly) {
     pool = pool.filter(w => hasKana(w.en) || isPureEnglishWord(w.en));
@@ -2950,16 +2945,16 @@ function showResult(){
     bb.classList.remove('show');
   }
 
-  // 自己ベスト表示カード
-  const bc = $('best-card');
-  if (best || isNewBest) {
-    bc.style.display='';
-    const showBest = isNewBest ? nowRec : best;
-    $('best-speed').textContent = showBest.speed.toFixed(1);
-    $('best-rank').textContent  = showBest.rank;
-  } else {
-    bc.style.display='none';
+  // 自己ベスト最速を詳細データの先頭セルに表示
+  const showBest = isNewBest ? nowRec : best;
+  const bsEl = $('best-speed');
+  if (bsEl) {
+    bsEl.innerHTML = showBest
+      ? `${showBest.speed.toFixed(1)} <span style="font-size:0.8em;font-weight:400">打/秒</span>`
+      : '—';
   }
+  const resetBtn = $('btn-best-reset');
+  if (resetBtn) resetBtn.style.display = (best || isNewBest) ? '' : 'none';
 
   // 保存
   saveLastScore(currentLevel, nowRec);
@@ -3020,7 +3015,8 @@ function showResult(){
   // ─ 次回練習のためにオート並び替え＆上位N選択 ─
   // 「自動再選択」ON のときのみ実行。現在のソートモードに従って上位N件を選出。
   const settingsAR = loadSettings();
-  const autoRotateOn = settingsAR.autoRotateWorst !== false; // 既定 ON
+  const lvSettingsAR = loadLevelSettings(currentLevel);
+  const autoRotateOn = (lvSettingsAR.autoRotateWorst ?? settingsAR.autoRotateWorst) !== false; // 既定 ON
   if (autoRotateOn && currentLevel && words.length > 0) {
     const sorted = getSortedIndices(); // 現在のソートモードで並び替え済み
     const N = totalRounds;
@@ -3034,7 +3030,7 @@ function showResult(){
       if (unplayed.length === 0) {
         // 全語挑戦済み → speed-asc（遅い順）に自動移行
         practiceSortMode = 'speed-asc';
-        saveSettings({ practiceSortMode });
+        saveLevelSettings(currentLevel, { practiceSortMode });
         document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
           b.classList.toggle('on', b.dataset.sort === 'speed-asc');
         });
@@ -3165,7 +3161,8 @@ $('btn-best-reset').addEventListener('click', async () => {
   localStorage.removeItem('typing-en-v2-best-lv'+currentLevel);
   localStorage.removeItem('typing-en-v2-last-lv'+currentLevel);
   if (typeof window._fbSaveAll === 'function') window._fbSaveAll();
-  $('best-card').style.display='none';
+  const bsEl2 = $('best-speed'); if (bsEl2) bsEl2.textContent = '—';
+  const rb2 = $('btn-best-reset'); if (rb2) rb2.style.display = 'none';
   refreshHomeCard(currentLevel);
   toast(`Lv.${currentLevel} のベスト記録をリセットしました`, 'suc');
 });
@@ -3898,14 +3895,14 @@ function toast(msg, type) {
 
 // ── 「単語のみ」トグル ──
 $('words-only-toggle').addEventListener('change', e => {
-  saveSettings({ englishWordsOnly: e.target.checked });
+  saveLevelSettings(currentLevel, { englishWordsOnly: e.target.checked });
   syncSubVisibility(e.target, 'words-only-sub');
   toast(e.target.checked ? '単語のみモード ON' : '文章モード ON','suc');
 });
 
 // ── 「自動再選択（遅い順 上位N シャッフル）」トグル ──
 $('auto-rotate-toggle').addEventListener('change', e => {
-  saveSettings({ autoRotateWorst: e.target.checked });
+  saveLevelSettings(currentLevel, { autoRotateWorst: e.target.checked });
   syncSubVisibility(e.target, 'auto-rotate-sub');
   toast(e.target.checked ? '自動再選択 ON（リザルト後に毎回入れ替え）' : '自動再選択 OFF','suc');
 });
@@ -3915,8 +3912,8 @@ document.querySelectorAll('.collapse-toggle').forEach(t => {
   t.addEventListener('change', () => {
     const tgt = document.getElementById(t.dataset.target);
     if (tgt) tgt.style.display = t.checked ? 'flex' : 'none';
-    if (t.id === 'speed-collapse') saveSettings({ speedCollapseOpen: t.checked });
-    if (t.id === 'perf-collapse')  saveSettings({ perfCollapseOpen: t.checked });
+    if (t.id === 'speed-collapse') saveLevelSettings(currentLevel, { speedCollapseOpen: t.checked });
+    if (t.id === 'perf-collapse')  saveLevelSettings(currentLevel, { perfCollapseOpen: t.checked });
   });
 });
 
