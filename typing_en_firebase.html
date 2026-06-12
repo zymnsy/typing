@@ -1142,7 +1142,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <button class="btn-best-reset" id="btn-best-reset" style="display:none">ベストをリセット</button>
     </div>
     <div class="res-grid res-grid-4">
-      <div class="res-cell"><div class="rl">自己ベスト最速</div><div class="rv" id="best-speed">—</div></div>
       <div class="res-cell"><div class="rl">総打鍵数</div><div class="rv" id="r-keys">—</div></div>
       <div class="res-cell"><div class="rl">経過時間</div><div class="rv" id="r-time">—</div></div>
       <div class="res-cell"><div class="rl">ミス打鍵</div><div class="rv ng-c" id="r-miss">—</div></div>
@@ -2945,14 +2944,6 @@ function showResult(){
     bb.classList.remove('show');
   }
 
-  // 自己ベスト最速を詳細データの先頭セルに表示
-  const showBest = isNewBest ? nowRec : best;
-  const bsEl = $('best-speed');
-  if (bsEl) {
-    bsEl.innerHTML = showBest
-      ? `${showBest.speed.toFixed(1)} <span style="font-size:0.8em;font-weight:400">打/秒</span>`
-      : '—';
-  }
   const resetBtn = $('btn-best-reset');
   if (resetBtn) resetBtn.style.display = (best || isNewBest) ? '' : 'none';
 
@@ -3161,7 +3152,6 @@ $('btn-best-reset').addEventListener('click', async () => {
   localStorage.removeItem('typing-en-v2-best-lv'+currentLevel);
   localStorage.removeItem('typing-en-v2-last-lv'+currentLevel);
   if (typeof window._fbSaveAll === 'function') window._fbSaveAll();
-  const bsEl2 = $('best-speed'); if (bsEl2) bsEl2.textContent = '—';
   const rb2 = $('btn-best-reset'); if (rb2) rb2.style.display = 'none';
   refreshHomeCard(currentLevel);
   toast(`Lv.${currentLevel} のベスト記録をリセットしました`, 'suc');
