@@ -405,10 +405,17 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 }
 /* round */
 .round-row{display:flex;gap:6px;flex-wrap:wrap}
-.round-chip{flex:1;min-width:54px;padding:10px 0;text-align:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:600;color:var(--sub);transition:all 0.18s var(--ease);}
+.round-chip{flex:1;min-width:54px;padding:10px 0;text-align:center;border:1px solid var(--border);border-radius:16px;background:var(--surface);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:600;color:var(--sub);transition:all 0.18s var(--ease);}
 .round-chip:hover{border-color:var(--border2);color:var(--text);background:var(--surface-alt);}
 .round-chip.on{border-color:var(--on);background:var(--on-bg);color:var(--on);box-shadow:0 0 0 3px rgba(201,100,66,0.08);}
 .round-chip:active{transform:scale(0.97);}
+.order-chip{flex:1;min-width:90px;padding:10px 0;text-align:center;border:1px solid var(--border);border-radius:16px;background:var(--surface);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:600;color:var(--sub);transition:all 0.18s var(--ease);}
+.order-chip:hover{border-color:var(--border2);color:var(--text);background:var(--surface-alt);}
+.order-chip.on{border-color:var(--on);background:var(--on-bg);color:var(--on);box-shadow:0 0 0 3px rgba(201,100,66,0.08);}
+.order-chip:active{transform:scale(0.97);}
+.btn-runall{width:100%;margin-top:12px;padding:12px 15px;background:var(--on);border:1px solid var(--on);border-radius:var(--r-sm);font-family:'Noto Sans JP',sans-serif;font-size:0.86rem;font-weight:600;color:#fff;cursor:pointer;transition:all 0.15s var(--ease);}
+.btn-runall:hover{filter:brightness(1.06);}
+.btn-runall:active{transform:scale(0.99);}
 /* hint box */
 .hint-box{padding:14px 16px;background:linear-gradient(135deg,var(--on-bg) 0%,#faeae0 100%);border:1px solid #f3d7c7;border-radius:var(--r);font-size:0.78rem;color:var(--sub);line-height:1.9;}
 .hint-box b{font-family:'JetBrains Mono','Noto Sans JP',sans-serif;color:var(--on);font-weight:700;}
@@ -884,7 +891,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
 
       <div class="filter-block">
-        <div class="filter-chips" id="preset-chips">
+        <div class="filter-chips compact-chips" id="preset-chips">
           <button class="filter-chip preset-chip preset-quick" data-preset="all">すべて選択</button>
           <button class="filter-chip preset-chip preset-quick" data-preset="none">すべて解除</button>
           <button class="filter-chip preset-chip" data-preset="fresh">未挑戦のみ <span class="chip-pop" id="pp-fresh">0</span></button>
@@ -948,15 +955,21 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         <button class="round-chip" data-n="10">10問</button>
         <button class="round-chip on" data-n="20">20問</button>
         <button class="round-chip" data-n="30">30問</button>
-        <button class="round-chip" data-n="40">40問</button>
         <button class="round-chip" data-n="50">50問</button>
+        <button class="round-chip" data-n="100">100問</button>
+        <button class="round-chip" data-n="0">全部</button>
       </div>
+      <div class="sec-label" style="margin-top:16px">出題順</div>
+      <div class="round-row">
+        <button class="order-chip on" data-order="random">ランダム</button>
+        <button class="order-chip" data-order="seq">この並び順のまま</button>
+      </div>
+      <button class="btn-runall" id="run-all-seq-btn">この並び順のまま最後まで通す</button>
     </div>
     <div class="card">
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">ソート順位 上位N件を自動で次回出題に設定</div>
-          <div class="voice-sub" id="auto-rotate-sub" style="display:none">リザルト後、現在のソート条件で上位N件を自動選出・出題します</div>
         </div>
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" id="auto-rotate-toggle">
@@ -1926,11 +1939,14 @@ function enterLevel(lv) {
   switchTab('practice');
   const settings=loadSettings();        // グローバル（音声設定など）
   const lvs=loadLevelSettings(lv);      // レベル別（ソート・出題数・トグル）
-  const sr = lvs.rounds ?? settings.rounds ?? 20;
+  const sr = lvs.rounds ?? 20;
   document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
   const rb=document.querySelector(`.round-chip[data-n="${sr}"]`);
   if(rb){ rb.classList.add('on'); totalRounds=sr; }
   else { document.querySelector('.round-chip[data-n="20"]').classList.add('on'); totalRounds=20; }
+  // 出題順を復元（既定: ランダム）
+  practiceOrder = (lvs.order === 'seq') ? 'seq' : 'random';
+  document.querySelectorAll('.order-chip').forEach(b=>b.classList.toggle('on', b.dataset.order===practiceOrder));
   // 並び替えモードを復元（デフォルト: 最速 遅い順）
   practiceSortMode = lvs.practiceSortMode ?? settings.practiceSortMode ?? 'speed-asc';
   document.querySelectorAll('#sort-chips .filter-chip').forEach(b => {
@@ -1939,14 +1955,13 @@ function enterLevel(lv) {
   // 「単語のみ」トグルを復元
   const wordsOnlyToggle = $('words-only-toggle');
   if (wordsOnlyToggle) {
-    wordsOnlyToggle.checked = (lvs.englishWordsOnly ?? settings.englishWordsOnly) === true;
+    wordsOnlyToggle.checked = lvs.englishWordsOnly === true;
     syncSubVisibility(wordsOnlyToggle, 'words-only-sub');
   }
   // 「自動再選択」トグルを復元（デフォルト ON）
   const autoRotToggle = $('auto-rotate-toggle');
   if (autoRotToggle) {
-    autoRotToggle.checked = (lvs.autoRotateWorst ?? settings.autoRotateWorst) !== false;
-    syncSubVisibility(autoRotToggle, 'auto-rotate-sub');
+    autoRotToggle.checked = lvs.autoRotateWorst !== false;
   }
   // しきい値セクションの開閉状態を復元
   restoreCollapseState('speed-collapse', 'speed-section', !!(lvs.speedCollapseOpen ?? settings.speedCollapseOpen));
@@ -1958,7 +1973,7 @@ function enterLevel(lv) {
   if (enabled.size === words.length && words.length > 0) {
     const sorted = getSortedIndices();
     enabled.clear();
-    sorted.slice(0, totalRounds).forEach(m => enabled.add(m.idx));
+    sorted.slice(0, totalRounds > 0 ? totalRounds : sorted.length).forEach(m => enabled.add(m.idx));
     saveLevelEnabled(currentLevel, enabled);
     const top10Btn = document.querySelector('[data-top-n="10"]');
     if (top10Btn) highlightActionChip(top10Btn);
@@ -2018,6 +2033,8 @@ $('level-title-save-btn').addEventListener('click',()=>{
 //  PRACTICE LIST
 // ══════════════════════════════════════════════
 let practiceSortMode = 'default';
+// 出題順: 'random' = シャッフル / 'seq' = 画面の単語リストと同じ並びのまま上から
+let practiceOrder = 'random';
 
 // 単語ごとの算出済み統計（ソート・フィルタで使用）
 function computeWordMetrics(idx) {
@@ -2535,6 +2552,27 @@ document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-c
   });
 });
 
+// 出題順（ランダム / 画面の並び順そのまま）
+function applyOrderMode(mode){
+  practiceOrder = (mode === 'seq') ? 'seq' : 'random';
+  document.querySelectorAll('.order-chip').forEach(b=>b.classList.toggle('on', b.dataset.order===practiceOrder));
+  if (currentLevel) saveLevelSettings(currentLevel, {order:practiceOrder});
+}
+document.querySelectorAll('.order-chip').forEach(btn=>{
+  btn.addEventListener('click',()=>applyOrderMode(btn.dataset.order));
+});
+// 「この並び順のまま最後まで通す」= 出題順=並び順 かつ 出題数=全部 にしてそのまま開始
+const runAllBtn = document.getElementById('run-all-seq-btn');
+if (runAllBtn) runAllBtn.addEventListener('click',()=>{
+  applyOrderMode('seq');
+  document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
+  const allChip=document.querySelector('.round-chip[data-n="0"]');
+  if(allChip) allChip.classList.add('on');
+  totalRounds=0;
+  saveLevelSettings(currentLevel, {rounds:0});
+  startGame();
+});
+
 // ══════════════════════════════════════════════
 //  GAME
 // ══════════════════════════════════════════════
@@ -2550,9 +2588,19 @@ function buildQueue(){
     pool = pool.filter(w => hasKana(w.en) || isPureEnglishWord(w.en));
   }
   if (pool.length === 0) return null;
+  // 出題数 0 = 全部
+  const limit = (totalRounds > 0) ? Math.min(totalRounds, pool.length) : pool.length;
+  if (practiceOrder === 'seq') {
+    // 画面の単語リストと同じ並び順のまま上から出題する
+    const inPool = new Set(pool.map(w => w.en));
+    const seq = getSortedIndices()
+      .filter(m => enabled.has(m.idx) && words[m.idx] && inPool.has(words[m.idx].en))
+      .map(m => words[m.idx]);
+    return seq.slice(0, limit);
+  }
   // シャッフルして重複なしで出題（pool < totalRounds の場合は pool 件数で打ち切り）
   const shuffled = [...pool].sort(()=>Math.random()-0.5);
-  return shuffled.slice(0, Math.min(totalRounds, pool.length));
+  return shuffled.slice(0, limit);
 }
 // 全単語の最遅 bestCps を取得（記録のある単語のみ対象。0 は未測定として除外）
 // 全単語が記録あり&bestCps>0 のときに最小値を返す。未挑戦が残っている場合は 0 を返す。
@@ -3010,7 +3058,7 @@ function showResult(){
   const autoRotateOn = (lvSettingsAR.autoRotateWorst ?? settingsAR.autoRotateWorst) !== false; // 既定 ON
   if (autoRotateOn && currentLevel && words.length > 0) {
     const sorted = getSortedIndices(); // 現在のソートモードで並び替え済み
-    const N = totalRounds;
+    const N = totalRounds > 0 ? totalRounds : sorted.length; // 0 = 全部
     enabled.clear();
     if (sorted.length <= N) {
       sorted.forEach(m => enabled.add(m.idx));
@@ -3893,7 +3941,6 @@ $('words-only-toggle').addEventListener('change', e => {
 // ── 「自動再選択（遅い順 上位N シャッフル）」トグル ──
 $('auto-rotate-toggle').addEventListener('change', e => {
   saveLevelSettings(currentLevel, { autoRotateWorst: e.target.checked });
-  syncSubVisibility(e.target, 'auto-rotate-sub');
   toast(e.target.checked ? '自動再選択 ON（リザルト後に毎回入れ替え）' : '自動再選択 OFF','suc');
 });
 
