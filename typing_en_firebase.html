@@ -443,6 +443,8 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 #hint-disp{font-family:'JetBrains Mono',monospace;font-size:1.38rem;letter-spacing:0.05em;min-height:1.7em;word-break:break-all;line-height:1.85;}
 #word-disp.long-text{font-size:1.15rem}
 #hint-disp.long-text{font-size:1rem;letter-spacing:0.02em}
+#word-disp .ans-hl{color:var(--on);font-weight:700;}
+#word-disp .ans-explain{font-size:0.8rem;font-weight:500;color:var(--sub);margin-top:8px;line-height:1.5;}
 #hint-disp .hint-char{color:var(--muted);transition:color 0.1s}
 #hint-disp .hint-hidden{color:transparent;border-bottom:1.5px dashed var(--border2);margin:0 1px;}
 #hint-disp .hint-typed{color:var(--ok);font-weight:700;}
@@ -1873,6 +1875,14 @@ function currentScreen() {
   return '';
 }
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// ja列内の **語** を正解ハイライト、## 以降を短い解説として別行表示する
+// （出典: 空所補充問題のCSVを想定。マーカーが無い通常のjaはそのまま表示される）
+function renderPromptHtml(raw){
+  const escaped = escHtml(raw);
+  const [main, explain] = escaped.split('##');
+  const withHl = main.replace(/\*\*(.+?)\*\*/g, '<span class="ans-hl">$1</span>');
+  return explain ? `${withHl}<div class="ans-explain">${explain.trim()}</div>` : withHl;
+}
 
 // ══════════════════════════════════════════════
 //  HOME
@@ -2671,7 +2681,7 @@ $('start-btn').addEventListener('click',startGame);
 
 function showWord(idx){
   const w=queue[idx];
-  $('word-disp').textContent=w.ja;
+  $('word-disp').innerHTML=renderPromptHtml(w.ja);
   const hintEl=$('hint-disp');
   // モード判定: かな含有 or ローマ字パース可能(3モーラ以上) → 寿司打スタイル
   const display = buildPracticeDisplay(w.en);
