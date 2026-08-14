@@ -113,6 +113,8 @@ onAuthStateChanged(auth, async user => {
     showSyncBadge('ok');
     // ホーム画面を再描画（データ更新後）
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
+    // クラウドから来た設定を画面に反映（大文字・小文字の判定モード）
+    if (typeof applyCaseStrictSetting === 'function') applyCaseStrictSetting();
   } else {
     cloudLoadDone = true;
     updateLoginUI(null);
@@ -992,6 +994,18 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <div class="card">
       <div class="voice-row">
         <div class="voice-info">
+          <div class="voice-title">大文字・小文字を厳密に判定する（Shift必須）</div>
+          <div class="voice-sub" id="case-strict-sub" style="display:none">ON にすると <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">Sunday</code> は <kbd>Shift</kbd>＋<kbd>S</kbd> から打つ必要があります。OFF（既定）なら大文字・小文字どちらで打っても正解で、画面の表示は自動で正しい形に直ります。</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="case-strict-toggle">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="voice-row">
+        <div class="voice-info">
           <div class="voice-title">英語を読み上げる</div>
           <div class="voice-sub" id="voice-sub" style="display:none">「読み上げタイミング」で発音タイミングを選択できます</div>
         </div>
@@ -1739,6 +1753,10 @@ let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
 let sessionWordResults=[];              // 今セッションの単語ごとの速度ログ
 let currentMode='en';                   // 'en' | 'kana'
+// 大文字・小文字の判定モード（グローバル設定）
+//   false（既定）… 区別しない。小文字だけで打っても正解、入力欄は正しい形に自動で直す
+//   true          … 区別する。頭の大文字は Shift を押して打つ必要がある
+let caseStrict=false;
 let currentMoras=null, currentPatterns=null;
 let currentRoman='', currentSegments=null; // kana モードでのローマ字表示用
 let manageSelected=new Set();
@@ -2687,7 +2705,19 @@ function showWord(idx){
 
 inp.addEventListener('input',()=>{
   if(!queue.length||!gameActive) return;
-  const target=queue[curIdx].en, typed=normalizeEn(inp.value);
+  const target=queue[curIdx].en;
+  let typed=normalizeEn(inp.value);
+  // 大文字・小文字を区別しない設定のとき（既定）
+  //   英語モード : 打った内容が大小無視でお手本の先頭と一致するなら、お手本どおりの
+  //                大文字・小文字に入力欄を書き換える（Shiftを押さなくても正解になる）
+  //   かなモード : ローマ字は常に小文字で判定するので、そのまま小文字化する
+  if (!caseStrict) {
+    if (currentMode === 'kana') {
+      typed = typed.toLowerCase();
+    } else if (target.slice(0, typed.length).toLowerCase() === typed.toLowerCase()) {
+      typed = target.slice(0, typed.length);
+    }
+  }
   totalKeystrokes++; inp.value=typed;
 
   // 実際に半角英字が入力されている＝もう英語入力モードに切り替え済み、と判定。
@@ -3283,6 +3313,27 @@ function loadEnVoices() {
     selectedVoiceName = enVoices[0].name;
     sel.value = 0;
   }
+}
+
+// ── 大文字・小文字の判定モード（全レベル共通の設定） ──
+// 保存値を画面とグローバル変数に反映するだけ。クラウド読み込み後にも呼ぶ
+function applyCaseStrictSetting() {
+  const toggle = $('case-strict-toggle');
+  if (!toggle) return;
+  caseStrict = loadSettings().caseStrict === true;   // 既定は OFF（区別しない）
+  toggle.checked = caseStrict;
+  syncSubVisibility(toggle, 'case-strict-sub');
+}
+function initCaseStrictSetting() {
+  const toggle = $('case-strict-toggle');
+  if (!toggle) return;
+  applyCaseStrictSetting();
+  toggle.addEventListener('change', () => {
+    caseStrict = toggle.checked;
+    saveSettings({ caseStrict });
+    syncSubVisibility(toggle, 'case-strict-sub');
+    toast(caseStrict ? '大文字・小文字を区別する（Shift必須）' : '大文字・小文字を区別しない','suc');
+  });
 }
 
 function initVoiceSettings() {
@@ -3984,6 +4035,7 @@ $('reset-all-btn').addEventListener('click', async () => {
 
 renderHomeScreen();
 initVoiceSettings();
+initCaseStrictSetting();
 window.addEventListener('beforeunload',()=>{ if(currentLevel) saveLevelEnabled(currentLevel,enabled); });
 </script>
 </body>
