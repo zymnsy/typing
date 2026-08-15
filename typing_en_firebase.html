@@ -420,6 +420,7 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rd-line.heading{margin-bottom:18px;}
 .rd-en{font-family:'JetBrains Mono',monospace;font-size:1rem;line-height:1.9;letter-spacing:0.01em;}
 .rd-line.heading .rd-en{font-size:1.2rem;font-weight:800;letter-spacing:0.03em;}
+.rd-paper.hide-ja .rd-ja{display:none;}   /* 設定で日本語訳を隠した時 */
 .rd-ja{font-size:0.76rem;color:var(--muted);margin-top:3px;line-height:1.6;}
 .rd-bullet{color:var(--muted);margin-right:5px;}
 .rd-lit{color:var(--muted);}
@@ -496,6 +497,18 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rs-num.miss-none{color:var(--muted);font-weight:500;}
 .rs-num.miss-some{color:var(--ng);}
 .rs-empty{text-align:center;padding:28px 0;font-size:0.82rem;color:var(--muted);}
+/* 長文の練習設定画面 */
+.rst-title{font-size:1.15rem;font-weight:800;letter-spacing:-0.01em;line-height:1.35;}
+.rst-sub{font-size:0.78rem;color:var(--sub);margin-top:3px;line-height:1.55;}
+.rst-progress-row{display:flex;align-items:center;gap:10px;margin-top:14px;}
+#rst-bar-fill{display:block;height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--ok) 0%,#4ba86e 100%);transition:width 0.2s var(--ease);}
+.rst-pct{font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;min-width:42px;text-align:right;}
+.rst-stats{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;}
+.rst-stat{display:inline-flex;align-items:baseline;gap:5px;font-family:'JetBrains Mono',monospace;
+  font-size:0.8rem;font-weight:700;color:var(--sub);}
+.rst-stat-l{font-family:'Noto Sans JP',sans-serif;font-size:0.68rem;font-weight:600;color:var(--muted);}
+.rst-stat.dim{color:var(--muted);font-weight:500;}
 /* 長文リーディングの管理画面 */
 .rm-note{font-size:0.72rem;color:var(--muted);margin-left:auto;}
 .rm-head{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;
@@ -512,7 +525,8 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rm-h-title{flex:1;min-width:0;}
 .rm-h-num{width:54px;text-align:right;flex-shrink:0;}
 .rm-h-act{width:184px;text-align:right;flex-shrink:0;}
-.rm-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.rm-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:pointer;}
+.rm-title:hover b{color:var(--on);}
 .rm-title b{font-size:0.86rem;font-weight:700;letter-spacing:-0.01em;}
 .rm-sub{font-size:0.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rm-num{width:54px;text-align:right;flex-shrink:0;font-family:'JetBrains Mono',monospace;
@@ -1470,11 +1484,146 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   </div>
 </div>
 
+<!-- READING SETUP（長文の練習設定） -->
+<div id="rsetup-screen" class="screen">
+  <div class="hrow">
+    <div>
+      <button class="back-link" id="rst-back-btn">← 一覧に戻る</button>
+      <div class="page-title" style="margin-top:6px">練習設定</div>
+    </div>
+    <span class="setup-badge lv3" id="rst-badge"></span>
+  </div>
+  <div class="tabbar">
+    <button class="tab active" id="rst-tab-practice" onclick="switchRTab('practice')">🎯 練習設定</button>
+    <button class="tab" id="rst-tab-manage" onclick="switchRTab('manage')">✏️ 長文管理</button>
+  </div>
+
+  <div id="rpane-practice" class="setup-2col">
+    <div class="setup-main">
+      <div class="card">
+        <div class="sec-label">この長文</div>
+        <div class="rst-title" id="rst-title">—</div>
+        <div class="rst-sub" id="rst-sub"></div>
+        <div class="rst-progress-row">
+          <span class="bar-track" style="flex:1"><span id="rst-bar-fill"></span></span>
+          <span class="rst-pct" id="rst-pct">0%</span>
+        </div>
+        <div class="rst-stats" id="rst-stats"></div>
+        <button class="btn-ghost" id="rst-stats-btn" style="margin-top:12px">文ごとの記録を見る</button>
+      </div>
+      <div class="card">
+        <div class="sec-label">打ち方</div>
+        <div class="add-hint" style="margin:0">
+          英文だけを上から順に入力します。行末の <b>␣</b> は <kbd>Space</kbd>（<kbd>Enter</kbd>でも可）で次の行へ。<br>
+          カッコなど薄い文字は打たずに飛ばします。左右の語句パネルはクリックで読み上げ。<br>
+          手が止まると経過時間の計測が自動で止まり、次の1打で再開します。
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-side">
+      <div class="card">
+        <div class="sec-label">開始位置</div>
+        <div class="round-row">
+          <button class="round-chip on" id="rst-start-resume" data-start="resume">続きから</button>
+          <button class="round-chip" id="rst-start-fresh" data-start="fresh">最初から</button>
+        </div>
+        <div class="add-hint" id="rst-start-hint" style="margin-top:8px">前回やめたところから続けます</div>
+      </div>
+      <div class="card">
+        <div class="voice-row">
+          <div class="voice-info">
+            <div class="voice-title">日本語訳を表示する</div>
+            <div class="voice-sub" style="display:block">OFFにすると英文だけになります（意味を見ずに打つ練習）</div>
+          </div>
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" id="rd-showja-toggle" checked>
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="voice-row">
+          <div class="voice-info">
+            <div class="voice-title">文法・語句パネルを表示する</div>
+            <div class="voice-sub" style="display:block">OFFにすると本文だけを広く使います</div>
+          </div>
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" id="rd-panels-toggle" checked>
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="voice-row">
+          <div class="voice-info">
+            <div class="voice-title">追いかけスクロールする</div>
+            <div class="voice-sub" style="display:block">OFFにすると画面は動かず、自分でスクロールします</div>
+          </div>
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" id="rd-autoscroll-toggle" checked>
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="voice-info">
+          <div class="voice-title">手が止まったら計測を一時停止する</div>
+          <div class="voice-sub" style="display:block">この秒数だけ入力が止まると、ストップウォッチを自動で止めます（単語練習と共通の設定）</div>
+        </div>
+        <div class="round-row" style="margin-top:10px">
+          <button class="round-chip idle-chip" data-sec="5">5秒</button>
+          <button class="round-chip idle-chip on" data-sec="10">10秒</button>
+          <button class="round-chip idle-chip" data-sec="20">20秒</button>
+          <button class="round-chip idle-chip" data-sec="30">30秒</button>
+          <button class="round-chip idle-chip" data-sec="60">60秒</button>
+          <button class="round-chip idle-chip" data-sec="0">止めない</button>
+        </div>
+      </div>
+      <button class="btn-primary" id="rst-start-btn">練習を開始する</button>
+      <div class="space-start-hint"><kbd>Space</kbd> でも開始できます</div>
+    </div>
+  </div>
+
+  <div id="rpane-manage" style="display:none;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="sec-label">この長文の管理</div>
+      <div class="voice-row" style="margin-bottom:14px">
+        <div class="voice-info">
+          <div class="voice-title">一覧に表示する</div>
+          <div class="voice-sub" style="display:block">OFFにするとホームの一覧から外れ、下部のアーカイブに入ります（記録は残ります）</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="rst-visible-toggle" checked>
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="rst-stats" id="rst-manage-stats"></div>
+      <div class="reset-row" style="margin-top:14px">
+        <span class="reset-label">途中経過（続き）を消して最初からにする</span>
+        <button class="btn-reset" id="rst-clear-progress">続きを消す</button>
+      </div>
+      <div class="reset-row">
+        <span class="reset-label">自己ベスト・文ごとの記録・練習回数を消す</span>
+        <button class="btn-reset" id="rst-clear-stats">記録を消す</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-label">長文リスト全体</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:0.78rem;color:var(--sub);flex:1;min-width:200px;line-height:1.55;">
+          どの長文を一覧に出すかをまとめて切り替えたり、記録を整理できます。</span>
+        <button class="btn-ghost" id="rst-goto-list">長文リストの管理へ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- READING (長文リーディング) -->
 <div id="reading-screen" class="screen">
   <div class="hrow">
     <div>
-      <button class="back-link" id="rd-back-btn">← レベル選択に戻る</button>
+      <button class="back-link" id="rd-back-btn">← 練習設定に戻る</button>
       <div class="page-title" style="margin-top:6px" id="rd-title">長文リーディング</div>
       <div class="page-sub" id="rd-sub"></div>
     </div>
@@ -2365,10 +2514,11 @@ function hideImeHint() {
 const $ = id => document.getElementById(id);
 const homeScr=$('home-screen'),setupScr=$('setup-screen'),gameScr=$('game-screen'),resScr=$('result-screen');
 const readingScr=$('reading-screen'), rstatsScr=$('rstats-screen'), rmanageScr=$('rmanage-screen');
+const rsetupScr=$('rsetup-screen');
 const inp=$('inp');
 
 function showScreen(id) {
-  [homeScr,setupScr,gameScr,resScr,readingScr,rstatsScr,rmanageScr].forEach(s=>s.classList.remove('active'));
+  [homeScr,setupScr,gameScr,resScr,readingScr,rstatsScr,rmanageScr,rsetupScr].forEach(s=>s.classList.remove('active'));
   $(id+'-screen').classList.add('active');
   if(id!=='game') disableCursorHide();
 }
@@ -2380,6 +2530,7 @@ function currentScreen() {
   if(readingScr.classList.contains('active')) return 'reading';
   if(rstatsScr.classList.contains('active')) return 'rstats';
   if(rmanageScr.classList.contains('active')) return 'rmanage';
+  if(rsetupScr.classList.contains('active')) return 'rsetup';
   return '';
 }
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -5284,11 +5435,25 @@ let rdSegStart = null, rdSegMiss = 0, rdSegKeys = 0;  // いま打っている�
 let rdPausedAt = null;     // 手が止まって計測を停めた時刻（動いている間は null）
 let rdIdleTimer = null;
 let rdRestoredMs = 0;      // 前回までの経過時間（途中から再開する時に引き継ぐ）
+// 長文の練習設定（全長文に共通）
+let rdShowJa = true;       // 日本語訳を出す
+let rdShowPanels = true;   // 文法・語句パネルを出す
+let rdAutoScroll = true;   // 打つ位置を追いかけてスクロールする
+let rdSetupId = null;      // 練習設定画面で開いている長文
+let rdStartMode = 'resume';// 'resume' = 続きから / 'fresh' = 最初から
 
 function rdJson(key){
   try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null; }
 }
 function rdSaved(id){ return rdJson(rdKey(id)); }
+// 途中経過（続き）。1文字でも打っていれば hasResume は true（%は0でも続きは続き）
+function rdProgressOf(id){
+  const d = rdSaved(id);
+  const cursor = d && d.cursor ? d.cursor : 0;
+  const total  = d && d.total  ? d.total  : 0;
+  return { cursor, total, pct: total ? Math.round((cursor/total)*100) : 0,
+           elapsedMs: (d && d.elapsedMs) || 0, hasResume: cursor > 0 };
+}
 function rdStats(id){ return rdJson(rdStatsKey(id)) || {}; }
 function rdLog(id){ return rdJson(rdLogKey(id)) || {plays:0, last:0}; }
 // 打ち始めた時に最終練習日を、通しで終えた時に回数を記録する
@@ -5397,8 +5562,8 @@ function renderReadingCards(){
   const passages = applySavedOrder(READING_PASSAGES, loadSettings().readingOrder, p=>p.id);
   passages.forEach(p => {
     const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
-    const saved = rdSaved(p.id);
-    const pct = saved && saved.total ? Math.round((saved.cursor / saved.total) * 100) : 0;
+    const prog = rdProgressOf(p.id);
+    const pct = prog.pct;
     const best = rdJson(rdBestKey(p.id));
     const card = document.createElement('div');
     card.className = 'reading-card' + (best ? ' has-best' : '');
@@ -5417,18 +5582,18 @@ function renderReadingCards(){
       <div class="rc-foot">
         <span class="rc-meta">${total.toLocaleString()} 字</span>
         <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
-        <span class="rc-meta${pct > 0 ? ' resume' : ''}">${pct > 0 ? '続き '+pct+'%' : (best ? best.speed.toFixed(1)+' 打/秒' : '0%')}</span>
+        <span class="rc-meta${prog.hasResume ? ' resume' : ''}">${prog.hasResume ? '続き '+pct+'%' : (best ? best.speed.toFixed(1)+' 打/秒' : '0%')}</span>
       </div>
       <div class="rc-stats">
         ${statCell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays)}
         ${log.last ? statCell('最終', fmtShortDate(log.last)) : ''}
         ${p.added ? statCell('追加', addedTxt) : ''}
-        ${saved && saved.elapsedMs ? statCell('経過', rdFmtTime(saved.elapsedMs/1000)) : ''}
+        ${prog.elapsedMs ? statCell('経過', rdFmtTime(prog.elapsedMs/1000)) : ''}
       </div>`;
     card.addEventListener('click', ()=>{
       if(reorderMode) return;
       if(archiveMode){ toggleArchiveSel(card); return; }
-      enterReading(p.id);
+      openReadingSetup(p.id);     // 単語練習と同じで、まず練習設定を開く
     });
     (archived.has(p.id) && arcGrid ? arcGrid : grid).appendChild(card);
   });
@@ -5438,15 +5603,18 @@ function renderReadingCards(){
   if(typeof updateArchiveSection === 'function') updateArchiveSection();
 }
 
-// ── 長文を開く ──
-function enterReading(id){
+// ── 長文を開く（fresh=true なら続きを捨てて最初から）──
+function enterReading(id, opts){
+  const fresh = !!(opts && opts.fresh);
   rdPassage = READING_PASSAGES.find(p => p.id === id);
   if(!rdPassage) return;
   $('rd-title').textContent = rdPassage.title;
   $('rd-sub').textContent = rdPassage.subtitle;
   rdBuildPaper();
   rdRenderPanels();
-  rdRestore();
+  if(fresh) localStorage.removeItem(rdKey(rdPassage.id));
+  else rdRestore();
+  rdApplyViewSettings();
   rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true); rdUpdateTimerChip();
   showScreen('reading');
   // 途中でやめた続きから開いた時は、どこから再開するのかを知らせる
@@ -5458,6 +5626,7 @@ function enterReading(id){
   requestAnimationFrame(()=>{
     const vp = $('rd-viewport');
     if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
+    else if(!rdAutoScroll) rdLock();          // 追いかけスクロールOFF
     else if(rdCursor > 0) rdFollowCaret();
   });
 }
@@ -5586,8 +5755,9 @@ function rdRenderPanels(){
   fill($('rd-grammar-list'), rdPassage.grammar);
   fill($('rd-vocab-list'), rdPassage.vocab);
   // 語句・文法が無い長文（CSVから入れたものなど）は空パネルを出さず本文を広く使う
-  const hasG = (rdPassage.grammar||[]).length > 0;
-  const hasV = (rdPassage.vocab||[]).length > 0;
+  // 設定で「パネルを表示しない」にした時も同じ扱いにする
+  const hasG = rdShowPanels && (rdPassage.grammar||[]).length > 0;
+  const hasV = rdShowPanels && (rdPassage.vocab||[]).length > 0;
   $('rd-grammar-panel').hidden = !hasG;
   $('rd-vocab-panel').hidden   = !hasV;
   const layout = document.querySelector('.rd-layout');
@@ -5895,7 +6065,14 @@ $('rs-sort-chips').addEventListener('click', e=>{
   [...$('rs-sort-chips').children].forEach(c=>c.classList.toggle('on', c===chip));
   renderReadingStats();
 });
-$('rs-back-btn').addEventListener('click', ()=>showScreen('reading'));
+// 「文ごとの記録」は本文からも設定画面からも開くので、戻り先を覚えておく
+let rsBackTo = 'reading';
+function backFromReadingStats(){
+  if(rsBackTo === 'rsetup' && rdSetupId){
+    renderReadingSetup(); switchRTab('practice'); showScreen('rsetup');
+  } else showScreen('reading');
+}
+$('rs-back-btn').addEventListener('click', backFromReadingStats);
 $('rs-reset-btn').addEventListener('click', async ()=>{
   if(!rdPassage) return;
   const ok = await customConfirm({
@@ -5909,6 +6086,137 @@ $('rs-reset-btn').addEventListener('click', async ()=>{
   localStorage.removeItem(rdLastKey(rdPassage.id));
   renderReadingStats(); renderReadingCards();
   toast('記録を消しました','suc');
+});
+
+// ══════════════════════════════════════════════
+//  長文の練習設定画面（単語練習の設定画面と同じ流れ）
+//   カードをクリック → ここで設定 → 「練習を開始する」で本文へ
+// ══════════════════════════════════════════════
+function rdApplyViewSettings(){
+  const paper = $('rd-paper');
+  if(paper) paper.classList.toggle('hide-ja', !rdShowJa);
+}
+function initReadingViewSettings(){
+  const s = loadSettings();
+  rdShowJa      = s.rdShowJa      !== false;
+  rdShowPanels  = s.rdShowPanels  !== false;
+  rdAutoScroll  = s.rdAutoScroll  !== false;
+  const bind = (id, get, set) => {
+    const el = $(id); if(!el) return;
+    el.checked = get();
+    el.addEventListener('change', e=>{
+      set(e.target.checked);
+      // 開いたまま切り替えた時のために、本文側にも即反映する
+      rdApplyViewSettings();
+      if(rdPassage && currentScreen() === 'reading') rdRenderPanels();
+    });
+  };
+  bind('rd-showja-toggle',     ()=>rdShowJa,     v=>{ rdShowJa = v;     saveSettings({rdShowJa:v}); });
+  bind('rd-panels-toggle',     ()=>rdShowPanels, v=>{ rdShowPanels = v; saveSettings({rdShowPanels:v}); });
+  bind('rd-autoscroll-toggle', ()=>rdAutoScroll, v=>{ rdAutoScroll = v; saveSettings({rdAutoScroll:v}); });
+}
+function switchRTab(tab){
+  $('rst-tab-practice').classList.toggle('active', tab === 'practice');
+  $('rst-tab-manage').classList.toggle('active', tab === 'manage');
+  $('rpane-practice').style.display = tab === 'practice' ? 'flex' : 'none';
+  $('rpane-manage').style.display   = tab === 'manage' ? 'flex' : 'none';
+}
+function rdLineCount(p){ return p.docs.reduce((n,d)=>n+d.lines.length, 0); }
+function openReadingSetup(id){
+  const p = READING_PASSAGES.find(x => x.id === id);
+  if(!p) return;
+  rdSetupId = id;
+  renderReadingSetup();
+  switchRTab('practice');
+  showScreen('rsetup');
+}
+function renderReadingSetup(){
+  const p = READING_PASSAGES.find(x => x.id === rdSetupId);
+  if(!p) return;
+  const prog  = rdProgressOf(p.id);
+  const pct   = prog.pct;
+  const best  = rdJson(rdBestKey(p.id));
+  const last  = rdJson(rdLastKey(p.id));
+  const log   = rdLog(p.id);
+
+  $('rst-badge').textContent = p.tag;
+  $('rst-title').textContent = p.title;
+  $('rst-sub').textContent   = p.subtitle;
+  $('rst-bar-fill').style.width = pct + '%';
+  $('rst-pct').textContent = pct + '%';
+
+  const cell = (label, value, dim) =>
+    `<span class="rst-stat${dim?' dim':''}"><span class="rst-stat-l">${label}</span>${value}</span>`;
+  const info = [
+    cell('字数', rdCharCount(p).toLocaleString()),
+    cell('行数', rdLineCount(p)),
+    cell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays),
+    log.last ? cell('最終', fmtShortDate(log.last)) : '',
+    best ? cell('自己ベスト', best.speed.toFixed(1)+' 打/秒') : cell('自己ベスト','—', true),
+    last ? cell('前回', last.speed.toFixed(1)+' 打/秒') : '',
+    prog.elapsedMs ? cell('経過', rdFmtTime(prog.elapsedMs/1000)) : ''
+  ].join('');
+  $('rst-stats').innerHTML = info;
+  $('rst-manage-stats').innerHTML = info;
+
+  // 続きが無い長文は「最初から」しか選べない
+  const hasResume = prog.hasResume;
+  rdStartMode = hasResume ? 'resume' : 'fresh';
+  $('rst-start-resume').disabled = !hasResume;
+  $('rst-start-resume').classList.toggle('on', rdStartMode === 'resume');
+  $('rst-start-fresh').classList.toggle('on', rdStartMode === 'fresh');
+  $('rst-start-hint').textContent = hasResume
+    ? `続きは ${prog.cursor.toLocaleString()}字目（${pct}%）${prog.elapsedMs ? '・経過 '+rdFmtTime(prog.elapsedMs/1000) : ''} から`
+    : 'まだ途中経過がないので、最初から始まります';
+
+  $('rst-visible-toggle').checked = !loadArchivedReadings().has(p.id);
+  $('rst-clear-progress').disabled = !hasResume;
+  $('rst-clear-stats').disabled = !(best || log.plays);
+}
+function setReadingStartMode(mode){
+  if(mode === 'resume' && $('rst-start-resume').disabled) return;
+  rdStartMode = mode;
+  $('rst-start-resume').classList.toggle('on', mode === 'resume');
+  $('rst-start-fresh').classList.toggle('on', mode === 'fresh');
+}
+function startReadingFromSetup(){
+  if(!rdSetupId) return;
+  enterReading(rdSetupId, { fresh: rdStartMode === 'fresh' });
+}
+$('rst-back-btn').addEventListener('click', ()=>{ renderHomeScreen(); showScreen('home'); });
+$('rst-start-btn').addEventListener('click', startReadingFromSetup);
+$('rst-start-resume').addEventListener('click', ()=>setReadingStartMode('resume'));
+$('rst-start-fresh').addEventListener('click', ()=>setReadingStartMode('fresh'));
+$('rst-stats-btn').addEventListener('click', ()=>{
+  rdPassage = READING_PASSAGES.find(x => x.id === rdSetupId) || rdPassage;
+  rsBackTo = 'rsetup';
+  renderReadingStats(); showScreen('rstats');
+});
+$('rst-visible-toggle').addEventListener('change', e=>{
+  setReadingVisible(rdSetupId, e.target.checked);
+  toast(e.target.checked ? '一覧に表示します' : 'アーカイブに移しました','suc');
+});
+$('rst-clear-progress').addEventListener('click', ()=>{
+  localStorage.removeItem(rdKey(rdSetupId));
+  if(rdPassage && rdPassage.id === rdSetupId) rdRestoredMs = 0;
+  renderHomeScreen(); renderReadingSetup();
+  toast('続きを消しました（次は最初から）','suc');
+});
+$('rst-clear-stats').addEventListener('click', async ()=>{
+  const p = READING_PASSAGES.find(x => x.id === rdSetupId); if(!p) return;
+  const ok = await customConfirm({
+    title:'この長文の記録を消す',
+    desc:'自己ベスト・文ごとのタイム・練習回数を消します。\n本文の続き（途中経過）は残ります。',
+    okText:'消す', danger:true
+  });
+  if(!ok) return;
+  [rdStatsKey(p.id), rdBestKey(p.id), rdLastKey(p.id), rdLogKey(p.id)].forEach(k=>localStorage.removeItem(k));
+  renderHomeScreen(); renderReadingSetup();
+  toast('記録を消しました','suc');
+});
+$('rst-goto-list').addEventListener('click', ()=>{
+  rmBackTo = 'rsetup';
+  renderReadingManage(); showScreen('rmanage');
 });
 
 // ══════════════════════════════════════════════
@@ -5935,8 +6243,8 @@ function renderReadingManage(){
   passages.forEach(p => {
     const on    = !archived.has(p.id);
     if(on) shown++;
-    const saved = rdSaved(p.id);
-    const pct   = saved && saved.total ? Math.round((saved.cursor / saved.total) * 100) : 0;
+    const prog  = rdProgressOf(p.id);
+    const pct   = prog.pct;
     const best  = rdJson(rdBestKey(p.id));
     const log   = rdLog(p.id);
     const row = document.createElement('div');
@@ -5947,19 +6255,20 @@ function renderReadingManage(){
         <input type="checkbox" class="rm-show"${on ? ' checked' : ''}>
         <span class="toggle-track"></span><span class="toggle-thumb"></span>
       </label>
-      <span class="rm-title">
+      <span class="rm-title" title="クリックで練習設定を開く">
         <b>${escHtml(p.title)}</b>
         <span class="rm-sub">${escHtml(p.tag)}・${escHtml(p.subtitle)}</span>
       </span>
       <span class="rm-num">${rdCharCount(p).toLocaleString()}</span>
-      <span class="rm-num${pct ? ' resume' : ' dim'}">${pct ? pct+'%' : '—'}</span>
+      <span class="rm-num${prog.hasResume ? ' resume' : ' dim'}">${prog.hasResume ? pct+'%' : '—'}</span>
       <span class="rm-num${log.plays ? '' : ' dim'}">${log.plays ? log.plays+'回' : '—'}</span>
       <span class="rm-num${best ? '' : ' dim'}">${best ? best.speed.toFixed(1) : '—'}</span>
       <span class="rm-act">
-        <button class="link-btn" data-act="progress"${pct ? '' : ' disabled'}>続きを消す</button>
+        <button class="link-btn" data-act="progress"${prog.hasResume ? '' : ' disabled'}>続きを消す</button>
         <button class="link-btn danger" data-act="stats"${(best || log.plays) ? '' : ' disabled'}>記録を消す</button>
       </span>`;
     row.querySelector('.rm-show').addEventListener('change', e=>setReadingVisible(p.id, e.target.checked));
+    row.querySelector('.rm-title').addEventListener('click', ()=>openReadingSetup(p.id));
     row.querySelector('[data-act="progress"]').addEventListener('click', ()=>{
       localStorage.removeItem(rdKey(p.id));
       if(rdPassage && rdPassage.id === p.id) rdRestoredMs = 0;
@@ -5987,12 +6296,21 @@ function setAllReadingVisible(visible){
   renderHomeScreen(); renderReadingManage();
   toast(visible ? 'すべて一覧に表示します' : 'すべてアーカイブに移しました','suc');
 }
+let rmBackTo = 'home';    // 管理画面をどこから開いたか
+function backFromReadingManage(){
+  if(rmBackTo === 'rsetup' && rdSetupId){
+    renderReadingSetup(); switchRTab('manage'); showScreen('rsetup');
+  } else {
+    renderHomeScreen(); showScreen('home');
+  }
+}
 $('reading-manage-btn').addEventListener('click', e=>{
   e.stopPropagation();
+  rmBackTo = 'home';
   renderReadingManage();
   showScreen('rmanage');
 });
-$('rm-back-btn').addEventListener('click', ()=>{ renderHomeScreen(); showScreen('home'); });
+$('rm-back-btn').addEventListener('click', backFromReadingManage);
 $('rm-all-show').addEventListener('click', ()=>setAllReadingVisible(true));
 $('rm-all-hide').addEventListener('click', ()=>setAllReadingVisible(false));
 $('rm-clear-all-btn').addEventListener('click', async ()=>{
@@ -6008,7 +6326,15 @@ $('rm-clear-all-btn').addEventListener('click', async ()=>{
   toast('すべての途中経過を消しました','suc');
 });
 
-$('rd-back-btn').addEventListener('click', ()=>{ rdLeaveReading(); renderReadingCards(); showScreen('home'); });
+// 本文から抜ける時は、単語練習と同じで設定画面に戻る（一覧へはもう一度戻る）
+function leaveReadingToSetup(){
+  rdLeaveReading();
+  renderReadingCards();
+  if(rdPassage) rdSetupId = rdPassage.id;
+  if(rdSetupId){ renderReadingSetup(); switchRTab('practice'); showScreen('rsetup'); }
+  else { renderHomeScreen(); showScreen('home'); }
+}
+$('rd-back-btn').addEventListener('click', leaveReadingToSetup);
 // 経過時間チップ：クリックで「何秒止まったら計測を止めるか」を切り替える
 $('rd-timer').addEventListener('click', ()=>{
   const i = IDLE_CHOICES.indexOf(idlePauseSec);
@@ -6018,20 +6344,29 @@ $('rd-timer').addEventListener('click', ()=>{
 });
 $('rd-restart-btn').addEventListener('click', rdRestart);
 $('rd-finish-retry').addEventListener('click', rdRestart);
-$('rd-fin-stats-btn').addEventListener('click', ()=>{ renderReadingStats(); showScreen('rstats'); });
-$('rd-stats-btn').addEventListener('click', ()=>{ renderReadingStats(); showScreen('rstats'); });
+$('rd-fin-stats-btn').addEventListener('click', ()=>{ rsBackTo='reading'; renderReadingStats(); showScreen('rstats'); });
+$('rd-stats-btn').addEventListener('click', ()=>{ rsBackTo='reading'; renderReadingStats(); showScreen('rstats'); });
 document.addEventListener('keydown', e=>{
   const scr = currentScreen();
   if(scr === 'rstats'){
-    if(e.key === 'Escape'){ e.preventDefault(); showScreen('reading'); }
+    if(e.key === 'Escape'){ e.preventDefault(); backFromReadingStats(); }
     return;
   }
   if(scr === 'rmanage'){
-    if(e.key === 'Escape'){ e.preventDefault(); renderHomeScreen(); showScreen('home'); }
+    if(e.key === 'Escape'){ e.preventDefault(); backFromReadingManage(); }
+    return;
+  }
+  if(scr === 'rsetup'){
+    if(e.key === 'Escape'){ e.preventDefault(); renderHomeScreen(); showScreen('home'); return; }
+    if(e.key === ' ' || e.code === 'Space'){
+      const ae = document.activeElement;
+      if(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+      e.preventDefault(); startReadingFromSetup();
+    }
     return;
   }
   if(scr !== 'reading') return;
-  if(e.key === 'Escape'){ e.preventDefault(); rdLeaveReading(); renderReadingCards(); showScreen('home'); return; }
+  if(e.key === 'Escape'){ e.preventDefault(); leaveReadingToSetup(); return; }
   rdHandleKey(e);
 });
 // 「文ごとの記録」を見に行っている間も計測は止めておく
@@ -6055,6 +6390,7 @@ renderReadingCards();
 initVoiceSettings();
 initCaseStrictSetting();
 initIdleSetting();
+initReadingViewSettings();
 window.addEventListener('beforeunload',()=>{
   if(currentLevel) saveLevelEnabled(currentLevel,enabled);
   if(currentScreen() === 'reading') rdLeaveReading();   // 閉じても続きが残るように
