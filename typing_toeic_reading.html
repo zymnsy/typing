@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TOEIC Reading Typing</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14161b;
+  --panel-bg:#1b1e25;
+  --panel-border:#2a2e37;
+  --paper:#fbf9f4;
+  --paper-border:#e4ded0;
+  --header-bg:#f1efe6;
+  --ink:#242832;
+  --muted:#8992a3;
+  --muted-2:#5b6272;
+  --bad:#e5484d;
+  --bad-soft:rgba(229,72,77,.15);
+  --grammar-accent:#4f8dfd;
+  --grammar-soft:rgba(79,141,253,.14);
+  --accent:#1f8f4e;
+  --accent-soft:rgba(31,143,78,.14);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans JP',sans-serif;height:100%;}
+body{display:flex;flex-direction:column;}
+
+/* ── top bar ── */
+.topbar{
+  display:flex;align-items:center;gap:20px;
+  padding:12px 20px;border-bottom:1px solid var(--panel-border);
+  background:#181b21;flex-wrap:wrap;
+}
+.topbar-left{display:flex;align-items:center;gap:10px;min-width:220px;}
+.doc-icon{width:20px;height:20px;flex:none;color:var(--muted);}
+.title-block .title{color:#f2f3f5;font-weight:700;font-size:15px;}
+.title-block .subtitle{color:var(--muted);font-size:11.5px;margin-top:2px;}
+.topbar-center{flex:1;min-width:160px;display:flex;align-items:center;gap:10px;}
+.progress-track{flex:1;height:6px;border-radius:4px;background:#2a2e37;overflow:hidden;}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent));transition:width .15s ease;}
+.progress-label{font-size:11.5px;color:var(--muted);min-width:36px;text-align:right;font-family:'JetBrains Mono',monospace;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.mode-chip{font-size:11.5px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--muted);white-space:nowrap;}
+.mode-chip.locked{background:var(--accent-soft);color:var(--accent);}
+.color-swatches{display:flex;gap:6px;}
+.swatch{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.15);}
+.swatch.active{border-color:#fff;}
+.icon-btn{background:rgba(255,255,255,.06);border:none;color:var(--muted);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;}
+.icon-btn:hover{background:rgba(255,255,255,.12);color:#fff;}
+
+.hintbar{padding:6px 20px;font-size:11.5px;color:var(--muted-2);background:#15171d;border-bottom:1px solid var(--panel-border);}
+
+/* ── layout ── */
+.layout{flex:1;display:grid;grid-template-columns:250px minmax(0,1fr) 250px;gap:18px;padding:18px 20px;min-height:0;}
+@media (max-width:1080px){
+  html,body{height:auto;}
+  .layout{grid-template-columns:1fr;height:auto;}
+  .panel{position:static !important;max-height:280px !important;}
+  .layout .paper-col{min-height:72vh;order:-1;}
+}
+.panel{
+  background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:12px;
+  padding:14px;position:sticky;top:18px;align-self:start;
+  max-height:calc(100vh - 140px);overflow-y:auto;
+}
+.panel-title{font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;font-weight:700;}
+.item-card{padding:9px 11px;border-radius:8px;margin-bottom:7px;border-left:3px solid transparent;background:rgba(255,255,255,.025);transition:background .2s,border-color .2s;}
+.item-term{font-weight:700;font-size:13px;color:#e7e9ee;margin-bottom:2px;font-family:'JetBrains Mono',monospace;}
+.item-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+.panel-left .item-card.active{background:var(--grammar-soft);border-left-color:var(--grammar-accent);}
+.panel-right .item-card.active{background:var(--accent-soft);border-left-color:var(--accent);}
+
+/* ── paper ── */
+.paper-col{position:relative;min-height:0;min-width:0;}
+.paper-viewport{position:absolute;inset:0;overflow-y:auto;border-radius:14px;}
+.paper{
+  max-width:720px;margin:0 auto 60px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--paper-border);border-radius:10px;
+  box-shadow:0 24px 60px rgba(0,0,0,.4);
+  padding:42px 48px 60px;
+}
+.paper-intro{font-size:12.5px;color:var(--muted-2);font-style:italic;margin-bottom:26px;padding-bottom:14px;border-bottom:1px dashed var(--paper-border);}
+
+.doc-block{margin-bottom:34px;}
+.doc-tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);background:rgba(0,0,0,.05);padding:3px 8px;border-radius:5px;margin-bottom:10px;font-weight:700;}
+
+.email-header{background:var(--header-bg);border-radius:7px;padding:12px 16px;margin-bottom:20px;}
+.hrow{display:flex;gap:10px;font-size:13px;padding:2px 0;}
+.hrow .hlabel{width:60px;flex:none;font-weight:700;color:var(--muted-2);}
+.hrow .hval{font-family:'JetBrains Mono',monospace;color:var(--ink);word-break:break-all;}
+
+.web-chrome{margin-bottom:20px;}
+.url-bar{font-family:'JetBrains Mono',monospace;font-size:12.5px;background:rgba(0,0,0,.05);border:1px solid var(--paper-border);border-radius:999px;padding:7px 14px;color:var(--muted-2);margin-bottom:8px;}
+.tab-strip{display:flex;gap:18px;border-bottom:1px solid var(--paper-border);padding-bottom:8px;}
+.tab-strip .tab{font-size:12.5px;color:var(--muted-2);padding-bottom:6px;}
+.tab-strip .tab.active{color:var(--ink);font-weight:700;border-bottom:2px solid var(--ink);}
+
+.line{margin-bottom:15px;}
+.line.new-para{margin-top:24px;}
+.line.heading{margin-bottom:20px;}
+.en-row{font-family:'JetBrains Mono',monospace;font-size:16.5px;line-height:1.85;letter-spacing:.01em;}
+.line.heading .en-row{font-size:21px;font-weight:800;letter-spacing:.03em;}
+.ja-row{font-family:'Noto Sans JP',sans-serif;font-size:12.5px;color:var(--muted);margin:3px 0 0 1px;}
+.line.heading .ja-row{font-size:13.5px;}
+
+.bullet-mark{color:var(--muted-2);margin-right:5px;}
+.literal{color:var(--muted-2);}
+
+.ch{position:relative;}
+.ch.correct{color:var(--accent);font-weight:600;}
+.ch.incorrect{color:var(--bad);text-decoration:underline wavy var(--bad);text-decoration-thickness:1px;}
+.ch.caret::before{
+  content:'';position:absolute;left:-1px;top:2px;bottom:1px;width:2px;background:var(--accent);
+  animation:blink 1s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0;}}
+
+.ch.line-end{
+  display:inline-block;font-size:10px;font-family:'Noto Sans JP',sans-serif;
+  color:var(--muted-2);background:rgba(0,0,0,.05);border-radius:4px;padding:0 5px;
+  margin-left:3px;vertical-align:middle;line-height:1.6;
+}
+.ch.line-end.correct{background:var(--accent-soft);color:var(--accent);}
+.ch.line-end.incorrect{background:var(--bad-soft);color:var(--bad);}
+
+.finish-overlay{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(10,11,14,.72);border-radius:14px;
+}
+.finish-overlay[hidden]{display:none;}
+.finish-card{
+  background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:14px;
+  padding:32px 40px;text-align:center;min-width:280px;
+}
+.finish-title{font-size:20px;font-weight:800;color:#fff;margin-bottom:14px;}
+.finish-stats{font-size:13.5px;color:var(--muted);line-height:2;margin-bottom:18px;font-family:'JetBrains Mono',monospace;}
+.finish-stats b{color:#e7e9ee;}
+#restartBtn2{
+  background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:8px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;
+}
+#restartBtn2:hover{filter:brightness(1.1);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <svg class="doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+    </svg>
+    <div class="title-block">
+      <div class="title">TOEIC Reading Typing</div>
+      <div class="subtitle">公式TOEIC問題集11・TEST2 Part7 最終問題(Q196-200・複数パッセージ)</div>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0%</div>
+  </div>
+  <div class="topbar-right">
+    <div class="mode-chip" id="modeChip">追いかけスクロール中</div>
+    <div class="color-swatches" id="colorSwatches"></div>
+    <button class="icon-btn" id="restartBtn" title="最初からやり直す">↺</button>
+  </div>
+</header>
+<div class="hintbar">英文だけを上から入力。行末の ␣ はSpaceキーで次の行へ。最後まで来ると自動スクロールが止まります。</div>
+
+<main class="layout">
+  <aside class="panel panel-left" id="grammarPanel">
+    <div class="panel-title">文法ポイント</div>
+    <div class="panel-list" id="grammarList"></div>
+  </aside>
+
+  <div class="paper-col">
+    <div class="paper-viewport" id="paperViewport">
+      <div class="paper" id="paper">
+        <div class="paper-intro">Questions 196-200 refer to the following e-mails and Web page.</div>
+      </div>
+    </div>
+    <div class="finish-overlay" id="finishOverlay" hidden>
+      <div class="finish-card">
+        <div class="finish-title">読み切りました</div>
+        <div class="finish-stats" id="finishStats"></div>
+        <button id="restartBtn2">もう一度やる</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel panel-right" id="vocabPanel">
+    <div class="panel-title">語句・表現</div>
+    <div class="panel-list" id="vocabList"></div>
+  </aside>
+</main>
+
+<script>
+// ══════════════════════════════════════════════
+//  データ: TOEIC公式問題集11 TEST2 Part7 Q196-200
+// ══════════════════════════════════════════════
+const DOC_BLOCKS = [
+  {
+    id:'doc1', kind:'email', tag:'E-mail 1 of 3',
+    meta:{ to:'Sarah Abboud <sabboud@mailhost.co.uk>', from:'Eun-Mi Yoon <emyoon@opalmail.co.uk>', date:'8 February', subject:'Lecture series' },
+    sentences:[
+      {id:'A1', en:"Hi Sarah,", ja:"サラへ、"},
+      {id:'A2', en:"I hope you are settled into your new job.", ja:"新しい仕事にはもう慣れたかな。", newPara:true},
+      {id:'A3', en:"We miss you around the office.", ja:"オフィスのみんな、あなたがいなくて寂しがってるよ。"},
+      {id:'A4', en:"I thought you might be interested in the upcoming lecture series from Travel the World Society (TTWS).", ja:"トラベル・ザ・ワールド協会(TTWS)の今度の講演シリーズ、あなたも興味あるかなと思って。"},
+      {id:'A5', en:"It would be fun to attend one of the lectures together, since they are interactive and participants might be able to turn on their cameras at some point.", ja:"参加型の講演で、途中でカメラをオンにできるかもしれないから、一緒に聴きに行くと楽しいと思う。"},
+      {id:'A6', en:"I attended a great one last year.", ja:"去年もすごく良い回に参加したんだ。"},
+      {id:'A7', en:"To view the speaker lineup, visit www.ttws.org/events.", ja:"講演者一覧は www.ttws.org/events で見られるよ。"},
+      {id:'A8', en:"I prefer the March lecture, but the April and May topics also look good.", ja:"私は3月の講演が気になるけど、4月と5月のテーマも良さそう。"},
+      {id:'A9', en:"I am a member of TTWS.", ja:"私はTTWSの会員なの。"},
+      {id:'A10', en:"You don't have to join to buy a ticket, but you will get a discount if you do.", ja:"入会しなくてもチケットは買えるけど、入会すれば割引になるよ。"},
+      {id:'A11', en:"Eun-Mi", ja:"ウンミより", newPara:true},
+    ]
+  },
+  {
+    id:'doc2', kind:'webpage', tag:'Webpage 2 of 3',
+    meta:{ url:'https://www.ttws.org/events', tabs:['Home','Events','Blogs','Membership'], active:'Events' },
+    sentences:[
+      {id:'B0', en:"LECTURE SERIES", ja:"講演シリーズ", heading:true},
+      {id:'B1', en:"Travel the World Society (TTWS) is pleased to announce that tickets for its fifth annual lecture series are now on sale.", ja:"トラベル・ザ・ワールド協会(TTWS)は、第5回目となる毎年恒例の講演シリーズのチケットを発売開始したことを発表します。"},
+      {id:'B2', en:"Tickets for the virtual lectures are £25 each or £95 for all four.", ja:"オンライン講演のチケットは1回25ポンド、4回セットなら95ポンドです。"},
+      {id:'B3', en:"Each lecture starts at noon GMT and lasts 90 minutes.", ja:"各講演はグリニッジ標準時の正午に始まり、90分間続きます。"},
+      {id:'B4', en:"The final 15 minutes are reserved for an open exchange among the speakers and participants.", ja:"最後の15分間は講演者と参加者による自由な意見交換の時間です。"},
+      {id:'B5', en:"15 March — Ashraf Shirvani, professor of Iranian culture, discusses traditional clothing and textiles of ancient Persia.", ja:"3月15日 — アシュラフ・シルヴァニ(イラン文化の教授)、古代ペルシャの伝統衣装と織物について。", bullet:true, newPara:true},
+      {id:'B6', en:"22 April — Carolina Perez, art historian, explores sculpture through Mexico's most important statues.", ja:"4月22日 — カロリーナ・ペレス(美術史家)、メキシコの重要な彫像を通して彫刻を探る。", bullet:true},
+      {id:'B7', en:"28 May (SOLD OUT) — Marcel Bisset, five-star chef, explores the culinary delights of France's Normandy region.", ja:"5月28日(完売) — マルセル・ビセ(一流シェフ)、フランス・ノルマンディー地方の美食を探る。", bullet:true},
+      {id:'B8', en:"12 June — Aoki Watanabe, host of the hit travel TV show Let's Tour Japan, shares the sights and sounds of Japan's island of Kyushu.", ja:"6月12日 — 青木渡辺(人気旅行番組『Let's Tour Japan』の司会)、日本・九州の見どころと雰囲気を紹介。", bullet:true},
+      {id:'B9', en:"A link will be e-mailed to ticket holders five days prior to each event.", ja:"リンクは各イベントの5日前にチケット購入者へメールで送られます。", newPara:true},
+      {id:'B10', en:"*TTWS members pay £20 for an individual ticket or £75 for all four.", ja:"*TTWS会員は1回20ポンド、4回セットなら75ポンドです。", newPara:true},
+      {id:'B11', en:"Simply include your membership number on the order form to get your discount.", ja:"申込フォームに会員番号を記入するだけで割引が受けられます。"},
+      {id:'B12', en:"To join TTWS, visit the Membership page.", ja:"TTWSに入会するには会員ページへどうぞ。"},
+    ]
+  },
+  {
+    id:'doc3', kind:'email', tag:'E-mail 3 of 3',
+    meta:{ to:'Eun-Mi Yoon <emyoon@opalmail.co.uk>', from:'Sarah Abboud <sabboud@mailhost.co.uk>', date:'13 June', subject:'Travel lecture' },
+    sentences:[
+      {id:'C1', en:"Hi Eun-Mi,", ja:"ウンミへ、"},
+      {id:'C2', en:"What a delight to see you at Ms. Perez' presentation.", ja:"ペレスさんの講演で会えてすごく嬉しかった!", newPara:true},
+      {id:'C3', en:"You asked such an interesting question!", ja:"あなた、すごく面白い質問してたね!"},
+      {id:'C4', en:"We must plan a trip to see some of those sites Ms. Perez talked about.", ja:"ペレスさんが話してた場所、いくつか見に行く旅行を計画しないとね。"},
+      {id:'C5', en:"Thanks for letting me know about the lecture series and TTWS, which I will probably join eventually.", ja:"講演シリーズとTTWSのこと教えてくれてありがとう。私もそのうち入会すると思う。"},
+      {id:'C6', en:"My apologies for not thanking you much sooner.", ja:"お礼がこんなに遅くなってごめんね。"},
+      {id:'C7', en:"I was promoted to team leader in May, so you can imagine how busy I have been.", ja:"5月にチームリーダーに昇進したから、どれだけ忙しかったか想像つくと思う。"},
+      {id:'C8', en:"I hope to see you at the civil engineering conference in New York next month!", ja:"来月ニューヨークである土木工学のカンファレンスで会えるといいな!"},
+      {id:'C9', en:"Kind regards,", ja:"それでは、", newPara:true},
+      {id:'C10', en:"Sarah", ja:"サラより"},
+    ]
+  }
+];
+
+const VOCAB_ITEMS = [
+  {term:"settle into ~", desc:"〜に慣れる、落ち着く", segIds:['A2']},
+  {term:"lecture series", desc:"講演シリーズ", segIds:['A4','B0']},
+  {term:"interactive", desc:"双方向の、参加型の", segIds:['A5']},
+  {term:"speaker lineup", desc:"講演者の顔ぶれ", segIds:['A7']},
+  {term:"discount", desc:"割引", segIds:['A10','B10','B11']},
+  {term:"be pleased to announce", desc:"〜を発表できて嬉しく思う(お知らせの定型句)", segIds:['B1']},
+  {term:"on sale", desc:"発売中", segIds:['B1']},
+  {term:"noon GMT", desc:"グリニッジ標準時の正午", segIds:['B3']},
+  {term:"open exchange", desc:"自由な意見交換", segIds:['B4']},
+  {term:"culinary delights", desc:"料理の魅力、美食", segIds:['B7']},
+  {term:"sights and sounds", desc:"見どころと雰囲気", segIds:['B8']},
+  {term:"prior to ~", desc:"〜より前に", segIds:['B9']},
+  {term:"membership number", desc:"会員番号", segIds:['B11']},
+  {term:"delight", desc:"大きな喜び", segIds:['C2']},
+  {term:"presentation", desc:"講演、発表", segIds:['C2']},
+  {term:"apologies", desc:"お詫び", segIds:['C6']},
+  {term:"be promoted to ~", desc:"〜に昇進する", segIds:['C7']},
+  {term:"civil engineering", desc:"土木工学", segIds:['C8']},
+];
+
+const GRAMMAR_ITEMS = [
+  {term:"might be able to ~", desc:"助動詞mightで婉曲的な推量＋可能「〜できるかもしれない」", segIds:['A5']},
+  {term:"since(理由)", desc:"ここでのsinceは時間でなく理由を表す接続詞(= because)", segIds:['A5']},
+  {term:"don't have to A, but B if you do", desc:"文末のdoは前の動詞(join)を受ける代動詞", segIds:['A10']},
+  {term:"be pleased to do", desc:"ビジネス文書で「お知らせします」を表す定型的な前置き", segIds:['B1']},
+  {term:"£X each", desc:"eachの副詞的用法「それぞれにつき」", segIds:['B2']},
+  {term:"所有格のアポストロフィのみ", desc:"sで終わる固有名詞の所有格は's を省略できる(Perez' = Perez's)", segIds:['C2']},
+  {term:"What a + 名詞!", desc:"感嘆文の基本形「なんて〜だろう」", segIds:['C2']},
+  {term:"such a + 形容詞 + 名詞", desc:"suchによる強調表現「あんなに〜な…」", segIds:['C3']},
+  {term:"which(非制限用法)", desc:"関係代名詞whichが直前の文の内容全体を受けている", segIds:['C5']},
+  {term:"現在完了(継続)", desc:"have been busyで「ずっと忙しい状態が続いている」ことを表す", segIds:['C7']},
+];
+
+const PALETTE = [
+  {name:'green',  accent:'#1f8f4e', soft:'rgba(31,143,78,.14)'},
+  {name:'teal',   accent:'#0f8b8d', soft:'rgba(15,139,141,.14)'},
+  {name:'amber',  accent:'#b45309', soft:'rgba(180,83,9,.14)'},
+  {name:'indigo', accent:'#4338ca', soft:'rgba(67,56,202,.14)'},
+];
+
+const TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"()]/;
+const STORE_KEY = 'toeic-reading-typing-v1';
+
+// ══════════════════════════════════════════════
+//  DOM構築
+// ══════════════════════════════════════════════
+const paperEl = document.getElementById('paper');
+const charSpans = [];   // {el, expected}
+const segRanges = [];   // {id, start, end}
+
+function makeChar(expected, opts={}){
+  const span = document.createElement('span');
+  span.className = 'ch pending' + (opts.lineEnd ? ' line-end' : '');
+  span.textContent = expected === ' ' ? (opts.lineEnd ? '␣' : ' ') : expected;
+  return {el: span, expected};
+}
+
+DOC_BLOCKS.forEach(block => {
+  const blockEl = document.createElement('section');
+  blockEl.className = 'doc-block';
+  const tag = document.createElement('div');
+  tag.className = 'doc-tag';
+  tag.textContent = block.tag;
+  blockEl.appendChild(tag);
+
+  if(block.kind === 'email'){
+    const header = document.createElement('div');
+    header.className = 'email-header';
+    header.innerHTML =
+      '<div class="hrow"><span class="hlabel">To:</span><span class="hval">'+block.meta.to+'</span></div>' +
+      '<div class="hrow"><span class="hlabel">From:</span><span class="hval">'+block.meta.from+'</span></div>' +
+      '<div class="hrow"><span class="hlabel">Date:</span><span class="hval">'+block.meta.date+'</span></div>' +
+      '<div class="hrow"><span class="hlabel">Subject:</span><span class="hval">'+block.meta.subject+'</span></div>';
+    blockEl.appendChild(header);
+  } else if(block.kind === 'webpage'){
+    const chrome = document.createElement('div');
+    chrome.className = 'web-chrome';
+    const urlbar = document.createElement('div');
+    urlbar.className = 'url-bar';
+    urlbar.textContent = block.meta.url;
+    const tabs = document.createElement('div');
+    tabs.className = 'tab-strip';
+    block.meta.tabs.forEach(t => {
+      const tb = document.createElement('span');
+      tb.className = 'tab' + (t === block.meta.active ? ' active' : '');
+      tb.textContent = t;
+      tabs.appendChild(tb);
+    });
+    chrome.appendChild(urlbar);
+    chrome.appendChild(tabs);
+    blockEl.appendChild(chrome);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'doc-body';
+
+  block.sentences.forEach(sent => {
+    const line = document.createElement('div');
+    line.className = 'line' + (sent.newPara ? ' new-para' : '') + (sent.heading ? ' heading' : '');
+    line.dataset.seg = sent.id;
+
+    const enRow = document.createElement('div');
+    enRow.className = 'en-row';
+
+    if(sent.bullet){
+      const b = document.createElement('span');
+      b.className = 'bullet-mark';
+      b.textContent = '•';
+      enRow.appendChild(b);
+    }
+
+    const segStart = charSpans.length;
+    for(const ch of sent.en){
+      if(TYPABLE.test(ch)){
+        const c = makeChar(ch);
+        enRow.appendChild(c.el);
+        charSpans.push(c);
+      } else {
+        const lit = document.createElement('span');
+        lit.className = 'literal';
+        lit.textContent = ch;
+        enRow.appendChild(lit);
+      }
+    }
+    // 行末: 次の行へ進むための空白(最後の行では後で除去)
+    const endSpace = makeChar(' ', {lineEnd:true});
+    enRow.appendChild(endSpace.el);
+    charSpans.push(endSpace);
+    const segEnd = charSpans.length - 1;
+    segRanges.push({id: sent.id, start: segStart, end: segEnd});
+
+    const jaRow = document.createElement('div');
+    jaRow.className = 'ja-row';
+    jaRow.textContent = sent.ja;
+
+    line.appendChild(enRow);
+    line.appendChild(jaRow);
+    body.appendChild(line);
+  });
+
+  blockEl.appendChild(body);
+  paperEl.appendChild(blockEl);
+});
+
+// パッセージ最後の行末スペースは不要なので取り除く
+(function trimTrailingLineEnd(){
+  const last = charSpans[charSpans.length - 1];
+  if(last && last.expected === ' '){
+    last.el.remove();
+    charSpans.pop();
+    segRanges[segRanges.length - 1].end = charSpans.length - 1;
+  }
+})();
+
+function renderPanel(listEl, items){
+  listEl.innerHTML = '';
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.dataset.segs = item.segIds.join(',');
+    const term = document.createElement('div');
+    term.className = 'item-term';
+    term.textContent = item.term;
+    const desc = document.createElement('div');
+    desc.className = 'item-desc';
+    desc.textContent = item.desc;
+    card.appendChild(term);
+    card.appendChild(desc);
+    listEl.appendChild(card);
+  });
+}
+renderPanel(document.getElementById('grammarList'), GRAMMAR_ITEMS);
+renderPanel(document.getElementById('vocabList'), VOCAB_ITEMS);
+
+// ══════════════════════════════════════════════
+//  カラーパレット
+// ══════════════════════════════════════════════
+const swatchWrap = document.getElementById('colorSwatches');
+function applyPalette(p){
+  document.documentElement.style.setProperty('--accent', p.accent);
+  document.documentElement.style.setProperty('--accent-soft', p.soft);
+  localStorage.setItem('toeic-reading-typing-accent', p.name);
+  [...swatchWrap.children].forEach(el => el.classList.toggle('active', el.dataset.name === p.name));
+}
+PALETTE.forEach(p => {
+  const sw = document.createElement('div');
+  sw.className = 'swatch';
+  sw.style.background = p.accent;
+  sw.dataset.name = p.name;
+  sw.title = p.name;
+  sw.onclick = () => applyPalette(p);
+  swatchWrap.appendChild(sw);
+});
+{
+  const savedName = localStorage.getItem('toeic-reading-typing-accent');
+  applyPalette(PALETTE.find(p => p.name === savedName) || PALETTE[0]);
+}
+
+// ══════════════════════════════════════════════
+//  タイピングエンジン
+// ══════════════════════════════════════════════
+const viewport = document.getElementById('paperViewport');
+const progressFill = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const modeChip = document.getElementById('modeChip');
+const finishOverlay = document.getElementById('finishOverlay');
+const finishStats = document.getElementById('finishStats');
+const grammarListEl = document.getElementById('grammarList');
+const vocabListEl = document.getElementById('vocabList');
+
+let cursor = 0;
+let autoScrollLocked = false;
+let correctCount = 0, incorrectCount = 0, startTime = null;
+
+function currentSeg(){
+  const idx = Math.min(cursor, charSpans.length - 1);
+  return segRanges.find(r => idx >= r.start && idx <= r.end) || segRanges[segRanges.length - 1];
+}
+
+function updateCaretClass(){
+  document.querySelectorAll('.ch.caret').forEach(el => el.classList.remove('caret'));
+  if(cursor < charSpans.length) charSpans[cursor].el.classList.add('caret');
+}
+
+function updateProgress(){
+  const pct = Math.round((cursor / charSpans.length) * 100);
+  progressFill.style.width = pct + '%';
+  progressLabel.textContent = pct + '%';
+}
+
+let lastPanelSegId = null;
+function updateSidePanels(force){
+  const segId = currentSeg().id;
+  if(!force && segId === lastPanelSegId) return; // 同じ行の間は再描画しない(重い処理を毎打鍵で走らせない)
+  lastPanelSegId = segId;
+  [grammarListEl, vocabListEl].forEach(list => {
+    list.querySelectorAll('.item-card').forEach(card => {
+      const segs = card.dataset.segs.split(',');
+      const active = segs.includes(segId);
+      card.classList.toggle('active', active);
+      if(active) card.scrollIntoView({block:'nearest', behavior:'smooth'});
+    });
+  });
+}
+
+function ensureCaretVisible(){
+  const idx = Math.min(cursor, charSpans.length - 1);
+  const el = charSpans[idx].el;
+  const vpRect = viewport.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const relTop = elRect.top - vpRect.top;
+  const targetLine = vpRect.height * 0.42;
+  if(relTop < vpRect.height * 0.12){
+    // 打ち直しで上へ戻った時は見失わないよう追従する(停止モード中も同じ)
+    viewport.scrollTop -= (vpRect.height * 0.12 - relTop);
+    return;
+  }
+  if(autoScrollLocked) return;
+  if(relTop > targetLine){
+    viewport.scrollTop += (relTop - targetLine);
+  }
+  const maxScroll = viewport.scrollHeight - viewport.clientHeight;
+  if(viewport.scrollTop >= maxScroll - 2){
+    lockScroll();
+  }
+}
+
+function lockScroll(){
+  if(autoScrollLocked) return;
+  autoScrollLocked = true;
+  modeChip.textContent = '入力モード(スクロール停止)';
+  modeChip.classList.add('locked');
+}
+
+let persistTimer = null;
+function persistState(){
+  // 打鍵のたびに全文字を書き出すと長文で重くなるため、入力が少し止まってからまとめて保存する
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    const states = charSpans.map(c => c.el.classList.contains('correct') ? 'c' : c.el.classList.contains('incorrect') ? 'i' : 'p');
+    localStorage.setItem(STORE_KEY, JSON.stringify({cursor, states, correctCount, incorrectCount}));
+  }, 500);
+}
+
+function restoreState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(!data.states || data.states.length !== charSpans.length) return;
+    // 打ち切った状態で開き直した時は最初からにする(続きが打てない画面を出さない)
+    if((data.cursor || 0) >= charSpans.length){ localStorage.removeItem(STORE_KEY); return; }
+    data.states.forEach((s, i) => {
+      const el = charSpans[i].el;
+      el.classList.remove('pending','correct','incorrect');
+      el.classList.add(s === 'c' ? 'correct' : s === 'i' ? 'incorrect' : 'pending');
+    });
+    cursor = data.cursor || 0;
+    correctCount = data.correctCount || 0;
+    incorrectCount = data.incorrectCount || 0;
+  }catch(e){ /* 復元失敗時は最初から */ }
+}
+
+function finish(){
+  lockScroll();
+  const elapsedMin = Math.max((Date.now() - startTime) / 60000, 0.05);
+  const wpm = Math.round((correctCount / 5) / elapsedMin);
+  const total = correctCount + incorrectCount;
+  const accuracy = total > 0 ? Math.round((correctCount / total) * 100) : 100;
+  finishStats.innerHTML =
+    '所要時間 <b>' + Math.round(elapsedMin * 60) + '秒</b><br>' +
+    'WPM <b>' + wpm + '</b><br>' +
+    '正確率 <b>' + accuracy + '%</b>';
+  finishOverlay.hidden = false;
+}
+
+function restart(){
+  cursor = 0;
+  correctCount = 0; incorrectCount = 0; startTime = null;
+  charSpans.forEach(c => {
+    c.el.classList.remove('correct','incorrect');
+    c.el.classList.add('pending');
+  });
+  autoScrollLocked = false;
+  modeChip.textContent = '追いかけスクロール中';
+  modeChip.classList.remove('locked');
+  viewport.scrollTop = 0;
+  finishOverlay.hidden = true;
+  updateCaretClass();
+  updateProgress();
+  updateSidePanels(true);
+  clearTimeout(persistTimer);
+  localStorage.removeItem(STORE_KEY);
+  const maxScroll = viewport.scrollHeight - viewport.clientHeight;
+  if(maxScroll <= 0) lockScroll();
+}
+
+function handleKey(e){
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(cursor >= charSpans.length) return;
+
+  if(e.key === 'Backspace'){
+    e.preventDefault();
+    if(cursor > 0){
+      cursor--;
+      const cs = charSpans[cursor];
+      cs.el.classList.remove('correct','incorrect');
+      cs.el.classList.add('pending');
+      updateCaretClass();
+      updateProgress();
+      updateSidePanels();
+      ensureCaretVisible();
+      persistState();
+    }
+    return;
+  }
+
+  const cs = charSpans[cursor];
+  const atLineEnd = cs.el.classList.contains('line-end');
+  // 行末では改行キーも空白と同じ扱いにする(指が勝手にEnterへ行くため)
+  if(e.key !== 'Enter' && e.key.length !== 1) return;
+  if(e.key === 'Enter' && !atLineEnd) return;
+  e.preventDefault();
+  if(!startTime) startTime = Date.now();
+
+  const isMatch = e.key === 'Enter' ? true : e.key.toLowerCase() === cs.expected.toLowerCase();
+  cs.el.classList.remove('pending');
+  if(isMatch){ cs.el.classList.add('correct'); correctCount++; }
+  else { cs.el.classList.add('incorrect'); incorrectCount++; }
+  cursor++;
+
+  updateCaretClass();
+  updateProgress();
+  updateSidePanels();
+  ensureCaretVisible();
+  persistState();
+
+  if(cursor >= charSpans.length) finish();
+}
+
+document.addEventListener('keydown', handleKey);
+document.getElementById('restartBtn').onclick = restart;
+document.getElementById('restartBtn2').onclick = restart;
+
+// ── 初期化 ──
+restoreState();
+updateCaretClass();
+updateProgress();
+updateSidePanels();
+requestAnimationFrame(() => {
+  const maxScroll = viewport.scrollHeight - viewport.clientHeight;
+  if(maxScroll <= 0){ lockScroll(); }
+  else if(cursor > 0){ ensureCaretVisible(); }
+  if(cursor >= charSpans.length && charSpans.length > 0 && startTime){
+    finish();
+  }
+});
+</script>
+</body>
+</html>
