@@ -115,6 +115,7 @@ onAuthStateChanged(auth, async user => {
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
     // クラウドから来た設定を画面に反映（大文字・小文字の判定モード）
     if (typeof applyCaseStrictSetting === 'function') applyCaseStrictSetting();
+    if (typeof applySkipParensSetting === 'function') applySkipParensSetting();
   } else {
     cloudLoadDone = true;
     updateLoginUI(null);
@@ -227,9 +228,9 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .level-rank-pill.t-a{background:var(--on-bg);color:var(--on);border-color:var(--on-soft);}
 /* 長文カード */
 .reading-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;}
-.reading-card{padding:15px 16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);
+.reading-card{padding:12px 14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);
   cursor:pointer;text-align:left;box-shadow:var(--sh-xs);position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:6px;
+  display:flex;flex-direction:column;gap:4px;
   transition:transform 0.16s var(--ease),box-shadow 0.16s var(--ease),border-color 0.16s var(--ease);}
 .reading-card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--border2);}
 .reading-card:active{transform:none;box-shadow:var(--sh-xs);}
@@ -242,30 +243,29 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;}
 .reading-card .rc-progress{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .reading-card .rc-progress-fill{height:100%;width:0%;background:var(--on);border-radius:2px;}
-/* カード下部の「追加 / 練習 / 最終」 */
-.rc-stats,.level-stats{display:flex;align-items:stretch;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);}
-.rc-stat,.lv-stat{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;
+/* カード下部の「練習 / 最終 / 追加」＝1行にまとめて高さを取らない */
+.rc-stats,.level-stats{display:flex;flex-wrap:wrap;align-items:baseline;gap:1px 9px;}
+.rc-stats{margin-top:7px;padding-top:6px;border-top:1px solid var(--border);}
+.level-stats{margin-top:4px;}
+.rc-stat,.lv-stat{display:inline-flex;align-items:baseline;gap:3px;
   font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sub);}
-.rc-stat{font-size:0.72rem;}
-.lv-stat{font-size:0.66rem;}
-.rc-stat + .rc-stat,.lv-stat + .lv-stat{border-left:1px solid var(--border);padding-left:10px;}
+.rc-stat{font-size:0.68rem;}
+.lv-stat{font-size:0.64rem;}
+.lv-count{color:var(--muted);}
 .rc-stat-l,.lv-stat-l{font-family:'Noto Sans JP',sans-serif;font-size:0.6rem;font-weight:600;
   color:var(--muted);letter-spacing:0.02em;}
 .rc-stat.dim,.lv-stat.dim{color:var(--muted);font-weight:600;}
 /* 単語・フレーズのレベルカード */
-.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
-.level-card{padding:11px 13px 12px;border-radius:var(--r);background:var(--surface);
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:7px}
+.level-card{padding:9px 11px 9px;border-radius:var(--r-sm);background:var(--surface);
   border:1px solid var(--border);cursor:pointer;text-align:left;
   transition:transform 0.16s var(--ease),box-shadow 0.16s var(--ease),border-color 0.16s var(--ease);
-  box-shadow:var(--sh-xs);position:relative;display:flex;flex-direction:column;gap:3px;}
+  box-shadow:var(--sh-xs);position:relative;display:flex;flex-direction:column;gap:0;}
 .level-card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--border2);}
 .level-card:active{transform:none;box-shadow:var(--sh-xs);}
-.level-card .level-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:16px;}
-.level-card .level-num{font-family:'JetBrains Mono',monospace;font-size:0.62rem;font-weight:700;
-  color:var(--muted);letter-spacing:0.06em;}
-.level-card .level-title{font-size:0.92rem;font-weight:700;line-height:1.4;letter-spacing:-0.01em;
-  word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
-.level-card .level-count{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;margin-top:2px;}
+.level-card .level-rank-pill{position:absolute;top:7px;right:8px;}
+.level-card .level-title{font-size:0.88rem;font-weight:700;line-height:1.35;letter-spacing:-0.01em;
+  padding-right:26px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 /* 単語が未登録のレベルは背景に沈める */
 .level-card.is-empty{background:transparent;border-style:dashed;box-shadow:none;}
 .level-card.is-empty .level-title{color:var(--muted);font-weight:600;}
@@ -1225,6 +1225,18 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <div class="card">
       <div class="voice-row">
         <div class="voice-info">
+          <div class="voice-title">カッコ ( ) は打たずに飛ばす</div>
+          <div class="voice-sub" id="skip-parens-sub" style="display:none">ON の間は <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">(be) designed to do</code> を <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">be designed to do</code> と打てば正解。中の語は打ちます</div>
+        </div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="skip-parens-toggle" checked>
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="voice-row">
+        <div class="voice-info">
           <div class="voice-title">単語のみ（記号・スペース・数字を含む語を除外）</div>
           <div class="voice-sub" id="words-only-sub" style="display:none">ON にすると <code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">apple</code> のような単語のみ出題。<code style="background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem">How are you?</code> 等の文章はスキップ（かな読みの単語には影響しません）</div>
         </div>
@@ -2087,6 +2099,8 @@ function saveLevelSettings(lv, obj){ const c=loadLevelSettings(lv); Object.assig
 //  STATE
 // ══════════════════════════════════════════════
 let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
+let skipParens=true;          // カッコ ( ) は打たずに飛ばす（既定ON）
+let currentTarget='';         // いま打っている英文（カッコを外した判定用。記録キーは元のen）
 let reorderMode=false;        // ホームのカード並べ替えモード
 let wordReorderMode=false;    // 単語リストの並べ替えモード
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
@@ -2260,21 +2274,17 @@ function renderHomeScreen() {
     const lastScore=loadLastScore(lv);
     const statCell=(label,value,dim)=>
       `<span class="lv-stat${dim?' dim':''}"><span class="lv-stat-l">${label}</span>${value}</span>`;
+    // 記録が無い項目は出さない（「まだ」だけは知りたいので練習回数は常に出す）
     const stats = wlist.length ? `
-      <div class="level-stats">
-        ${statCell('追加', lvs.addedAt ? fmtShortDate(lvs.addedAt) : 'ー', !lvs.addedAt)}
         ${statCell('練習', lvs.plays ? lvs.plays+' 回' : 'まだ', !lvs.plays)}
-        ${statCell('最終', lastScore && lastScore.date ? fmtShortDate(lastScore.date) : 'ー', !(lastScore&&lastScore.date))}
-      </div>` : '';
+        ${lastScore && lastScore.date ? statCell('最終', fmtShortDate(lastScore.date)) : ''}
+        ${lvs.addedAt ? statCell('追加', fmtShortDate(lvs.addedAt)) : ''}` : '';
     card.innerHTML=`
-      <div class="level-head">
-        <span class="level-num">LV ${lv}</span>
-        ${rankPill}
-      </div>
+      ${rankPill}
       <div class="level-title">${escHtml(title)}</div>
-      <div class="level-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</div>
-      ${stats}
-    `;
+      <div class="level-stats">
+        <span class="lv-stat lv-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</span>${stats}
+      </div>`;
     card.addEventListener('click',()=>{ if(!reorderMode) enterLevel(lv); });
     grid.appendChild(card);
   });
@@ -2299,19 +2309,19 @@ function refreshHomeCard(lv) {
   card.querySelector('.level-title').textContent=title;
   card.dataset.title=title.toLowerCase();
   const n=loadLevelWords(lv).length;
-  card.querySelector('.level-count').textContent=n>0?n+' 語':'単語なし';
+  const cnt=card.querySelector('.lv-count');
+  if(cnt) cnt.textContent=n>0?n+' 語':'単語なし';
   card.classList.toggle('is-empty', n===0);
   // best rank pill も更新
   const best=loadLevelBest(lv);
-  const head=card.querySelector('.level-head');
-  const existing=head.querySelector('.level-rank-pill');
+  const existing=card.querySelector('.level-rank-pill');
   if(existing) existing.remove();
   card.classList.toggle('has-best', !!best);
   if(best){
     const pill=document.createElement('span');
     pill.className='level-rank-pill t-'+best.tier;
     pill.textContent=best.rank.replace('RANK ','');
-    head.appendChild(pill);
+    card.insertBefore(pill, card.firstChild);
   }
 }
 
@@ -2449,6 +2459,7 @@ function enterLevel(lv) {
     b.classList.toggle('on', b.dataset.sort === practiceSortMode);
   });
   // 「単語のみ」トグルを復元
+  applySkipParensSetting();
   const wordsOnlyToggle = $('words-only-toggle');
   if (wordsOnlyToggle) {
     wordsOnlyToggle.checked = lvs.englishWordsOnly === true;
@@ -3220,12 +3231,22 @@ function startGame(){
 }
 $('start-btn').addEventListener('click',startGame);
 
+// 打つ対象の文字列。カッコ ( ) は打たずに飛ばす設定のとき、カッコだけ外す
+//（中の語は打つ。"(be) designed to do" → "be designed to do"）
+// 記録・統計のキーは元の en のままにするので、履歴は分断されない。
+function toTypingTarget(en){
+  if(!skipParens) return en;
+  const t = en.replace(/[()]/g,'').replace(/\s+/g,' ').trim();
+  return t || en;
+}
+
 function showWord(idx){
   const w=queue[idx];
+  currentTarget = toTypingTarget(w.en);
   $('word-disp').innerHTML=renderPromptHtml(w.ja);
   const hintEl=$('hint-disp');
   // モード判定: かな含有 or ローマ字パース可能(3モーラ以上) → 寿司打スタイル
-  const display = buildPracticeDisplay(w.en);
+  const display = buildPracticeDisplay(currentTarget);
   if (display) {
     currentMode='kana';
     currentMoras    = display.moras;
@@ -3240,8 +3261,8 @@ function showWord(idx){
   } else {
     currentMode='en';
     currentMoras=null; currentPatterns=null; currentSegments=null;
-    currentHintData = generateHint(w.en);
-    const isLong = w.en.length > 40;
+    currentHintData = generateHint(currentTarget);
+    const isLong = currentTarget.length > 40;
     $('word-disp').classList.toggle('long-text', isLong);
     hintEl.classList.toggle('long-text', isLong);
     hintEl.innerHTML = renderHintHtml(currentHintData,0);
@@ -3251,12 +3272,13 @@ function showWord(idx){
   currentWordStart = Date.now();
   $('game-prog').innerHTML=`${idx+1}<span class="prog-sep">/</span><span class="prog-total">${totalRounds}</span>`;
   $('bar-fill').style.width=(idx/totalRounds*100)+'%';
-  if (voiceTiming === 'instant') speakEnglish(w.en);
+  if (voiceTiming === 'instant') speakEnglish(currentTarget);
 }
 
 inp.addEventListener('input',()=>{
   if(!queue.length||!gameActive) return;
-  const target=queue[curIdx].en;
+  const recKey=queue[curIdx].en;          // 記録は元の英文をキーにする
+  const target=currentTarget || recKey;   // 判定はカッコを外した英文で行う
   let typed=normalizeEn(inp.value);
   // 大文字・小文字を区別しない設定のとき（既定）
   //   英語モード : 打った内容が大小無視でお手本の先頭と一致するなら、お手本どおりの
@@ -3304,9 +3326,9 @@ inp.addEventListener('input',()=>{
       if (r.completed) {
         const _dur = Date.now()-currentWordStart;
         const _cps = _dur > 0 ? +(typed.length / (_dur/1000)).toFixed(2) : 0;
-        incrementWordCount(currentLevel, target);
-        recordWordStat(currentLevel, target, currentWordMisses, _dur, typed.length);
-        sessionWordResults.push({ja:queue[curIdx].ja, en:target, cps:_cps, misses:currentWordMisses});
+        incrementWordCount(currentLevel, recKey);
+        recordWordStat(currentLevel, recKey, currentWordMisses, _dur, typed.length);
+        sessionWordResults.push({ja:queue[curIdx].ja, en:recKey, cps:_cps, misses:currentWordMisses});
         clears++; $('c-clear').textContent=clears; curIdx++;
         if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
         else showWord(curIdx);
@@ -3334,9 +3356,9 @@ inp.addEventListener('input',()=>{
     if(typed===target){
       const _dur = Date.now()-currentWordStart;
       const _cps = _dur > 0 ? +(typed.length / (_dur/1000)).toFixed(2) : 0;
-      incrementWordCount(currentLevel, target);
-      recordWordStat(currentLevel, target, currentWordMisses, _dur, typed.length);
-      sessionWordResults.push({ja:queue[curIdx].ja, en:target, cps:_cps, misses:currentWordMisses});
+      incrementWordCount(currentLevel, recKey);
+      recordWordStat(currentLevel, recKey, currentWordMisses, _dur, typed.length);
+      sessionWordResults.push({ja:queue[curIdx].ja, en:recKey, cps:_cps, misses:currentWordMisses});
       clears++; $('c-clear').textContent=clears; curIdx++;
       if(curIdx>=totalRounds){gameActive=false;disableCursorHide();restoreInput();showResult();}
       else showWord(curIdx);
@@ -3881,7 +3903,17 @@ function applyCaseStrictSetting() {
   toggle.checked = caseStrict;
   syncSubVisibility(toggle, 'case-strict-sub');
 }
+
+// 「カッコは打たずに飛ばす」の復元（既定 ON）
+function applySkipParensSetting() {
+  skipParens = loadSettings().skipParens !== false;
+  const toggle = $('skip-parens-toggle');
+  if (!toggle) return;
+  toggle.checked = skipParens;
+  syncSubVisibility(toggle, 'skip-parens-sub');
+}
 function initCaseStrictSetting() {
+  applySkipParensSetting();
   const toggle = $('case-strict-toggle');
   if (!toggle) return;
   applyCaseStrictSetting();
@@ -4540,6 +4572,14 @@ function toast(msg, type) {
 }
 
 // ── 「単語のみ」トグル ──
+// ── 「カッコは打たずに飛ばす」トグル（既定ON） ──
+$('skip-parens-toggle').addEventListener('change', e => {
+  skipParens = e.target.checked;
+  saveSettings({ skipParens });
+  syncSubVisibility(e.target, 'skip-parens-sub');
+  toast(skipParens ? 'カッコは打たなくて正解になります' : 'カッコも打つ判定に戻しました','suc');
+});
+
 $('words-only-toggle').addEventListener('change', e => {
   saveLevelSettings(currentLevel, { englishWordsOnly: e.target.checked });
   syncSubVisibility(e.target, 'words-only-sub');
@@ -5020,9 +5060,9 @@ function renderReadingCards(){
         <span class="rc-meta">${best ? best.speed.toFixed(1)+' 打/秒' : pct+'%'}</span>
       </div>
       <div class="rc-stats">
-        ${statCell('追加', addedTxt)}
         ${statCell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays)}
-        ${statCell('最終', log.last ? fmtShortDate(log.last) : 'ー', !log.last)}
+        ${log.last ? statCell('最終', fmtShortDate(log.last)) : ''}
+        ${p.added ? statCell('追加', addedTxt) : ''}
       </div>`;
     card.addEventListener('click', ()=>{ if(!reorderMode) enterReading(p.id); });
     grid.appendChild(card);
