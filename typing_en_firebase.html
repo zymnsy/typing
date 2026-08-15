@@ -242,6 +242,16 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;}
 .reading-card .rc-progress{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .reading-card .rc-progress-fill{height:100%;width:0%;background:var(--on);border-radius:2px;}
+/* カード下部の「追加 / 練習 / 最終」 */
+.rc-stats,.level-stats{display:flex;align-items:stretch;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);}
+.rc-stat,.lv-stat{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;
+  font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sub);}
+.rc-stat{font-size:0.72rem;}
+.lv-stat{font-size:0.66rem;}
+.rc-stat + .rc-stat,.lv-stat + .lv-stat{border-left:1px solid var(--border);padding-left:10px;}
+.rc-stat-l,.lv-stat-l{font-family:'Noto Sans JP',sans-serif;font-size:0.6rem;font-weight:600;
+  color:var(--muted);letter-spacing:0.02em;}
+.rc-stat.dim,.lv-stat.dim{color:var(--muted);font-weight:600;}
 /* 単語・フレーズのレベルカード */
 .level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
 .level-card{padding:11px 13px 12px;border-radius:var(--r);background:var(--surface);
@@ -325,6 +335,9 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rd-hint b{font-family:'JetBrains Mono',monospace;color:var(--sub);}
 
 .rd-layout{display:grid;grid-template-columns:250px minmax(0,1fr) 250px;gap:16px;align-items:start;}
+.rd-layout.no-left{grid-template-columns:minmax(0,1fr) 250px;}
+.rd-layout.no-right{grid-template-columns:250px minmax(0,1fr);}
+.rd-layout.no-left.no-right{grid-template-columns:minmax(0,1fr);}
 @media(max-width:1180px){
   .rd-layout{grid-template-columns:1fr;}
   .rd-panel{position:static!important;max-height:240px!important;}
@@ -2243,6 +2256,16 @@ function renderHomeScreen() {
     card.dataset.lv=lv;
     card.dataset.title=title.toLowerCase();
     const rankPill = best ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
+    const lvs=loadLevelSettings(lv);
+    const lastScore=loadLastScore(lv);
+    const statCell=(label,value,dim)=>
+      `<span class="lv-stat${dim?' dim':''}"><span class="lv-stat-l">${label}</span>${value}</span>`;
+    const stats = wlist.length ? `
+      <div class="level-stats">
+        ${statCell('追加', lvs.addedAt ? fmtShortDate(lvs.addedAt) : 'ー', !lvs.addedAt)}
+        ${statCell('練習', lvs.plays ? lvs.plays+' 回' : 'まだ', !lvs.plays)}
+        ${statCell('最終', lastScore && lastScore.date ? fmtShortDate(lastScore.date) : 'ー', !(lastScore&&lastScore.date))}
+      </div>` : '';
     card.innerHTML=`
       <div class="level-head">
         <span class="level-num">LV ${lv}</span>
@@ -2250,6 +2273,7 @@ function renderHomeScreen() {
       </div>
       <div class="level-title">${escHtml(title)}</div>
       <div class="level-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</div>
+      ${stats}
     `;
     card.addEventListener('click',()=>{ if(!reorderMode) enterLevel(lv); });
     grid.appendChild(card);
@@ -3026,6 +3050,8 @@ $('csv-file-input').addEventListener('change',e=>{
       const ej=new Set(words.map(w=>w.ja));
       imported.forEach(row=>{ if(ej.has(row.ja)){skipped++;return;} words.push({ja:row.ja,en:row.en}); enabled.add(words.length-1); ej.add(row.ja); added++; });
       saveLevelWords(currentLevel,words); saveLevelEnabled(currentLevel,enabled);
+      // 最初に単語を入れた日をレベルの「追加日」として残す（ホームのカードに出す）
+      if(!loadLevelSettings(currentLevel).addedAt) saveLevelSettings(currentLevel, { addedAt: Date.now() });
       // ファイル名からレベルタイトルを設定
       let titleMsg = '';
       const newTitle = deriveTitleFromFilename(file.name);
@@ -3553,6 +3579,8 @@ function showResult(){
   // 保存
   saveLastScore(currentLevel, nowRec);
   if (isNewBest) saveLevelBest(currentLevel, nowRec);
+  // 練習した回数（ホームのカードに出す）
+  saveLevelSettings(currentLevel, { plays: (loadLevelSettings(currentLevel).plays || 0) + 1 });
 
   // ─ 全単語マイルストーン判定（最遅 bestCps が 0.1 刻みの閾値を跨いだか） ─
   const newMinCps = computeMinBestCpsAllWords();
@@ -4573,6 +4601,7 @@ const READING_PASSAGES = [
     title: 'TOEIC 公式11 TEST2 Part7 Q196-200',
     subtitle: 'メール2通 + Webページ（複数パッセージ）',
     tag: 'PART 7',
+    added: '2026-08-15',
     intro: 'Questions 196-200 refer to the following e-mails and Web page.',
     docs: [
       {
@@ -4666,6 +4695,7 @@ const READING_PASSAGES = [
     title: 'TOEIC 公式10 TEST2 Part7 Q196-200',
     subtitle: '記事 + メール2通（複数パッセージ）',
     tag: 'PART 7',
+    added: '2026-08-15',
     intro: 'Questions 196-200 refer to the following article and e-mails.',
     docs: [
       {
@@ -4758,6 +4788,7 @@ const READING_PASSAGES = [
     title: 'Dear Mr. President',
     subtitle: '歌詞32行を上から順に通して打つ',
     tag: 'LYRICS',
+    added: '2026-08-15',
     intro: 'Lv.1「Dear Mr president」と同じ英文を、歌詞の並び順のまま上から通して打ちます。',
     docs: [
       {
@@ -4843,6 +4874,7 @@ const READING_PASSAGES = [
 // 打つ対象の文字。丸カッコ ( ) は打たずに飛ばす（Shift併用で打ちにくく実用でも使わないため）
 const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"]/;
 const rdKey      = id => 'typing-en-v2-reading-' + id;        // 途中経過
+const rdLogKey   = id => 'typing-en-v2-reading-log-' + id;    // 練習した回数と最終日
 const rdStatsKey = id => 'typing-en-v2-reading-stats-' + id;  // 文ごとの記録
 const rdBestKey  = id => 'typing-en-v2-reading-best-' + id;   // 自己ベスト
 const rdLastKey  = id => 'typing-en-v2-reading-last-' + id;   // 前回スコア
@@ -4861,6 +4893,28 @@ function rdJson(key){
 }
 function rdSaved(id){ return rdJson(rdKey(id)); }
 function rdStats(id){ return rdJson(rdStatsKey(id)) || {}; }
+function rdLog(id){ return rdJson(rdLogKey(id)) || {plays:0, last:0}; }
+// 打ち始めた時に最終練習日を、通しで終えた時に回数を記録する
+function rdLogTouch(){
+  if(!rdPassage) return;
+  const g = rdLog(rdPassage.id);
+  g.last = Date.now();
+  localStorage.setItem(rdLogKey(rdPassage.id), JSON.stringify(g));
+}
+function rdLogFinish(){
+  if(!rdPassage) return;
+  const g = rdLog(rdPassage.id);
+  g.plays = (g.plays || 0) + 1;
+  g.last  = Date.now();
+  localStorage.setItem(rdLogKey(rdPassage.id), JSON.stringify(g));
+}
+// 日付を「8/15」形式に（去年以前なら「2025/8/15」）
+function fmtShortDate(ts){
+  if(!ts) return '';
+  const d = new Date(ts), n = new Date();
+  const md = (d.getMonth()+1) + '/' + d.getDate();
+  return d.getFullYear() === n.getFullYear() ? md : d.getFullYear() + '/' + md;
+}
 
 // 秒数を「N分N秒」に（1分未満は「N秒」）
 function rdFmtTime(sec){
@@ -4952,6 +5006,10 @@ function renderReadingCards(){
     card.dataset.id = p.id;
     const bestPill = best
       ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
+    const log = rdLog(p.id);
+    const addedTxt = p.added ? fmtShortDate(new Date(p.added).getTime()) : '—';
+    const statCell = (label, value, dim) =>
+      `<span class="rc-stat${dim?' dim':''}"><span class="rc-stat-l">${label}</span>${value}</span>`;
     card.innerHTML = `
       <div class="rc-head"><span class="rc-tag">${escHtml(p.tag)}</span>${bestPill}</div>
       <div class="rc-title">${escHtml(p.title)}</div>
@@ -4960,6 +5018,11 @@ function renderReadingCards(){
         <span class="rc-meta">${total.toLocaleString()} 字</span>
         <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
         <span class="rc-meta">${best ? best.speed.toFixed(1)+' 打/秒' : pct+'%'}</span>
+      </div>
+      <div class="rc-stats">
+        ${statCell('追加', addedTxt)}
+        ${statCell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays)}
+        ${statCell('最終', log.last ? fmtShortDate(log.last) : 'ー', !log.last)}
       </div>`;
     card.addEventListener('click', ()=>{ if(!reorderMode) enterReading(p.id); });
     grid.appendChild(card);
@@ -5100,6 +5163,14 @@ function rdRenderPanels(){
   };
   fill($('rd-grammar-list'), rdPassage.grammar);
   fill($('rd-vocab-list'), rdPassage.vocab);
+  // 語句・文法が無い長文（CSVから入れたものなど）は空パネルを出さず本文を広く使う
+  const hasG = (rdPassage.grammar||[]).length > 0;
+  const hasV = (rdPassage.vocab||[]).length > 0;
+  $('rd-grammar-panel').hidden = !hasG;
+  $('rd-vocab-panel').hidden   = !hasV;
+  const layout = document.querySelector('.rd-layout');
+  layout.classList.toggle('no-left',  !hasG);
+  layout.classList.toggle('no-right', !hasV);
 }
 
 function rdCurrentSeg(){
@@ -5233,6 +5304,7 @@ function rdFinish(){
 
   localStorage.setItem(rdLastKey(rdPassage.id), JSON.stringify(now));
   if(isBest) localStorage.setItem(rdBestKey(rdPassage.id), JSON.stringify(now));
+  rdLogFinish();   // 通しで終えた回数と最終練習日
 
   $('rd-finish').hidden = false;
   renderReadingCards();
@@ -5267,7 +5339,7 @@ function rdHandleKey(e){
   if(e.key !== 'Enter' && e.key.length !== 1) return;
   if(e.key === 'Enter' && !atEnd) return;   // 行末だけEnterでも進める
   e.preventDefault();
-  if(!rdStart) rdStart = Date.now();
+  if(!rdStart){ rdStart = Date.now(); rdLogTouch(); }   // 打ち始めた日を最終練習日に
 
   const seg = rdCurrentSeg();
   if(rdSegStart === null) rdSegStart = Date.now();   // その文の最初の打鍵から計測
