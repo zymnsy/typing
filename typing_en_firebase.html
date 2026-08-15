@@ -970,7 +970,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   <div class="home-section">
     <div class="home-section-head">
       <span class="home-section-title">長文リーディング</span>
-      <span class="home-section-note">問題文の書式のまま、englishを上から通して打つ練習</span>
+      <span class="home-section-note">問題文の書式のまま、英文を上から通して打つ練習</span>
     </div>
     <div class="reading-grid" id="reading-card-grid"></div>
   </div>
@@ -2099,6 +2099,8 @@ function renderHomeScreen() {
     card.addEventListener('click',()=>enterLevel(lv));
     grid.appendChild(card);
   }
+  // 長文カードも同じタイミングで描き直す（ログイン後の再描画でも進捗が揃うように）
+  if(typeof renderReadingCards === 'function') renderReadingCards();
 }
 function filterHomeGrid(q) {
   const kw=q.trim().toLowerCase();
@@ -4245,7 +4247,404 @@ $('reset-all-btn').addEventListener('click', async () => {
   toast('すべての記録をリセットしました','suc');
 });
 
+// ══════════════════════════════════════════════
+//  READING（長文リーディング）
+//  問題文の書式のまま、英文だけを上から通して打つモード。
+//  単語レベル（1〜100）とはデータも記録も完全に別系統。
+// ══════════════════════════════════════════════
+const READING_PASSAGES = [
+  {
+    id: 'toeic11-t2-q196',
+    title: 'TOEIC 公式11 TEST2 Part7 Q196-200',
+    subtitle: 'メール2通 + Webページ（複数パッセージ）',
+    tag: 'PART 7',
+    intro: 'Questions 196-200 refer to the following e-mails and Web page.',
+    docs: [
+      {
+        kind:'email', tag:'E-mail 1 of 3',
+        meta:{ to:'Sarah Abboud <sabboud@mailhost.co.uk>', from:'Eun-Mi Yoon <emyoon@opalmail.co.uk>', date:'8 February', subject:'Lecture series' },
+        lines:[
+          {id:'A1', en:"Hi Sarah,", ja:"サラへ、"},
+          {id:'A2', en:"I hope you are settled into your new job.", ja:"新しい仕事にはもう慣れたかな。", newPara:true},
+          {id:'A3', en:"We miss you around the office.", ja:"オフィスのみんな、あなたがいなくて寂しがってるよ。"},
+          {id:'A4', en:"I thought you might be interested in the upcoming lecture series from Travel the World Society (TTWS).", ja:"トラベル・ザ・ワールド協会(TTWS)の今度の講演シリーズ、あなたも興味あるかなと思って。"},
+          {id:'A5', en:"It would be fun to attend one of the lectures together, since they are interactive and participants might be able to turn on their cameras at some point.", ja:"参加型の講演で、途中でカメラをオンにできるかもしれないから、一緒に聴きに行くと楽しいと思う。"},
+          {id:'A6', en:"I attended a great one last year.", ja:"去年もすごく良い回に参加したんだ。"},
+          {id:'A7', en:"To view the speaker lineup, visit www.ttws.org/events.", ja:"講演者一覧は www.ttws.org/events で見られるよ。"},
+          {id:'A8', en:"I prefer the March lecture, but the April and May topics also look good.", ja:"私は3月の講演が気になるけど、4月と5月のテーマも良さそう。"},
+          {id:'A9', en:"I am a member of TTWS.", ja:"私はTTWSの会員なの。"},
+          {id:'A10', en:"You don't have to join to buy a ticket, but you will get a discount if you do.", ja:"入会しなくてもチケットは買えるけど、入会すれば割引になるよ。"},
+          {id:'A11', en:"Eun-Mi", ja:"ウンミより", newPara:true},
+        ]
+      },
+      {
+        kind:'web', tag:'Webpage 2 of 3',
+        meta:{ url:'https://www.ttws.org/events', tabs:['Home','Events','Blogs','Membership'], active:'Events' },
+        lines:[
+          {id:'B0', en:"LECTURE SERIES", ja:"講演シリーズ", heading:true},
+          {id:'B1', en:"Travel the World Society (TTWS) is pleased to announce that tickets for its fifth annual lecture series are now on sale.", ja:"トラベル・ザ・ワールド協会(TTWS)は、第5回目となる毎年恒例の講演シリーズのチケットを発売開始したことを発表します。"},
+          {id:'B2', en:"Tickets for the virtual lectures are £25 each or £95 for all four.", ja:"オンライン講演のチケットは1回25ポンド、4回セットなら95ポンドです。"},
+          {id:'B3', en:"Each lecture starts at noon GMT and lasts 90 minutes.", ja:"各講演はグリニッジ標準時の正午に始まり、90分間続きます。"},
+          {id:'B4', en:"The final 15 minutes are reserved for an open exchange among the speakers and participants.", ja:"最後の15分間は講演者と参加者による自由な意見交換の時間です。"},
+          {id:'B5', en:"15 March — Ashraf Shirvani, professor of Iranian culture, discusses traditional clothing and textiles of ancient Persia.", ja:"3月15日 — アシュラフ・シルヴァニ(イラン文化の教授)、古代ペルシャの伝統衣装と織物について。", bullet:true, newPara:true},
+          {id:'B6', en:"22 April — Carolina Perez, art historian, explores sculpture through Mexico's most important statues.", ja:"4月22日 — カロリーナ・ペレス(美術史家)、メキシコの重要な彫像を通して彫刻を探る。", bullet:true},
+          {id:'B7', en:"28 May (SOLD OUT) — Marcel Bisset, five-star chef, explores the culinary delights of France's Normandy region.", ja:"5月28日(完売) — マルセル・ビセ(一流シェフ)、フランス・ノルマンディー地方の美食を探る。", bullet:true},
+          {id:'B8', en:"12 June — Aoki Watanabe, host of the hit travel TV show Let's Tour Japan, shares the sights and sounds of Japan's island of Kyushu.", ja:"6月12日 — 青木渡辺(人気旅行番組『Let's Tour Japan』の司会)、日本・九州の見どころと雰囲気を紹介。", bullet:true},
+          {id:'B9', en:"A link will be e-mailed to ticket holders five days prior to each event.", ja:"リンクは各イベントの5日前にチケット購入者へメールで送られます。", newPara:true},
+          {id:'B10', en:"*TTWS members pay £20 for an individual ticket or £75 for all four.", ja:"*TTWS会員は1回20ポンド、4回セットなら75ポンドです。", newPara:true},
+          {id:'B11', en:"Simply include your membership number on the order form to get your discount.", ja:"申込フォームに会員番号を記入するだけで割引が受けられます。"},
+          {id:'B12', en:"To join TTWS, visit the Membership page.", ja:"TTWSに入会するには会員ページへどうぞ。"},
+        ]
+      },
+      {
+        kind:'email', tag:'E-mail 3 of 3',
+        meta:{ to:'Eun-Mi Yoon <emyoon@opalmail.co.uk>', from:'Sarah Abboud <sabboud@mailhost.co.uk>', date:'13 June', subject:'Travel lecture' },
+        lines:[
+          {id:'C1', en:"Hi Eun-Mi,", ja:"ウンミへ、"},
+          {id:'C2', en:"What a delight to see you at Ms. Perez' presentation.", ja:"ペレスさんの講演で会えてすごく嬉しかった!", newPara:true},
+          {id:'C3', en:"You asked such an interesting question!", ja:"あなた、すごく面白い質問してたね!"},
+          {id:'C4', en:"We must plan a trip to see some of those sites Ms. Perez talked about.", ja:"ペレスさんが話してた場所、いくつか見に行く旅行を計画しないとね。"},
+          {id:'C5', en:"Thanks for letting me know about the lecture series and TTWS, which I will probably join eventually.", ja:"講演シリーズとTTWSのこと教えてくれてありがとう。私もそのうち入会すると思う。"},
+          {id:'C6', en:"My apologies for not thanking you much sooner.", ja:"お礼がこんなに遅くなってごめんね。"},
+          {id:'C7', en:"I was promoted to team leader in May, so you can imagine how busy I have been.", ja:"5月にチームリーダーに昇進したから、どれだけ忙しかったか想像つくと思う。"},
+          {id:'C8', en:"I hope to see you at the civil engineering conference in New York next month!", ja:"来月ニューヨークである土木工学のカンファレンスで会えるといいな!"},
+          {id:'C9', en:"Kind regards,", ja:"それでは、", newPara:true},
+          {id:'C10', en:"Sarah", ja:"サラより"},
+        ]
+      }
+    ],
+    vocab: [
+      {term:"settle into ~", desc:"〜に慣れる、落ち着く", ids:['A2']},
+      {term:"lecture series", desc:"講演シリーズ", ids:['A4','B0']},
+      {term:"interactive", desc:"双方向の、参加型の", ids:['A5']},
+      {term:"speaker lineup", desc:"講演者の顔ぶれ", ids:['A7']},
+      {term:"discount", desc:"割引", ids:['A10','B10','B11']},
+      {term:"be pleased to announce", desc:"〜を発表できて嬉しく思う(お知らせの定型句)", ids:['B1']},
+      {term:"on sale", desc:"発売中", ids:['B1']},
+      {term:"noon GMT", desc:"グリニッジ標準時の正午", ids:['B3']},
+      {term:"open exchange", desc:"自由な意見交換", ids:['B4']},
+      {term:"culinary delights", desc:"料理の魅力、美食", ids:['B7']},
+      {term:"sights and sounds", desc:"見どころと雰囲気", ids:['B8']},
+      {term:"prior to ~", desc:"〜より前に", ids:['B9']},
+      {term:"membership number", desc:"会員番号", ids:['B11']},
+      {term:"delight", desc:"大きな喜び", ids:['C2']},
+      {term:"presentation", desc:"講演、発表", ids:['C2']},
+      {term:"apologies", desc:"お詫び", ids:['C6']},
+      {term:"be promoted to ~", desc:"〜に昇進する", ids:['C7']},
+      {term:"civil engineering", desc:"土木工学", ids:['C8']},
+    ],
+    grammar: [
+      {term:"might be able to ~", desc:"助動詞mightで婉曲的な推量＋可能「〜できるかもしれない」", ids:['A5']},
+      {term:"since(理由)", desc:"ここでのsinceは時間でなく理由を表す接続詞(= because)", ids:['A5']},
+      {term:"don't have to A, but B if you do", desc:"文末のdoは前の動詞(join)を受ける代動詞", ids:['A10']},
+      {term:"be pleased to do", desc:"ビジネス文書で「お知らせします」を表す定型的な前置き", ids:['B1']},
+      {term:"£X each", desc:"eachの副詞的用法「それぞれにつき」", ids:['B2']},
+      {term:"所有格のアポストロフィのみ", desc:"sで終わる固有名詞の所有格は's を省略できる(Perez' = Perez's)", ids:['C2']},
+      {term:"What a + 名詞!", desc:"感嘆文の基本形「なんて〜だろう」", ids:['C2']},
+      {term:"such a + 形容詞 + 名詞", desc:"suchによる強調表現「あんなに〜な…」", ids:['C3']},
+      {term:"which(非制限用法)", desc:"関係代名詞whichが直前の文の内容全体を受けている", ids:['C5']},
+      {term:"現在完了(継続)", desc:"have been busyで「ずっと忙しい状態が続いている」ことを表す", ids:['C7']},
+    ]
+  }
+];
+
+const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"()]/;
+const rdKey = id => 'typing-en-v2-reading-' + id;
+
+let rdPassage = null;      // 現在の長文
+let rdChars = [];          // {el, expected}
+let rdSegs = [];           // {id, start, end}
+let rdCursor = 0;
+let rdLocked = false;      // 最終ページに達して自動スクロールを止めた状態
+let rdCorrect = 0, rdMiss = 0, rdStart = null;
+let rdLastSeg = null, rdPersistTimer = null;
+
+function rdSaved(id){
+  try{ return JSON.parse(localStorage.getItem(rdKey(id)) || 'null'); }catch(e){ return null; }
+}
+
+// ── ホームの長文カード ──
+function renderReadingCards(){
+  const grid = $('reading-card-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  READING_PASSAGES.forEach(p => {
+    const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
+    const saved = rdSaved(p.id);
+    const pct = saved && saved.total ? Math.round((saved.cursor / saved.total) * 100) : 0;
+    const card = document.createElement('div');
+    card.className = 'reading-card';
+    card.innerHTML = `
+      <span class="rc-tag">${escHtml(p.tag)}</span>
+      <div class="rc-title">${escHtml(p.title)}</div>
+      <div class="rc-sub">${escHtml(p.subtitle)}</div>
+      <div class="rc-foot">
+        <span class="rc-meta">${total.toLocaleString()} 字</span>
+        <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
+        <span class="rc-meta">${pct}%</span>
+      </div>`;
+    card.addEventListener('click', ()=>enterReading(p.id));
+    grid.appendChild(card);
+  });
+}
+
+// ── 長文を開く ──
+function enterReading(id){
+  rdPassage = READING_PASSAGES.find(p => p.id === id);
+  if(!rdPassage) return;
+  $('rd-title').textContent = rdPassage.title;
+  $('rd-sub').textContent = rdPassage.subtitle;
+  rdBuildPaper();
+  rdRenderPanels();
+  rdRestore();
+  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true);
+  showScreen('reading');
+  requestAnimationFrame(()=>{
+    const vp = $('rd-viewport');
+    if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
+    else if(rdCursor > 0) rdFollowCaret();
+  });
+}
+
+function rdMakeChar(expected, lineEnd){
+  const span = document.createElement('span');
+  span.className = 'rd-ch' + (lineEnd ? ' lineend' : '');
+  span.textContent = expected === ' ' ? (lineEnd ? '␣' : ' ') : expected;
+  return {el: span, expected};
+}
+
+function rdBuildPaper(){
+  const paper = $('rd-paper');
+  paper.innerHTML = '';
+  rdChars = []; rdSegs = [];
+  rdCursor = 0; rdCorrect = 0; rdMiss = 0; rdStart = null;
+  rdLocked = false; rdLastSeg = null;
+  $('rd-mode-chip').textContent = '追いかけスクロール中';
+  $('rd-mode-chip').classList.remove('locked');
+  $('rd-finish').hidden = true;
+  $('rd-viewport').scrollTop = 0;
+
+  const intro = document.createElement('div');
+  intro.className = 'rd-intro';
+  intro.textContent = rdPassage.intro;
+  paper.appendChild(intro);
+
+  rdPassage.docs.forEach(doc => {
+    const block = document.createElement('section');
+    block.className = 'rd-doc';
+    const tag = document.createElement('div');
+    tag.className = 'rd-doc-tag';
+    tag.textContent = doc.tag;
+    block.appendChild(tag);
+
+    if(doc.kind === 'email'){
+      const h = document.createElement('div');
+      h.className = 'rd-mailhead';
+      h.innerHTML =
+        `<div class="rd-mailrow"><span class="rd-ml">To:</span><span class="rd-mv">${escHtml(doc.meta.to)}</span></div>`+
+        `<div class="rd-mailrow"><span class="rd-ml">From:</span><span class="rd-mv">${escHtml(doc.meta.from)}</span></div>`+
+        `<div class="rd-mailrow"><span class="rd-ml">Date:</span><span class="rd-mv">${escHtml(doc.meta.date)}</span></div>`+
+        `<div class="rd-mailrow"><span class="rd-ml">Subject:</span><span class="rd-mv">${escHtml(doc.meta.subject)}</span></div>`;
+      block.appendChild(h);
+    } else if(doc.kind === 'web'){
+      const c = document.createElement('div');
+      c.className = 'rd-webchrome';
+      const tabs = doc.meta.tabs.map(t =>
+        `<span class="rd-tab${t===doc.meta.active?' active':''}">${escHtml(t)}</span>`).join('');
+      c.innerHTML = `<div class="rd-url">${escHtml(doc.meta.url)}</div><div class="rd-tabs">${tabs}</div>`;
+      block.appendChild(c);
+    }
+
+    doc.lines.forEach(line => {
+      const row = document.createElement('div');
+      row.className = 'rd-line' + (line.newPara?' newpara':'') + (line.heading?' heading':'');
+      const en = document.createElement('div');
+      en.className = 'rd-en';
+      if(line.bullet){
+        const b = document.createElement('span');
+        b.className = 'rd-bullet'; b.textContent = '•';
+        en.appendChild(b);
+      }
+      const start = rdChars.length;
+      for(const ch of line.en){
+        if(RD_TYPABLE.test(ch)){
+          const c = rdMakeChar(ch, false);
+          en.appendChild(c.el); rdChars.push(c);
+        } else {
+          const lit = document.createElement('span');
+          lit.className = 'rd-lit'; lit.textContent = ch;
+          en.appendChild(lit);
+        }
+      }
+      const endSp = rdMakeChar(' ', true);
+      en.appendChild(endSp.el); rdChars.push(endSp);
+      rdSegs.push({id: line.id, start, end: rdChars.length - 1});
+
+      const ja = document.createElement('div');
+      ja.className = 'rd-ja';
+      ja.textContent = line.ja;
+      row.appendChild(en); row.appendChild(ja);
+      block.appendChild(row);
+    });
+    paper.appendChild(block);
+  });
+
+  // 最後の行末スペースは打つ必要がないので外す
+  const last = rdChars[rdChars.length-1];
+  if(last && last.expected === ' '){
+    last.el.remove(); rdChars.pop();
+    rdSegs[rdSegs.length-1].end = rdChars.length - 1;
+  }
+}
+
+function rdRenderPanels(){
+  const fill = (el, items) => {
+    el.innerHTML = '';
+    items.forEach(it => {
+      const d = document.createElement('div');
+      d.className = 'rd-item';
+      d.dataset.ids = it.ids.join(',');
+      d.innerHTML = `<div class="rd-item-term">${escHtml(it.term)}</div><div class="rd-item-desc">${escHtml(it.desc)}</div>`;
+      el.appendChild(d);
+    });
+  };
+  fill($('rd-grammar-list'), rdPassage.grammar);
+  fill($('rd-vocab-list'), rdPassage.vocab);
+}
+
+function rdCurrentSeg(){
+  const i = Math.min(rdCursor, rdChars.length-1);
+  return rdSegs.find(s => i >= s.start && i <= s.end) || rdSegs[rdSegs.length-1];
+}
+function rdUpdateCaret(){
+  document.querySelectorAll('.rd-ch.caret').forEach(el=>el.classList.remove('caret'));
+  if(rdCursor < rdChars.length) rdChars[rdCursor].el.classList.add('caret');
+}
+function rdUpdateProgress(){
+  const pct = rdChars.length ? Math.round((rdCursor / rdChars.length) * 100) : 0;
+  $('rd-bar-fill').style.width = pct + '%';
+  $('rd-progress-label').textContent = pct + '%';
+}
+function rdUpdatePanels(force){
+  const seg = rdCurrentSeg(); if(!seg) return;
+  if(!force && seg.id === rdLastSeg) return;   // 同じ行の間は重い再描画をしない
+  rdLastSeg = seg.id;
+  [$('rd-grammar-list'), $('rd-vocab-list')].forEach(list=>{
+    list.querySelectorAll('.rd-item').forEach(item=>{
+      const on = item.dataset.ids.split(',').includes(seg.id);
+      item.classList.toggle('active', on);
+      if(on) item.scrollIntoView({block:'nearest', behavior:'smooth'});
+    });
+  });
+}
+function rdLock(){
+  if(rdLocked) return;
+  rdLocked = true;
+  const chip = $('rd-mode-chip');
+  chip.textContent = '入力モード(スクロール停止)';
+  chip.classList.add('locked');
+}
+function rdFollowCaret(){
+  const i = Math.min(rdCursor, rdChars.length-1);
+  if(i < 0 || !rdChars[i]) return;
+  const vp = $('rd-viewport');
+  const vr = vp.getBoundingClientRect();
+  const er = rdChars[i].el.getBoundingClientRect();
+  const rel = er.top - vr.top;
+  if(rel < vr.height * 0.12){          // 打ち直しで上に戻った時は停止中でも追う
+    vp.scrollTop -= (vr.height * 0.12 - rel);
+    return;
+  }
+  if(rdLocked) return;
+  const target = vr.height * 0.42;      // 画面の中央あたりを保つ
+  if(rel > target) vp.scrollTop += (rel - target);
+  if(vp.scrollTop >= vp.scrollHeight - vp.clientHeight - 2) rdLock();
+}
+function rdPersist(){
+  clearTimeout(rdPersistTimer);
+  rdPersistTimer = setTimeout(()=>{
+    if(!rdPassage) return;
+    const states = rdChars.map(c => c.el.classList.contains('correct') ? 'c'
+                                  : c.el.classList.contains('incorrect') ? 'i' : 'p');
+    localStorage.setItem(rdKey(rdPassage.id), JSON.stringify({
+      cursor: rdCursor, total: rdChars.length, states, correct: rdCorrect, miss: rdMiss
+    }));
+  }, 500);
+}
+function rdRestore(){
+  const d = rdSaved(rdPassage.id);
+  if(!d || !d.states || d.states.length !== rdChars.length) return;
+  if((d.cursor||0) >= rdChars.length){ localStorage.removeItem(rdKey(rdPassage.id)); return; }
+  d.states.forEach((s,i)=>{
+    rdChars[i].el.classList.remove('correct','incorrect');
+    if(s==='c') rdChars[i].el.classList.add('correct');
+    else if(s==='i') rdChars[i].el.classList.add('incorrect');
+  });
+  rdCursor = d.cursor||0; rdCorrect = d.correct||0; rdMiss = d.miss||0;
+}
+function rdFinish(){
+  rdLock();
+  const min = Math.max((Date.now() - rdStart)/60000, 0.05);
+  const wpm = Math.round((rdCorrect/5)/min);
+  const tot = rdCorrect + rdMiss;
+  const acc = tot ? Math.round((rdCorrect/tot)*100) : 100;
+  $('rd-finish-stats').innerHTML =
+    `所要時間 <b>${Math.round(min*60)}秒</b><br>WPM <b>${wpm}</b><br>正確率 <b>${acc}%</b>`;
+  $('rd-finish').hidden = false;
+  renderReadingCards();
+}
+function rdRestart(){
+  rdBuildPaper();
+  clearTimeout(rdPersistTimer);
+  if(rdPassage) localStorage.removeItem(rdKey(rdPassage.id));
+  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true);
+  const vp = $('rd-viewport');
+  if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
+  renderReadingCards();
+}
+
+function rdHandleKey(e){
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(rdCursor >= rdChars.length) return;
+
+  if(e.key === 'Backspace'){
+    e.preventDefault();
+    if(rdCursor > 0){
+      rdCursor--;
+      const c = rdChars[rdCursor];
+      c.el.classList.remove('correct','incorrect');
+      rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(); rdFollowCaret(); rdPersist();
+    }
+    return;
+  }
+
+  const c = rdChars[rdCursor];
+  const atEnd = c.el.classList.contains('lineend');
+  if(e.key !== 'Enter' && e.key.length !== 1) return;
+  if(e.key === 'Enter' && !atEnd) return;   // 行末だけEnterでも進める
+  e.preventDefault();
+  if(!rdStart) rdStart = Date.now();
+
+  const ok = e.key === 'Enter' ? true : e.key.toLowerCase() === c.expected.toLowerCase();
+  if(ok){ c.el.classList.add('correct'); rdCorrect++; }
+  else { c.el.classList.add('incorrect'); rdMiss++; }
+  rdCursor++;
+
+  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(); rdFollowCaret(); rdPersist();
+  if(rdCursor >= rdChars.length) rdFinish();
+}
+
+$('rd-back-btn').addEventListener('click', ()=>{ renderReadingCards(); showScreen('home'); });
+$('rd-restart-btn').addEventListener('click', rdRestart);
+$('rd-finish-retry').addEventListener('click', rdRestart);
+document.addEventListener('keydown', e=>{
+  if(currentScreen() !== 'reading') return;
+  if(e.key === 'Escape'){ e.preventDefault(); renderReadingCards(); showScreen('home'); return; }
+  rdHandleKey(e);
+});
+
 renderHomeScreen();
+renderReadingCards();
 initVoiceSettings();
 initCaseStrictSetting();
 window.addEventListener('beforeunload',()=>{ if(currentLevel) saveLevelEnabled(currentLevel,enabled); });
