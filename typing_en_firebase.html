@@ -181,12 +181,17 @@ window._fbShowSync = showSyncBadge;
 }
 html{scroll-behavior:smooth}
 body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;color:var(--text);
-  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:20px;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   font-feature-settings:"palt" 1;}
 body.hide-cursor,body.hide-cursor *{cursor:none!important}
-.screen{display:none;width:100%;max-width:640px;flex-direction:column;gap:16px;
+/* 画面ごとに適切な幅を持たせる（横幅を余らせない） */
+.screen{display:none;width:100%;max-width:1280px;flex-direction:column;gap:16px;
   animation:fadeSlideIn 0.25s ease-out;}
+/* 打鍵中と結果は視線移動を減らすため中央の読みやすい幅に保つ */
+#game-screen{max-width:860px;}
+#result-screen{max-width:900px;}
+#reading-screen{max-width:1600px;}
 .screen.active{display:flex}
 @keyframes fadeSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .hrow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;}
@@ -201,12 +206,37 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .search-input:hover{border-color:var(--border2);}
 .search-input:focus{border-color:var(--on);box-shadow:0 0 0 3px rgba(201,100,66,0.12),var(--sh-xs);}
 .search-input::placeholder{color:var(--muted);}
-#home-grid-wrap{max-height:62vh;overflow-y:auto;border-radius:var(--r);padding:2px;margin:-2px;}
+#home-grid-wrap{max-height:none;overflow:visible;border-radius:var(--r);padding:2px;margin:-2px;}
 #home-grid-wrap::-webkit-scrollbar{width:6px;}
 #home-grid-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 .empty-state{display:none;text-align:center;padding:32px 0;font-size:0.85rem;color:var(--muted);}
 /* level grid */
-.level-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+/* ── ホームの区分け（長文 / 単語） ── */
+.home-section{display:flex;flex-direction:column;gap:10px;}
+.home-section-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.home-section-title{font-size:0.95rem;font-weight:800;letter-spacing:-0.01em;}
+.home-section-note{font-size:0.74rem;color:var(--muted);}
+.home-foot{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+@media(max-width:820px){.home-foot{grid-template-columns:1fr;}}
+/* 長文カード */
+.reading-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
+.reading-card{padding:16px 18px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);
+  cursor:pointer;text-align:left;box-shadow:var(--sh);position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:8px;
+  transition:transform 0.18s var(--ease),box-shadow 0.18s var(--ease),border-color 0.18s var(--ease);}
+.reading-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--lv2);transition:height 0.18s var(--ease);}
+.reading-card:hover{transform:translateY(-3px);box-shadow:var(--sh2);border-color:var(--lv2-border);}
+.reading-card:hover::before{height:4px;}
+.reading-card:active{transform:translateY(-1px);box-shadow:var(--sh);}
+.reading-card .rc-tag{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;letter-spacing:0.06em;
+  color:var(--lv2);background:var(--lv2-bg);border:1px solid var(--lv2-border);padding:2px 8px;border-radius:10px;align-self:flex-start;}
+.reading-card .rc-title{font-size:0.92rem;font-weight:700;line-height:1.4;}
+.reading-card .rc-sub{font-size:0.74rem;color:var(--sub);line-height:1.5;}
+.reading-card .rc-foot{display:flex;align-items:center;gap:10px;margin-top:2px;}
+.reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--muted);font-weight:600;}
+.reading-card .rc-progress{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.reading-card .rc-progress-fill{height:100%;width:0%;background:var(--lv2);border-radius:2px;}
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .level-card{padding:14px 12px 12px;border-radius:var(--r);background:var(--surface);
   border:1px solid var(--border);cursor:pointer;text-align:left;
   transition:transform 0.18s var(--ease),box-shadow 0.18s var(--ease),border-color 0.18s var(--ease);
@@ -264,6 +294,97 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .setup-badge.lv3{background:var(--lv3-bg);color:var(--lv3);border:1px solid var(--lv3-border)}
 .setup-badge.lv4{background:var(--lv4-bg);color:var(--lv4);border:1px solid var(--lv4-border)}
 .setup-badge.lv5{background:var(--lv5-bg);color:var(--lv5);border:1px solid var(--lv5-border)}
+/* ── 練習設定の2カラム（左=単語リスト / 右=出題設定と開始） ── */
+.setup-2col{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;}
+.setup-main{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.setup-side{display:flex;flex-direction:column;gap:12px;position:sticky;top:70px;}
+.setup-side .card{padding:16px;}
+.setup-side .word-scroll{max-height:none;}
+@media(max-width:980px){
+  .setup-2col{grid-template-columns:1fr;}
+  .setup-side{position:static;}
+}
+/* 設定画面では単語リストを画面の高さいっぱいまで見せる */
+#pane-practice .word-scroll{max-height:52vh;}
+
+/* ══ 長文リーディング ══ */
+.rd-status{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.rd-mode-chip{font-size:0.74rem;font-weight:600;padding:5px 12px;border-radius:20px;background:var(--surface-alt);
+  color:var(--sub);border:1px solid var(--border);white-space:nowrap;transition:all 0.2s var(--ease);}
+.rd-mode-chip.locked{background:var(--ok-bg);color:var(--ok);border-color:#b8dcc5;}
+.rd-progress-label{font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:700;min-width:44px;text-align:right;}
+#rd-bar-fill{height:100%;background:linear-gradient(90deg,var(--ok) 0%,#4ba86e 100%);width:0%;
+  transition:width 0.2s var(--ease);border-radius:2px;}
+.rd-hint{font-size:0.76rem;color:var(--muted);line-height:1.6;}
+.rd-hint b{font-family:'JetBrains Mono',monospace;color:var(--sub);}
+
+.rd-layout{display:grid;grid-template-columns:250px minmax(0,1fr) 250px;gap:16px;align-items:start;}
+@media(max-width:1180px){
+  .rd-layout{grid-template-columns:1fr;}
+  .rd-panel{position:static!important;max-height:240px!important;}
+  .rd-paper-col{order:-1;min-height:70vh;}
+}
+.rd-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;
+  box-shadow:var(--sh);position:sticky;top:70px;max-height:calc(100vh - 200px);overflow-y:auto;}
+.rd-panel::-webkit-scrollbar{width:6px;}
+.rd-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+.rd-panel-title{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.rd-item{padding:9px 11px;border-radius:var(--r-sm);margin-bottom:7px;border-left:3px solid transparent;
+  background:var(--surface-alt);transition:background 0.2s var(--ease),border-color 0.2s var(--ease);}
+.rd-item-term{font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:2px;}
+.rd-item-desc{font-size:0.75rem;color:var(--sub);line-height:1.55;}
+#rd-grammar-panel .rd-item.active{background:var(--lv2-bg);border-left-color:var(--lv2);}
+#rd-vocab-panel .rd-item.active{background:var(--ok-bg);border-left-color:var(--ok);}
+
+.rd-paper-col{position:relative;min-height:0;min-width:0;height:calc(100vh - 200px);}
+.rd-viewport{position:absolute;inset:0;overflow-y:auto;border-radius:var(--r);}
+.rd-viewport::-webkit-scrollbar{width:8px;}
+.rd-viewport::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.rd-paper{max-width:760px;margin:0 auto 60px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);box-shadow:var(--sh2);padding:38px 44px 56px;}
+.rd-intro{font-size:0.8rem;color:var(--sub);font-style:italic;margin-bottom:24px;padding-bottom:14px;border-bottom:1px dashed var(--border);}
+.rd-doc{margin-bottom:32px;}
+.rd-doc-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;letter-spacing:0.06em;
+  text-transform:uppercase;color:var(--muted);background:var(--surface-alt);border:1px solid var(--border);
+  padding:3px 9px;border-radius:5px;margin-bottom:12px;}
+.rd-mailhead{background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:18px;}
+.rd-mailrow{display:flex;gap:10px;font-size:0.82rem;padding:2px 0;}
+.rd-mailrow .rd-ml{width:58px;flex:none;font-weight:700;color:var(--sub);}
+.rd-mailrow .rd-mv{font-family:'JetBrains Mono',monospace;color:var(--text);word-break:break-all;}
+.rd-webchrome{margin-bottom:18px;}
+.rd-url{font-family:'JetBrains Mono',monospace;font-size:0.76rem;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:20px;padding:7px 14px;color:var(--sub);margin-bottom:8px;}
+.rd-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+.rd-tab{font-size:0.78rem;color:var(--muted);padding-bottom:6px;}
+.rd-tab.active{color:var(--text);font-weight:700;border-bottom:2px solid var(--text);}
+
+.rd-line{margin-bottom:14px;}
+.rd-line.newpara{margin-top:22px;}
+.rd-line.heading{margin-bottom:18px;}
+.rd-en{font-family:'JetBrains Mono',monospace;font-size:1rem;line-height:1.9;letter-spacing:0.01em;}
+.rd-line.heading .rd-en{font-size:1.2rem;font-weight:800;letter-spacing:0.03em;}
+.rd-ja{font-size:0.76rem;color:var(--muted);margin-top:3px;line-height:1.6;}
+.rd-bullet{color:var(--muted);margin-right:5px;}
+.rd-lit{color:var(--muted);}
+.rd-ch{position:relative;}
+.rd-ch.correct{color:var(--ok);font-weight:600;}
+.rd-ch.incorrect{color:var(--ng);text-decoration:underline wavy var(--ng);text-decoration-thickness:1px;}
+.rd-ch.caret::before{content:'';position:absolute;left:-1px;top:2px;bottom:1px;width:2px;background:var(--ok);animation:rdBlink 1s steps(1) infinite;}
+@keyframes rdBlink{50%{opacity:0;}}
+.rd-ch.lineend{display:inline-block;font-family:'Noto Sans JP',sans-serif;font-size:0.62rem;color:var(--muted);
+  background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:0 5px;margin-left:3px;
+  vertical-align:middle;line-height:1.7;}
+.rd-ch.lineend.correct{background:var(--ok-bg);color:var(--ok);border-color:#b8dcc5;}
+.rd-ch.lineend.incorrect{background:var(--ng-bg);color:var(--ng);border-color:#f3cdcd;}
+
+.rd-finish{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(246,244,239,0.82);border-radius:var(--r);}
+.rd-finish[hidden]{display:none;}
+.rd-finish-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:30px 38px;text-align:center;box-shadow:var(--sh3);}
+.rd-finish-title{font-size:1.25rem;font-weight:800;margin-bottom:14px;}
+.rd-finish-stats{font-family:'JetBrains Mono',monospace;font-size:0.86rem;color:var(--sub);line-height:2;margin-bottom:18px;}
+.rd-finish-stats b{color:var(--text);}
 /* tab */
 .tabbar{display:flex;background:var(--surface-alt);padding:4px;border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-xs);gap:4px;}
 .tab{flex:1;padding:9px 0;text-align:center;font-size:0.83rem;font-weight:600;color:var(--sub);cursor:pointer;border:none;background:transparent;transition:all 0.2s var(--ease);border-radius:var(--r-sm);}
@@ -846,23 +967,40 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <input type="text" id="level-search" class="search-input" placeholder="タイトル・番号で検索…"
       oninput="filterHomeGrid(this.value)">
   </div>
-  <div id="home-grid-wrap">
-    <div class="level-grid" id="home-level-grid"></div>
-    <div id="home-no-result" class="empty-state">
-      該当するレベルが見つかりません
+  <div class="home-section">
+    <div class="home-section-head">
+      <span class="home-section-title">長文リーディング</span>
+      <span class="home-section-note">問題文の書式のまま、englishを上から通して打つ練習</span>
+    </div>
+    <div class="reading-grid" id="reading-card-grid"></div>
+  </div>
+
+  <div class="home-section">
+    <div class="home-section-head">
+      <span class="home-section-title">単語・フレーズ練習</span>
+      <span class="home-section-note">レベルごとに単語リストを登録して出題</span>
+    </div>
+    <div id="home-grid-wrap">
+      <div class="level-grid" id="home-level-grid"></div>
+      <div id="home-no-result" class="empty-state">
+        該当するレベルが見つかりません
+      </div>
     </div>
   </div>
-  <div class="hint-box">
-    <b>使い方</b>　レベル 1〜100 それぞれに独立した単語リストを登録できます。<br>
-    レベルをクリック → 設定画面 → <kbd>Space</kbd> でタイピング開始。<br>
-    タイピング中は自動的に <b>半角英数（IMEオフ）</b> に切り替わります。<br>
-    かな読み（ひらがな/カタカナ）を入れた単語は <b>寿司打スタイル</b>（ji/zi、shi/si、n/nn、っの子音重ね 等を許容）で判定されます。
-  </div>
-  <div class="card" style="margin-top:4px;">
-    <div class="sec-label">記録の管理</div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:0.78rem;color:var(--sub);flex:1;min-width:200px;line-height:1.55;">全レベル（1〜100）のタイピング記録を一括消去します。<br><span style="font-size:0.72rem;color:var(--muted)">対象: 出題回数 / ミスタイプ / 完璧率 / 最速 / 自己ベスト / 前回スコア。単語データは残ります。</span></span>
-      <button class="btn-reset" id="reset-all-btn">すべての記録をリセット</button>
+
+  <div class="home-foot">
+    <div class="hint-box">
+      <b>使い方</b>　レベル 1〜100 それぞれに独立した単語リストを登録できます。<br>
+      レベルをクリック → 設定画面 → <kbd>Space</kbd> でタイピング開始。<br>
+      タイピング中は自動的に <b>半角英数（IMEオフ）</b> に切り替わります。<br>
+      かな読み（ひらがな/カタカナ）を入れた単語は <b>寿司打スタイル</b>（ji/zi、shi/si、n/nn、っの子音重ね 等を許容）で判定されます。
+    </div>
+    <div class="card">
+      <div class="sec-label">記録の管理</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:0.78rem;color:var(--sub);flex:1;min-width:200px;line-height:1.55;">全レベル（1〜100）のタイピング記録を一括消去します。<br><span style="font-size:0.72rem;color:var(--muted)">対象: 出題回数 / ミスタイプ / 完璧率 / 最速 / 自己ベスト / 前回スコア。単語データは残ります。</span></span>
+        <button class="btn-reset" id="reset-all-btn">すべての記録をリセット</button>
+      </div>
     </div>
   </div>
 </div>
@@ -880,7 +1018,8 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <button class="tab active" id="tab-practice" onclick="switchTab('practice')">🎯 練習設定</button>
     <button class="tab" id="tab-manage" onclick="switchTab('manage')">✏️ 単語管理</button>
   </div>
-  <div id="pane-practice" style="display:flex;flex-direction:column;gap:16px">
+  <div id="pane-practice" class="setup-2col">
+    <div class="setup-main">
     <div class="card">
       <div class="filter-block">
 
@@ -951,6 +1090,8 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
       <div class="word-scroll" id="word-list" style="margin-top:10px"></div>
     </div>
+    </div>
+    <div class="setup-side">
     <div class="card">
       <div class="sec-label">出題数</div>
       <div class="round-row">
@@ -1041,6 +1182,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     </div>
     <button class="btn-primary" id="start-btn">練習を開始する</button>
     <div class="space-start-hint"><kbd>Space</kbd> でも開始できます</div>
+    </div>
   </div>
   <div id="pane-manage" style="display:none;flex-direction:column;gap:16px">
     <div class="card">
@@ -1101,6 +1243,46 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         <button class="btn-reset" id="reset-btn">クリア</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- READING (長文リーディング) -->
+<div id="reading-screen" class="screen">
+  <div class="hrow">
+    <div>
+      <button class="back-link" id="rd-back-btn">← レベル選択に戻る</button>
+      <div class="page-title" style="margin-top:6px" id="rd-title">長文リーディング</div>
+      <div class="page-sub" id="rd-sub"></div>
+    </div>
+    <div class="rd-status">
+      <span class="rd-mode-chip" id="rd-mode-chip">追いかけスクロール中</span>
+      <span class="rd-progress-label" id="rd-progress-label">0%</span>
+      <button class="btn-ghost" id="rd-restart-btn">最初から</button>
+    </div>
+  </div>
+  <div class="bar-track"><div id="rd-bar-fill"></div></div>
+  <div class="rd-hint">英文だけを上から入力。行末の <b>␣</b> は Space（Enterでも可）で次の行へ。最後まで来ると自動スクロールが止まります。</div>
+  <div class="rd-layout">
+    <aside class="rd-panel" id="rd-grammar-panel">
+      <div class="rd-panel-title">文法ポイント</div>
+      <div id="rd-grammar-list"></div>
+    </aside>
+    <div class="rd-paper-col">
+      <div class="rd-viewport" id="rd-viewport">
+        <div class="rd-paper" id="rd-paper"></div>
+      </div>
+      <div class="rd-finish" id="rd-finish" hidden>
+        <div class="rd-finish-card">
+          <div class="rd-finish-title">読み切りました</div>
+          <div class="rd-finish-stats" id="rd-finish-stats"></div>
+          <button class="btn-primary" id="rd-finish-retry" style="width:auto;padding:10px 24px">もう一度やる</button>
+        </div>
+      </div>
+    </div>
+    <aside class="rd-panel" id="rd-vocab-panel">
+      <div class="rd-panel-title">語句・表現</div>
+      <div id="rd-vocab-list"></div>
+    </aside>
   </div>
 </div>
 
@@ -1860,10 +2042,11 @@ function hideImeHint() {
 // ══════════════════════════════════════════════
 const $ = id => document.getElementById(id);
 const homeScr=$('home-screen'),setupScr=$('setup-screen'),gameScr=$('game-screen'),resScr=$('result-screen');
+const readingScr=$('reading-screen');
 const inp=$('inp');
 
 function showScreen(id) {
-  [homeScr,setupScr,gameScr,resScr].forEach(s=>s.classList.remove('active'));
+  [homeScr,setupScr,gameScr,resScr,readingScr].forEach(s=>s.classList.remove('active'));
   $(id+'-screen').classList.add('active');
   if(id!=='game') disableCursorHide();
 }
@@ -1872,6 +2055,7 @@ function currentScreen() {
   if(setupScr.classList.contains('active')) return 'setup';
   if(gameScr.classList.contains('active')) return 'game';
   if(resScr.classList.contains('active')) return 'result';
+  if(readingScr.classList.contains('active')) return 'reading';
   return '';
 }
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -2573,10 +2757,23 @@ function parseCSVLine(line){
 // ══════════════════════════════════════════════
 //  ROUNDS
 // ══════════════════════════════════════════════
+// 出題数の変更に合わせて選択単語を同期する（「自動で次回出題に設定」ONのとき）
+// 0=全部なら全単語、Nなら現在のソート順の上位N件を選択し直す
+function syncEnabledToRounds(){
+  if (!currentLevel || words.length === 0) return;
+  const arOn = (loadLevelSettings(currentLevel).autoRotateWorst ?? loadSettings().autoRotateWorst) !== false;
+  if (!arOn) return;
+  const sorted = getSortedIndices();
+  enabled.clear();
+  sorted.slice(0, totalRounds > 0 ? totalRounds : sorted.length).forEach(m => enabled.add(m.idx));
+  saveLevelEnabled(currentLevel, enabled);
+  renderWordList(); updateStartBtn();
+}
 document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.round-chip:not(.voice-rate-chip):not(.voice-timing-chip)').forEach(b=>b.classList.remove('on'));
     btn.classList.add('on'); totalRounds=parseInt(btn.dataset.n); saveLevelSettings(currentLevel, {rounds:totalRounds});
+    syncEnabledToRounds();
   });
 });
 
@@ -2598,6 +2795,7 @@ if (runAllBtn) runAllBtn.addEventListener('click',()=>{
   if(allChip) allChip.classList.add('on');
   totalRounds=0;
   saveLevelSettings(currentLevel, {rounds:0});
+  syncEnabledToRounds(); // 「最後まで通す」は全単語を対象にする
   startGame();
 });
 
@@ -3095,10 +3293,12 @@ function showResult(){
   // 「自動再選択」ON のときのみ実行。現在のソートモードに従って上位N件を選出。
   const settingsAR = loadSettings();
   const lvSettingsAR = loadLevelSettings(currentLevel);
+  // totalRounds は startGame で実出題数に上書きされるため、保存済みの出題数設定を正とする（0 = 全部）
+  const roundsSettingAR = lvSettingsAR.rounds ?? 20;
   const autoRotateOn = (lvSettingsAR.autoRotateWorst ?? settingsAR.autoRotateWorst) !== false; // 既定 ON
   if (autoRotateOn && currentLevel && words.length > 0) {
     const sorted = getSortedIndices(); // 現在のソートモードで並び替え済み
-    const N = totalRounds > 0 ? totalRounds : sorted.length; // 0 = 全部
+    const N = roundsSettingAR > 0 ? roundsSettingAR : sorted.length; // 0 = 全部
     enabled.clear();
     if (sorted.length <= N) {
       sorted.forEach(m => enabled.add(m.idx));
@@ -3159,6 +3359,8 @@ function showResult(){
     }
     saveLevelEnabled(currentLevel, enabled);
   }
+  // 出題数設定を復元（startGame で実出題数に上書きされたままにしない）
+  totalRounds = roundsSettingAR;
 
   $('r-keys').textContent=totalKeystrokes;
   $('r-time').textContent=timeStr;
