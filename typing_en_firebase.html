@@ -1323,7 +1323,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     </div>
   </div>
   <div class="bar-track"><div id="rd-bar-fill"></div></div>
-  <div class="rd-hint">英文だけを上から入力。行末の <b>␣</b> は Space（Enterでも可）で次の行へ。最後まで来ると自動スクロールが止まります。</div>
+  <div class="rd-hint">英文だけを上から入力。行末の <b>␣</b> は Space（Enterでも可）で次の行へ。カッコなど薄い文字は打たずに飛ばします。左右の語句はクリックで読み上げ。</div>
   <div class="rd-layout">
     <aside class="rd-panel" id="rd-grammar-panel">
       <div class="rd-panel-title">文法ポイント</div>
@@ -4465,7 +4465,8 @@ const READING_PASSAGES = [
   }
 ];
 
-const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"()]/;
+// 打つ対象の文字。丸カッコ ( ) は打たずに飛ばす（Shift併用で打ちにくく実用でも使わないため）
+const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"]/;
 const rdKey      = id => 'typing-en-v2-reading-' + id;        // 途中経過
 const rdStatsKey = id => 'typing-en-v2-reading-stats-' + id;  // 文ごとの記録
 const rdBestKey  = id => 'typing-en-v2-reading-best-' + id;   // 自己ベスト
@@ -4501,18 +4502,63 @@ function rdEnglishOf(text){
     .replace(/^[\s,.;:!?'"()\-]+|[\s,.;:!?'"()\-]+$/g, '')
     .trim();
 }
-// パネル・記録の英語部分だけを読み上げる（本体の読み上げ設定に関係なく鳴らす）
-function rdSpeak(text){
-  const en = rdEnglishOf(text);
-  if(!en || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
+// パネル・記録の英語部分だけを読み上げる（本体の読み上げ設定のON/OFFに関係なく鳴らす）
+let rdUtterRef = null;   // 参照を保持しないとChromeがGCして無音になることがある
+function rdPickVoice(){
+  const all = (window.speechSynthesis.getVoices && window.speechSynthesis.getVoices()) || [];
+  if(!all.length) return null;
+  const named = selectedVoiceName && all.find(v => v.name === selectedVoiceName && /^en/i.test(v.lang));
+  return named
+      || all.find(v => /^en[-_]?US/i.test(v.lang))
+      || all.find(v => /^en/i.test(v.lang))
+      || null;
+}
+function rdSpeakNow(en, retried){
+  const synth = window.speechSynthesis;
   const u = new SpeechSynthesisUtterance(en);
   u.lang = 'en-US';
-  u.rate = (typeof voiceRate === 'number' ? voiceRate : 1.0);
-  const v = (typeof enVoices !== 'undefined' && enVoices.length)
-    ? (enVoices.find(x => x.name === selectedVoiceName) || enVoices[0]) : null;
-  if(v) u.voice = v;
-  window.speechSynthesis.speak(u);
+  u.rate = (typeof voiceRate === 'number' && voiceRate > 0) ? voiceRate : 1.0;
+  u.pitch = 1.0;
+  u.volume = 1.0;
+  // 音声の指定に失敗しても、既定の音声で必ず読み上げは続行する
+  try { const v = rdPickVoice(); if(v) u.voice = v; } catch(e){ /* 既定音声のまま */ }
+  let started = false;
+  u.onstart = ()=>{ started = true; };
+  u.onend   = ()=>{ started = true; if(rdUtterRef === u) rdUtterRef = null; };
+  u.onerror = (ev)=>{
+    if(rdUtterRef === u) rdUtterRef = null;
+    const err = ev && ev.error;
+    if(err && err !== 'interrupted' && err !== 'canceled'){
+      toast('読み上げできませんでした（' + err + '）','err');
+    }
+  };
+  rdUtterRef = u;
+  if(synth.paused) synth.resume();   // Chromeが一時停止のまま止まることへの対処
+  synth.speak(u);
+  // まれにキューが動かないので、鳴り始めていない時だけ一度蹴り直す
+  if(!retried){
+    setTimeout(()=>{
+      if(!started && rdUtterRef === u && !synth.speaking && !synth.pending){
+        rdUtterRef = null;
+        rdSpeakNow(en, true);
+      }
+    }, 300);
+  }
+}
+function rdSpeak(text){
+  const en = rdEnglishOf(text);
+  if(!en) return;
+  const synth = window.speechSynthesis;
+  if(!synth){ toast('このブラウザは読み上げに対応していません','err'); return; }
+  if(synth.speaking || synth.pending) synth.cancel();   // 鳴っている時だけ止める
+  const voices = synth.getVoices ? synth.getVoices() : [];
+  if(!voices.length){
+    // 音声一覧がまだ読み込まれていない端末向け：読み込み完了後にもう一度だけ話す
+    const once = ()=>{ synth.removeEventListener('voiceschanged', once); rdSpeakNow(en); };
+    synth.addEventListener('voiceschanged', once);
+    setTimeout(()=>synth.removeEventListener('voiceschanged', once), 3000);
+  }
+  rdSpeakNow(en);
 }
 
 // ── ホームの長文カード ──
@@ -4740,7 +4786,9 @@ function rdPersist(){
 }
 function rdRestore(){
   const d = rdSaved(rdPassage.id);
-  if(!d || !d.states || d.states.length !== rdChars.length) return;
+  if(!d || !d.states) return;
+  // 打つ文字の並びが変わった時（仕様変更など）は古い途中経過を捨てて最初から
+  if(d.states.length !== rdChars.length){ localStorage.removeItem(rdKey(rdPassage.id)); return; }
   if((d.cursor||0) >= rdChars.length){ localStorage.removeItem(rdKey(rdPassage.id)); return; }
   d.states.forEach((s,i)=>{
     rdChars[i].el.classList.remove('correct','incorrect');
