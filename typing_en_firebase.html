@@ -218,72 +218,75 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .home-section-note{font-size:0.74rem;color:var(--muted);}
 .home-foot{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
 @media(max-width:820px){.home-foot{grid-template-columns:1fr;}}
+/* ── ホームのカード（色は極力使わず、タイトルを主役にする） ── */
+/* ランク表示は 3 トーンのみ：S以上=ゴールド / A=アクセント / それ以外=グレー */
+.level-rank-pill{font-family:'JetBrains Mono',monospace;font-size:0.58rem;font-weight:800;
+  padding:1px 6px;border-radius:6px;letter-spacing:0.05em;white-space:nowrap;line-height:1.6;
+  background:var(--surface-alt);color:var(--muted);border:1px solid var(--border);}
+.level-rank-pill.t-ss,.level-rank-pill.t-s{background:var(--gold-bg);color:var(--gold);border-color:#e6d5a0;}
+.level-rank-pill.t-a{background:var(--on-bg);color:var(--on);border-color:var(--on-soft);}
 /* 長文カード */
-.reading-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
-.reading-card{padding:16px 18px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);
-  cursor:pointer;text-align:left;box-shadow:var(--sh);position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:8px;
-  transition:transform 0.18s var(--ease),box-shadow 0.18s var(--ease),border-color 0.18s var(--ease);}
-.reading-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--lv2);transition:height 0.18s var(--ease);}
-.reading-card:hover{transform:translateY(-3px);box-shadow:var(--sh2);border-color:var(--lv2-border);}
-.reading-card:hover::before{height:4px;}
-.reading-card:active{transform:translateY(-1px);box-shadow:var(--sh);}
+.reading-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;}
+.reading-card{padding:15px 16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);
+  cursor:pointer;text-align:left;box-shadow:var(--sh-xs);position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:6px;
+  transition:transform 0.16s var(--ease),box-shadow 0.16s var(--ease),border-color 0.16s var(--ease);}
+.reading-card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--border2);}
+.reading-card:active{transform:none;box-shadow:var(--sh-xs);}
 .reading-card .rc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.reading-card .rc-tag{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;letter-spacing:0.06em;
-  color:var(--lv2);background:var(--lv2-bg);border:1px solid var(--lv2-border);padding:2px 8px;border-radius:10px;}
-.reading-card .level-rank-pill{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;
-  padding:2px 7px;border-radius:10px;letter-spacing:0.04em;white-space:nowrap;line-height:1.4;}
-.reading-card .rc-title{font-size:0.92rem;font-weight:700;line-height:1.4;}
+.reading-card .rc-tag{font-family:'JetBrains Mono',monospace;font-size:0.58rem;font-weight:700;
+  letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;}
+.reading-card .rc-title{font-size:1rem;font-weight:700;line-height:1.35;letter-spacing:-0.01em;}
 .reading-card .rc-sub{font-size:0.74rem;color:var(--sub);line-height:1.5;}
-.reading-card .rc-foot{display:flex;align-items:center;gap:10px;margin-top:2px;}
-.reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--muted);font-weight:600;}
-.reading-card .rc-progress{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
-.reading-card .rc-progress-fill{height:100%;width:0%;background:var(--lv2);border-radius:2px;}
-.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.level-card{padding:14px 12px 12px;border-radius:var(--r);background:var(--surface);
+.reading-card .rc-foot{display:flex;align-items:center;gap:10px;margin-top:4px;}
+.reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;}
+.reading-card .rc-progress{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.reading-card .rc-progress-fill{height:100%;width:0%;background:var(--on);border-radius:2px;}
+/* 単語・フレーズのレベルカード */
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
+.level-card{padding:11px 13px 12px;border-radius:var(--r);background:var(--surface);
   border:1px solid var(--border);cursor:pointer;text-align:left;
-  transition:transform 0.18s var(--ease),box-shadow 0.18s var(--ease),border-color 0.18s var(--ease);
-  box-shadow:var(--sh);position:relative;overflow:hidden;min-height:94px;display:flex;flex-direction:column;}
-.level-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;transition:height 0.18s var(--ease);}
-.level-card:hover{transform:translateY(-3px);box-shadow:var(--sh2);border-color:var(--border2);}
-.level-card:hover::before{height:4px;}
-.level-card:active{transform:translateY(-1px);box-shadow:var(--sh);}
-.level-card .level-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;}
-.level-card .level-num{font-family:'JetBrains Mono',monospace;font-size:0.95rem;font-weight:800;letter-spacing:-0.02em;}
-.level-card .level-rank-pill{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;padding:2px 7px;border-radius:10px;letter-spacing:0.04em;white-space:nowrap;line-height:1.4;}
-.level-card .level-rank-pill.t-ss{background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;box-shadow:0 1px 3px rgba(168,85,247,0.35);}
-.level-card .level-rank-pill.t-s{background:#fdf6e3;color:var(--gold);border:1px solid #e6d5a0;}
-.level-card .level-rank-pill.t-a{background:var(--ok-bg);color:var(--ok);border:1px solid #b8dcc5;}
-.level-card .level-rank-pill.t-b{background:var(--on-bg);color:var(--on);border:1px solid #e8c4b3;}
-.level-card .level-rank-pill.t-c{background:#f0f0ee;color:var(--sub);border:1px solid var(--border);}
-.level-card .level-rank-pill.t-d{background:#f5f0f0;color:#8a7070;border:1px solid #e0d5d5;}
-.level-card .level-rank-pill.t-e{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;}
-.level-card .level-rank-pill.t-f{background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;}
-.level-card .level-title{font-size:0.8rem;font-weight:600;line-height:1.4;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1;}
-.level-card .level-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:4px;}
-.level-card .level-count{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--muted);font-weight:600;letter-spacing:0.02em;}
-.level-card .level-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;opacity:0.35;transition:opacity 0.2s var(--ease);}
-.level-card.has-best .level-dot{opacity:1;}
-.level-card[data-lv="1"]::before,.level-card[data-cycle="1"]::before{background:var(--lv1)}
-.level-card[data-lv="2"]::before,.level-card[data-cycle="2"]::before{background:var(--lv2)}
-.level-card[data-lv="3"]::before,.level-card[data-cycle="3"]::before{background:var(--lv3)}
-.level-card[data-lv="4"]::before,.level-card[data-cycle="4"]::before{background:var(--lv4)}
-.level-card[data-lv="5"]::before,.level-card[data-cycle="5"]::before{background:var(--lv5)}
-.level-card[data-cycle="1"] .level-num{color:var(--lv1);}
-.level-card[data-cycle="2"] .level-num{color:var(--lv2);}
-.level-card[data-cycle="3"] .level-num{color:var(--lv3);}
-.level-card[data-cycle="4"] .level-num{color:var(--lv4);}
-.level-card[data-cycle="5"] .level-num{color:var(--lv5);}
-.level-card[data-cycle="1"] .level-dot{background:var(--lv1);}
-.level-card[data-cycle="2"] .level-dot{background:var(--lv2);}
-.level-card[data-cycle="3"] .level-dot{background:var(--lv3);}
-.level-card[data-cycle="4"] .level-dot{background:var(--lv4);}
-.level-card[data-cycle="5"] .level-dot{background:var(--lv5);}
-.level-card[data-cycle="1"]:hover{border-color:var(--lv1-border)}
-.level-card[data-cycle="2"]:hover{border-color:var(--lv2-border)}
-.level-card[data-cycle="3"]:hover{border-color:var(--lv3-border)}
-.level-card[data-cycle="4"]:hover{border-color:var(--lv4-border)}
-.level-card[data-cycle="5"]:hover{border-color:var(--lv5-border)}
+  transition:transform 0.16s var(--ease),box-shadow 0.16s var(--ease),border-color 0.16s var(--ease);
+  box-shadow:var(--sh-xs);position:relative;display:flex;flex-direction:column;gap:3px;}
+.level-card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--border2);}
+.level-card:active{transform:none;box-shadow:var(--sh-xs);}
+.level-card .level-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:16px;}
+.level-card .level-num{font-family:'JetBrains Mono',monospace;font-size:0.62rem;font-weight:700;
+  color:var(--muted);letter-spacing:0.06em;}
+.level-card .level-title{font-size:0.92rem;font-weight:700;line-height:1.4;letter-spacing:-0.01em;
+  word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.level-card .level-count{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;margin-top:2px;}
+/* 単語が未登録のレベルは背景に沈める */
+.level-card.is-empty{background:transparent;border-style:dashed;box-shadow:none;}
+.level-card.is-empty .level-title{color:var(--muted);font-weight:600;}
+/* ── 並べ替えモード ── */
+.reorder-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.reorder-switch{display:inline-flex;align-items:center;gap:9px;padding:6px 12px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface);cursor:pointer;user-select:none;
+  font-size:0.78rem;font-weight:700;color:var(--sub);transition:all 0.16s var(--ease);}
+.reorder-switch:hover{border-color:var(--border2);}
+.reorder-switch .toggle{display:inline-block;width:32px;height:18px;}
+.reorder-switch .toggle-thumb{width:14px;height:14px;}
+.reorder-switch .toggle input:checked ~ .toggle-thumb{transform:translateX(14px);}
+.reorder-switch.on{border-color:var(--on-soft);background:var(--on-bg);color:var(--on);}
+.reorder-note{font-size:0.73rem;color:var(--muted);}
+.reorder-reset{font-family:inherit;font-size:0.73rem;font-weight:700;color:var(--sub);cursor:pointer;
+  background:none;border:1px solid var(--border);border-radius:14px;padding:4px 11px;transition:all 0.16s var(--ease);}
+.reorder-reset:hover{border-color:var(--border2);color:var(--text);}
+#home-screen.reorder-on .level-card,#home-screen.reorder-on .reading-card{cursor:grab;touch-action:none;}
+#home-screen.reorder-on .level-card:hover,#home-screen.reorder-on .reading-card:hover{transform:none;border-color:var(--on-soft);}
+#home-screen.reorder-on .level-card::after,#home-screen.reorder-on .reading-card::after{
+  content:'⠿';position:absolute;top:6px;right:8px;font-size:0.72rem;color:var(--muted);line-height:1;}
+.card-ghost{opacity:0.3;border-style:dashed!important;border-color:var(--on-soft)!important;box-shadow:none!important;}
+.card-float{position:fixed;z-index:9999;pointer-events:none;margin:0;
+  box-shadow:var(--sh3)!important;border-color:var(--on-soft)!important;transform:rotate(-1.2deg);opacity:0.97;}
+/* 単語リストの並べ替え */
+#word-list.reorder-on .word-row{cursor:grab;touch-action:none;border:1px dashed var(--border);margin-bottom:3px;}
+#word-list.reorder-on .word-row:hover{background:var(--on-bg);border-color:var(--on-soft);}
+#word-list.reorder-on .word-row .toggle{opacity:0.35;pointer-events:none;}
+#word-list.reorder-on .word-row::after{content:'⠿';color:var(--muted);font-size:0.8rem;flex-shrink:0;}
+.word-row.card-float{background:var(--surface);border:1px solid var(--on-soft)!important;border-radius:var(--r-sm);
+  display:flex;align-items:center;gap:12px;padding:9px 12px;}
 /* badges */
 .game-lv-badge{font-size:0.74rem;font-weight:700;padding:4px 12px;border-radius:14px;letter-spacing:0.01em;}
 .game-lv-badge.lv1{background:var(--lv1-bg);color:var(--lv1);border:1px solid var(--lv1-border);}
@@ -958,9 +961,10 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   .page-sub{font-size:0.78rem;}
   .card{padding:16px;}
   .level-grid{grid-template-columns:1fr 1fr;gap:8px;}
-  .level-card{padding:12px 11px 11px;min-height:86px;}
-  .level-card .level-num{font-size:0.9rem;}
-  .level-card .level-title{font-size:0.76rem;}
+  .level-card{padding:10px 11px 11px;}
+  .level-card .level-num{font-size:0.6rem;}
+  .level-card .level-title{font-size:0.84rem;}
+  .reading-grid{grid-template-columns:1fr;}
   .round-chip{min-width:48px;padding:9px 0;font-size:0.82rem;}
   .res-grid{grid-template-columns:1fr 1fr;}
   .res-grid-4{grid-template-columns:1fr 1fr!important;}
@@ -1027,6 +1031,17 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <span class="search-icon">🔍</span>
     <input type="text" id="level-search" class="search-input" placeholder="タイトル・番号で検索…"
       oninput="filterHomeGrid(this.value)">
+  </div>
+  <div class="reorder-bar">
+    <label class="reorder-switch" id="reorder-switch">
+      <span class="toggle">
+        <input type="checkbox" id="reorder-toggle">
+        <span class="toggle-track"></span><span class="toggle-thumb"></span>
+      </span>
+      並べ替え
+    </label>
+    <span class="reorder-note" id="reorder-note">ONにするとカードをドラッグして順番を入れ替えられます</span>
+    <button type="button" class="reorder-reset" id="reorder-reset" style="display:none">並び順をリセット</button>
   </div>
   <div class="home-section">
     <div class="home-section-head">
@@ -1144,6 +1159,17 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
 
       <input type="text" class="word-search-input" id="word-search" placeholder="🔍 単語を検索（英語・日本語）" style="margin-top:4px">
+
+      <div class="reorder-bar" style="margin-top:10px">
+        <label class="reorder-switch" id="word-reorder-switch">
+          <span class="toggle">
+            <input type="checkbox" id="word-reorder-toggle">
+            <span class="toggle-track"></span><span class="toggle-thumb"></span>
+          </span>
+          並べ替え
+        </label>
+        <span class="reorder-note" id="word-reorder-note">ONにすると単語をドラッグして並び順（登録順）を入れ替えられます</span>
+      </div>
 
       <div class="sel-stats" id="sel-stats" style="margin-top:10px">
         選択中 <b id="sel-count">0</b> / <b id="sel-total">0</b> 語
@@ -2048,6 +2074,8 @@ function saveLevelSettings(lv, obj){ const c=loadLevelSettings(lv); Object.assig
 //  STATE
 // ══════════════════════════════════════════════
 let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
+let reorderMode=false;        // ホームのカード並べ替えモード
+let wordReorderMode=false;    // 単語リストの並べ替えモード
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
 let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
@@ -2188,36 +2216,47 @@ function renderPromptHtml(raw){
 // ══════════════════════════════════════════════
 //  HOME
 // ══════════════════════════════════════════════
+// 保存済みの並び順（settings に入れてクラウド同期に乗せる）を適用する。
+// 保存に無いものは元の順番のまま後ろに続ける。
+function applySavedOrder(items, savedOrder, keyOf){
+  if(!Array.isArray(savedOrder) || !savedOrder.length) return items;
+  const pos = new Map(savedOrder.map((k,i)=>[String(k), i]));
+  return items.slice().sort((a,b)=>{
+    const pa = pos.has(String(keyOf(a))) ? pos.get(String(keyOf(a))) : Infinity;
+    const pb = pos.has(String(keyOf(b))) ? pos.get(String(keyOf(b))) : Infinity;
+    return pa - pb;
+  });
+}
+
 function renderHomeScreen() {
   const grid=$('home-level-grid');
   grid.innerHTML='';
-  for(let lv=1;lv<=NUM_LEVELS;lv++) {
+  const order = loadSettings().homeOrder;
+  const levels = applySavedOrder(
+    Array.from({length:NUM_LEVELS},(_,i)=>i+1), order, lv=>lv);
+  levels.forEach(lv=>{
     const title=loadLevelTitle(lv);
     const wlist=loadLevelWords(lv);
-    const cycle=((lv-1)%5)+1;
     const best=loadLevelBest(lv);
     const card=document.createElement('div');
-    card.className='level-card'+(best?' has-best':'');
+    card.className='level-card'+(best?' has-best':'')+(wlist.length?'':' is-empty');
     card.dataset.lv=lv;
-    card.dataset.cycle=cycle;
     card.dataset.title=title.toLowerCase();
     const rankPill = best ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
     card.innerHTML=`
       <div class="level-head">
-        <span class="level-num">${lv}</span>
+        <span class="level-num">LV ${lv}</span>
         ${rankPill}
       </div>
       <div class="level-title">${escHtml(title)}</div>
-      <div class="level-foot">
-        <span class="level-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</span>
-        <span class="level-dot"></span>
-      </div>
+      <div class="level-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</div>
     `;
-    card.addEventListener('click',()=>enterLevel(lv));
+    card.addEventListener('click',()=>{ if(!reorderMode) enterLevel(lv); });
     grid.appendChild(card);
-  }
+  });
   // 長文カードも同じタイミングで描き直す（ログイン後の再描画でも進捗が揃うように）
   if(typeof renderReadingCards === 'function') renderReadingCards();
+  if(typeof applyReorderMode === 'function') applyReorderMode();
 }
 function filterHomeGrid(q) {
   const kw=q.trim().toLowerCase();
@@ -2237,6 +2276,7 @@ function refreshHomeCard(lv) {
   card.dataset.title=title.toLowerCase();
   const n=loadLevelWords(lv).length;
   card.querySelector('.level-count').textContent=n>0?n+' 語':'単語なし';
+  card.classList.toggle('is-empty', n===0);
   // best rank pill も更新
   const best=loadLevelBest(lv);
   const head=card.querySelector('.level-head');
@@ -2250,6 +2290,106 @@ function refreshHomeCard(lv) {
     head.appendChild(pill);
   }
 }
+
+// ══════════════════════════════════════════════
+//  並べ替えモード（ホームのカードをドラッグで入れ替える）
+//  スイッチONの間だけドラッグ可。並び順は settings に保存 → クラウドにも同期される。
+// ══════════════════════════════════════════════
+function applyReorderMode(){
+  const home = $('home-screen');
+  if(home) home.classList.toggle('reorder-on', reorderMode);
+  const sw = $('reorder-switch');   if(sw) sw.classList.toggle('on', reorderMode);
+  const cb = $('reorder-toggle');   if(cb) cb.checked = reorderMode;
+  const note = $('reorder-note');
+  if(note) note.textContent = reorderMode
+    ? 'カードをドラッグして並べ替えます（この間はクリックしても開きません）'
+    : 'ONにするとカードをドラッグして順番を入れ替えられます';
+  const rst = $('reorder-reset');   if(rst) rst.style.display = reorderMode ? '' : 'none';
+  const search = $('level-search');
+  if(search){
+    search.disabled = reorderMode;
+    if(reorderMode && search.value){ search.value=''; filterHomeGrid(''); }
+  }
+}
+
+function saveCardOrder(){
+  const levels = [...document.querySelectorAll('#home-level-grid .level-card')].map(c=>Number(c.dataset.lv));
+  const reads  = [...document.querySelectorAll('#reading-card-grid .reading-card')].map(c=>c.dataset.id);
+  saveSettings({ homeOrder: levels, readingOrder: reads });
+}
+
+// 一覧の要素をポインタ操作で並べ替える（マウス・タッチ共通）
+//   opts.axis   : 'x'=横並びのグリッド / 'y'=縦一列のリスト（入れ替え位置の判定に使う）
+//   opts.active : 並べ替えモード中かを返す関数
+//   opts.onDrop : 離した時に呼ばれる（並びの保存はここで行う）
+function makeGridSortable(gridId, itemSel, opts){
+  const grid = $(gridId);
+  if(!grid) return;
+  const axis   = (opts && opts.axis) || 'x';
+  const active = (opts && opts.active) || (()=>reorderMode);
+  const onDrop = (opts && opts.onDrop) || saveCardOrder;
+  let src = null, floatEl = null, dx = 0, dy = 0;
+
+  grid.addEventListener('pointerdown', e=>{
+    if(!active() || e.button === 2) return;
+    const card = e.target.closest(itemSel);
+    if(!card || !grid.contains(card)) return;
+    e.preventDefault();
+    src = card;
+    const r = card.getBoundingClientRect();
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    floatEl = card.cloneNode(true);
+    floatEl.classList.add('card-float');
+    floatEl.style.width  = r.width + 'px';
+    floatEl.style.height = r.height + 'px';
+    floatEl.style.left   = r.left + 'px';
+    floatEl.style.top    = r.top + 'px';
+    document.body.appendChild(floatEl);
+    card.classList.add('card-ghost');
+    try{ grid.setPointerCapture(e.pointerId); }catch(_){}
+  });
+
+  grid.addEventListener('pointermove', e=>{
+    if(!src || !floatEl) return;
+    floatEl.style.left = (e.clientX - dx) + 'px';
+    floatEl.style.top  = (e.clientY - dy) + 'px';
+    // 浮かせているカード自身を拾わないよう、判定の一瞬だけ隠す
+    floatEl.style.visibility = 'hidden';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    floatEl.style.visibility = '';
+    const target = under && under.closest(itemSel);
+    if(!target || target === src || !grid.contains(target)) return;
+    const r = target.getBoundingClientRect();
+    const after = axis === 'y'
+      ? (e.clientY - r.top)  > r.height / 2
+      : (e.clientX - r.left) > r.width / 2;
+    grid.insertBefore(src, after ? target.nextSibling : target);
+  });
+
+  const finish = e=>{
+    if(!src) return;
+    src.classList.remove('card-ghost');
+    if(floatEl) floatEl.remove();
+    floatEl = null; src = null;
+    try{ grid.releasePointerCapture(e.pointerId); }catch(_){}
+    onDrop();
+  };
+  grid.addEventListener('pointerup', finish);
+  grid.addEventListener('pointercancel', finish);
+}
+
+makeGridSortable('home-level-grid', '.level-card', {axis:'x'});
+makeGridSortable('reading-card-grid', '.reading-card', {axis:'x'});
+
+$('reorder-toggle').addEventListener('change', e=>{
+  reorderMode = e.target.checked;
+  applyReorderMode();
+});
+$('reorder-reset').addEventListener('click', ()=>{
+  saveSettings({ homeOrder: [], readingOrder: [] });
+  renderHomeScreen();
+  toast('並び順を最初の順番に戻しました','suc');
+});
 
 // ══════════════════════════════════════════════
 //  ENTER LEVEL
@@ -2267,6 +2407,7 @@ function enterLevel(lv) {
   const gb=$('game-badge');
   gb.className=`game-lv-badge lv${cycle}`;
   gb.textContent=`Lv.${lv}  ${title}`;
+  wordReorderMode=false;      // レベルを開き直したら並べ替えは解除
   switchTab('practice');
   const settings=loadSettings();        // グローバル（音声設定など）
   const lvs=loadLevelSettings(lv);      // レベル別（ソート・出題数・トグル）
@@ -2458,6 +2599,7 @@ function renderWordList() {
     const uid='tw'+i;
     const row=document.createElement('div');
     row.className='word-row';
+    row.dataset.idx=i;
     row.dataset.en=w.en||'';
     row.dataset.ja=w.ja||'';
     row.innerHTML=`
@@ -2470,6 +2612,7 @@ function renderWordList() {
       <span class="word-stats">${buildMiniStatHtml(m)}</span>
     `;
     row.addEventListener('click',()=>{
+      if(wordReorderMode) return;   // 並べ替え中はON/OFFを切り替えない
       const cb=$(uid); cb.checked=!cb.checked;
       if(cb.checked) enabled.add(i); else enabled.delete(i);
       saveLevelEnabled(currentLevel,enabled); updateStartBtn(); updateSelStats();
@@ -2481,6 +2624,7 @@ function renderWordList() {
     list.appendChild(row);
   });
   updatePresetCounts();
+  applyWordReorderMode();
   // 検索クエリを再適用
   const ws = $('word-search');
   if (ws && ws.value) {
@@ -2492,6 +2636,60 @@ function renderWordList() {
     });
   }
 }
+
+// ══════════════════════════════════════════════
+//  単語リストの並べ替えモード（練習設定タブ）
+//  ONの間だけドラッグ可。並びは words 配列そのものを書き換えて保存する。
+//  （記録は英単語をキーに持っているので、順番を変えても記録は消えない）
+// ══════════════════════════════════════════════
+function applyWordReorderMode(){
+  const list = $('word-list');
+  if(list) list.classList.toggle('reorder-on', wordReorderMode);
+  const sw = $('word-reorder-switch'); if(sw) sw.classList.toggle('on', wordReorderMode);
+  const cb = $('word-reorder-toggle'); if(cb) cb.checked = wordReorderMode;
+  const note = $('word-reorder-note');
+  if(note) note.textContent = wordReorderMode
+    ? 'ドラッグで並べ替えます（この間はON/OFFの切り替えと検索はできません）'
+    : 'ONにすると単語をドラッグして並び順（登録順）を入れ替えられます';
+  const ws = $('word-search');
+  if(ws){ ws.disabled = wordReorderMode; if(wordReorderMode) ws.value = ''; }
+  document.querySelectorAll('#sort-chips .filter-chip').forEach(b=>{
+    b.disabled = wordReorderMode;
+    b.style.opacity = wordReorderMode ? '0.4' : '';
+  });
+}
+
+// 画面に並んでいる順を words 配列に反映して保存する
+function commitWordOrder(){
+  const rows = [...document.querySelectorAll('#word-list .word-row')];
+  const order = rows.map(r=>Number(r.dataset.idx));
+  if(order.length !== words.length || order.some(i=>!(i>=0 && i<words.length))) return;
+  const newEnabled = new Set();
+  order.forEach((oldIdx,newIdx)=>{ if(enabled.has(oldIdx)) newEnabled.add(newIdx); });
+  words = order.map(i=>words[i]);
+  enabled = newEnabled;
+  saveLevelWords(currentLevel, words);
+  saveLevelEnabled(currentLevel, enabled);
+  renderWordList();               // data-idx を振り直す
+  refreshHomeCard(currentLevel);
+}
+
+makeGridSortable('word-list', '.word-row', {
+  axis:'y', active:()=>wordReorderMode, onDrop:commitWordOrder
+});
+
+$('word-reorder-toggle').addEventListener('change', e=>{
+  wordReorderMode = e.target.checked;
+  if(wordReorderMode && practiceSortMode !== 'default'){
+    // 並べ替えは「登録順」でしか意味がないので自動で戻す
+    practiceSortMode = 'default';
+    saveLevelSettings(currentLevel, { practiceSortMode });
+    document.querySelectorAll('#sort-chips .filter-chip').forEach(b=>
+      b.classList.toggle('on', (b.dataset.sort||'default')==='default'));
+    toast('並べ替えのため「登録順」に切り替えました','suc');
+  }
+  renderWordList();
+});
 
 function updateSelStats() {
   $('sel-count').textContent = enabled.size;
@@ -4462,6 +4660,91 @@ const READING_PASSAGES = [
       {term:"which(非制限用法)", desc:"関係代名詞whichが直前の文の内容全体を受けている", ids:['C5']},
       {term:"現在完了(継続)", desc:"have been busyで「ずっと忙しい状態が続いている」ことを表す", ids:['C7']},
     ]
+  },
+  {
+    id: 'dear-mr-president',
+    title: 'Dear Mr. President',
+    subtitle: '歌詞32行を上から順に通して打つ',
+    tag: 'LYRICS',
+    intro: 'Lv.1「Dear Mr president」と同じ英文を、歌詞の並び順のまま上から通して打ちます。',
+    docs: [
+      {
+        kind:'lyrics', tag:'Lyrics',
+        lines:[
+          {id:'D1', en:"Dear Mr. President", ja:"親愛なるミスター・プレジデントへ", heading:true},
+          {id:'D2', en:"Come take a walk with me.", ja:"一緒に散歩しませんか"},
+          {id:'D3', en:"Let's pretend we're just two people.", ja:"私たちがただの二人だと思ってください"},
+          {id:'D4', en:"And you're not better than me.", ja:"あなたが私より偉くはないと思って"},
+          {id:'D5', en:"I'd like to ask you some questions if we can speak honestly.", ja:"正直に話せるなら、いくつか質問してもいいですか"},
+          {id:'D6', en:"What do you feel when you see all the homeless on the street?", ja:"街で路上生活者を見るとき、何を感じますか", newPara:true},
+          {id:'D7', en:"Who do you pray for at night before you go to sleep?", ja:"夜、眠る前に誰のために祈りますか"},
+          {id:'D8', en:"What do you feel when you look in the mirror?", ja:"鏡を見るとき、何を感じますか"},
+          {id:'D9', en:"Are you proud?", ja:"あなたは誇らしいですか"},
+          {id:'D10', en:"How do you sleep while the rest of us cry?", ja:"残りの私たちが泣いている間、どうやって眠れますか", newPara:true},
+          {id:'D11', en:"How do you dream when a mother has no chance to say goodbye?", ja:"母親が別れを告げる機会もないとき、あなたはどうやって夢を見ますか"},
+          {id:'D12', en:"How do you walk with your head held high?", ja:"どうやって胸を張って歩けますか"},
+          {id:'D13', en:"Can you even look me in the eye?", ja:"私の目を見ることさえできますか"},
+          {id:'D14', en:"And tell me why?", ja:"なぜか、教えてくれますか"},
+          {id:'D15', en:"Were you a lonely boy?", ja:"あなたは孤独な少年でしたか", newPara:true},
+          {id:'D16', en:"Are you a lonely boy?", ja:"孤独な少年ですか"},
+          {id:'D17', en:"How can you say no child is left behind?", ja:"どの子も置いてきぼりにしないとどうして言えますか"},
+          {id:'D18', en:"We're not dumb and we're not blind.", ja:"私たちはバカじゃないし、目も見えています"},
+          {id:'D19', en:"They're all sitting in your cells while you pave the road to hell.", ja:"あなたが地獄への道を敷く中、彼らは牢獄に座っています"},
+          {id:'D20', en:"What kind of father would take his own daughter's rights away?", ja:"自分の娘の権利を奪うような父親とはどんな人ですか", newPara:true},
+          {id:'D21', en:"What kind of father might hate his own daughter if she were gay?", ja:"もし娘がゲイだったら憎むような父親とはどんな人ですか"},
+          {id:'D22', en:"I can only imagine what the first lady has to say.", ja:"ファーストレディが何を言うか、想像するしかありません"},
+          {id:'D23', en:"You've come a long way from whiskey and cocaine.", ja:"あなたはウイスキーとコカインから長い道のりを歩んできましたね"},
+          {id:'D24', en:"Let me tell you 'bout hard work.", ja:"大変な仕事について話させてください", newPara:true},
+          {id:'D25', en:"Building a bed out of a cardboard box.", ja:"段ボール箱でベッドを作ること"},
+          {id:'D26', en:"Hard work.", ja:"大変な仕事"},
+          {id:'D27', en:"You don't know nothing 'bout hard work.", ja:"あなたは大変な仕事について何も知らない"},
+          {id:'D28', en:"Minimum wage with a baby on the way.", ja:"最低賃金で赤ちゃんを育てようとしている"},
+          {id:'D29', en:"Rebuilding your house after the bombs took them away.", ja:"爆弾で家を失った後、家を再建すること"},
+          {id:'D30', en:"How do you sleep at night?", ja:"夜、どうやって眠れますか", newPara:true},
+          {id:'D31', en:"You'd never take a walk with me.", ja:"あなたは私と一緒に散歩しないでしょう"},
+          {id:'D32', en:"Would you?", ja:"そうでしょう?"},
+        ]
+      }
+    ],
+    vocab: [
+      {term:"take a walk", desc:"散歩する", ids:['D2','D31']},
+      {term:"pretend", desc:"〜のふりをする、〜だと思い込む", ids:['D3']},
+      {term:"speak honestly", desc:"正直に話す", ids:['D5']},
+      {term:"the homeless", desc:"住む家のない人たち(the+形容詞で「〜な人々」)", ids:['D6']},
+      {term:"pray for ~", desc:"〜のために祈る", ids:['D7']},
+      {term:"proud", desc:"誇らしい、得意な", ids:['D9']},
+      {term:"have no chance to do", desc:"〜する機会がまったくない", ids:['D11']},
+      {term:"with one's head held high", desc:"胸を張って、堂々と", ids:['D12']},
+      {term:"look ~ in the eye", desc:"〜の目をまっすぐ見る", ids:['D13']},
+      {term:"lonely", desc:"孤独な、さみしい", ids:['D15','D16']},
+      {term:"leave ~ behind", desc:"〜を置き去りにする", ids:['D17']},
+      {term:"dumb", desc:"物のわからない、頭の悪い(口語)", ids:['D18']},
+      {term:"cell", desc:"独房、監房", ids:['D19']},
+      {term:"pave the road to ~", desc:"〜への道を敷く、〜への道を作る", ids:['D19']},
+      {term:"take ~ away", desc:"〜を取り上げる、奪う", ids:['D20']},
+      {term:"the first lady", desc:"大統領夫人", ids:['D22']},
+      {term:"come a long way", desc:"ずいぶん遠くまで来た、大きく変わった", ids:['D23']},
+      {term:"'bout", desc:"about の語頭を落とした口語形", ids:['D24','D27']},
+      {term:"cardboard box", desc:"段ボール箱", ids:['D25']},
+      {term:"minimum wage", desc:"最低賃金", ids:['D28']},
+      {term:"on the way", desc:"(赤ちゃんが)生まれてくる予定で", ids:['D28']},
+    ],
+    grammar: [
+      {term:"Come take a walk", desc:"come and do の and が落ちた口語「〜しに来て」", ids:['D2']},
+      {term:"Let's pretend (that) ~", desc:"pretend の後ろの接続詞thatが省略されている", ids:['D3']},
+      {term:"I'd like to ~", desc:"would like to の短縮。want より丁寧な希望", ids:['D5']},
+      {term:"疑問詞 + do you ~ when …?", desc:"疑問文の骨組み＋whenの副詞節「…するとき」", ids:['D6','D8']},
+      {term:"while(〜する間ずっと)", desc:"接続詞while。ここは対比「〜な一方で」のニュアンス", ids:['D10','D19']},
+      {term:"the rest of us", desc:"「私たち残りの者」。restは残りの部分", ids:['D10']},
+      {term:"with + 名詞 + 過去分詞", desc:"付帯状況のwith。head held high で「頭を高く保ったまま」", ids:['D12']},
+      {term:"no + 名詞 + 受動態", desc:"no child is left behind「どの子も置き去りにされない」", ids:['D17']},
+      {term:"What kind of father would ~?", desc:"仮定法のwould「いったいどんな父親が〜するだろうか」", ids:['D20']},
+      {term:"if she were gay(仮定法過去)", desc:"現実と違う仮定はbe動詞をwereにする", ids:['D21']},
+      {term:"間接疑問(what … has to say)", desc:"imagine の目的語が「what+主語+動詞」の語順になる", ids:['D22']},
+      {term:"現在完了(結果)", desc:"You've come で「来て今ここにいる」状態を表す", ids:['D23']},
+      {term:"二重否定(口語)", desc:"don't know nothing は口語の強調。標準英語では anything", ids:['D27']},
+      {term:"would never ~", desc:"仮定法のwould「(実際には)決して〜しないだろう」", ids:['D31']},
+    ]
   }
 ];
 
@@ -4566,13 +4849,15 @@ function renderReadingCards(){
   const grid = $('reading-card-grid');
   if(!grid) return;
   grid.innerHTML = '';
-  READING_PASSAGES.forEach(p => {
+  const passages = applySavedOrder(READING_PASSAGES, loadSettings().readingOrder, p=>p.id);
+  passages.forEach(p => {
     const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
     const saved = rdSaved(p.id);
     const pct = saved && saved.total ? Math.round((saved.cursor / saved.total) * 100) : 0;
     const best = rdJson(rdBestKey(p.id));
     const card = document.createElement('div');
     card.className = 'reading-card' + (best ? ' has-best' : '');
+    card.dataset.id = p.id;
     const bestPill = best
       ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
     card.innerHTML = `
@@ -4584,7 +4869,7 @@ function renderReadingCards(){
         <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
         <span class="rc-meta">${best ? best.speed.toFixed(1)+' 打/秒' : pct+'%'}</span>
       </div>`;
-    card.addEventListener('click', ()=>enterReading(p.id));
+    card.addEventListener('click', ()=>{ if(!reorderMode) enterReading(p.id); });
     grid.appendChild(card);
   });
 }
