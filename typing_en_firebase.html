@@ -228,8 +228,11 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .reading-card:hover{transform:translateY(-3px);box-shadow:var(--sh2);border-color:var(--lv2-border);}
 .reading-card:hover::before{height:4px;}
 .reading-card:active{transform:translateY(-1px);box-shadow:var(--sh);}
+.reading-card .rc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .reading-card .rc-tag{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;letter-spacing:0.06em;
-  color:var(--lv2);background:var(--lv2-bg);border:1px solid var(--lv2-border);padding:2px 8px;border-radius:10px;align-self:flex-start;}
+  color:var(--lv2);background:var(--lv2-bg);border:1px solid var(--lv2-border);padding:2px 8px;border-radius:10px;}
+.reading-card .level-rank-pill{font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:800;
+  padding:2px 7px;border-radius:10px;letter-spacing:0.04em;white-space:nowrap;line-height:1.4;}
 .reading-card .rc-title{font-size:0.92rem;font-weight:700;line-height:1.4;}
 .reading-card .rc-sub{font-size:0.74rem;color:var(--sub);line-height:1.5;}
 .reading-card .rc-foot{display:flex;align-items:center;gap:10px;margin-top:2px;}
@@ -335,6 +338,10 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rd-item-desc{font-size:0.75rem;color:var(--sub);line-height:1.55;}
 #rd-grammar-panel .rd-item.active{background:var(--lv2-bg);border-left-color:var(--lv2);}
 #rd-vocab-panel .rd-item.active{background:var(--ok-bg);border-left-color:var(--ok);}
+.rd-item.speakable{cursor:pointer;}
+.rd-item.speakable:hover{background:var(--on-bg);}
+.rd-item.speakable:hover .rd-item-term{color:var(--on);}
+.rd-item.speaking{box-shadow:0 0 0 2px var(--on-soft) inset;}
 
 .rd-paper-col{position:relative;min-height:0;min-width:0;height:calc(100vh - 200px);}
 .rd-viewport{position:absolute;inset:0;overflow-y:auto;border-radius:var(--r);}
@@ -381,10 +388,64 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
   background:rgba(246,244,239,0.82);border-radius:var(--r);}
 .rd-finish[hidden]{display:none;}
 .rd-finish-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
-  padding:30px 38px;text-align:center;box-shadow:var(--sh3);}
-.rd-finish-title{font-size:1.25rem;font-weight:800;margin-bottom:14px;}
-.rd-finish-stats{font-family:'JetBrains Mono',monospace;font-size:0.86rem;color:var(--sub);line-height:2;margin-bottom:18px;}
-.rd-finish-stats b{color:var(--text);}
+  padding:24px 28px;box-shadow:var(--sh3);width:min(460px,90%);max-height:92%;overflow-y:auto;}
+.rd-finish-card.tier-ss{background:linear-gradient(135deg,#0d0d2b,#1a0a3a,#0a1a2a);border:2px solid #a855f7;color:#e9d5ff;}
+.rd-finish-card.tier-s{background:linear-gradient(135deg,#fdf6e3,#fff8e1);border-color:#e6d5a0;}
+.rd-finish-card.tier-a{background:var(--ok-bg);border-color:#b8dcc5;}
+.rd-finish-card.tier-b{background:var(--on-bg);border-color:#e8c4b3;}
+.rd-finish-card.tier-e{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#86efac;}
+.rd-fin-banner{display:none;font-size:0.82rem;font-weight:700;padding:8px 12px;border-radius:var(--r-sm);
+  margin-bottom:12px;text-align:center;background:var(--gold-bg);color:var(--gold);border:1px solid #e6d5a0;}
+.rd-fin-banner.show{display:block;}
+.rd-fin-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.09);}
+.rd-finish-card.tier-ss .rd-fin-head{border-bottom-color:rgba(255,255,255,0.15);}
+.rd-fin-emoji{font-size:1.8rem;flex-shrink:0;}
+.rd-fin-headmid{flex:1;min-width:0;display:flex;flex-direction:column;text-align:left;}
+.rd-finish-title{font-size:1.05rem;font-weight:800;line-height:1.3;}
+.rd-fin-sub{font-size:0.74rem;opacity:0.7;margin-top:2px;}
+.rd-fin-rank{font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:800;letter-spacing:0.08em;
+  padding:3px 12px;border-radius:20px;background:rgba(0,0,0,0.07);flex-shrink:0;}
+.rd-finish-card.tier-ss .rd-fin-rank{background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;}
+.rd-fin-speedrow{text-align:center;}
+.rd-fin-speed{font-family:'JetBrains Mono',monospace;font-size:2.4rem;font-weight:700;line-height:1;letter-spacing:-0.02em;}
+.rd-finish-card.tier-ss .rd-fin-speed{color:#f0abfc;text-shadow:0 0 20px #a855f7;}
+.rd-fin-unit{font-size:0.78rem;font-weight:600;margin-left:6px;opacity:0.75;}
+.rd-fin-delta{text-align:center;font-size:0.78rem;font-weight:700;margin-top:6px;opacity:0.85;}
+.rd-fin-comment{font-size:0.8rem;line-height:1.7;text-align:center;margin-top:10px;opacity:0.9;}
+.rd-fin-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:16px;}
+.rd-fin-cell{padding:10px 6px;background:rgba(0,0,0,0.035);border-radius:var(--r-sm);text-align:center;}
+.rd-finish-card.tier-ss .rd-fin-cell{background:rgba(255,255,255,0.08);}
+.rd-fin-l{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;opacity:0.65;margin-bottom:4px;font-weight:700;}
+.rd-fin-v{font-family:'JetBrains Mono',monospace;font-size:0.95rem;font-weight:700;}
+.rd-fin-v.ng{color:var(--ng);}
+.rd-finish-card.tier-ss .rd-fin-v.ng{color:#fca5a5;}
+.rd-fin-btns{display:flex;gap:8px;margin-top:18px;}
+.rd-fin-btns .btn-ghost{flex:1;}
+
+/* ── 文ごとの記録 ── */
+.rs-head{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:10px;
+  border-bottom:1px solid var(--border);font-size:0.64rem;font-weight:700;color:var(--muted);
+  letter-spacing:0.06em;text-transform:uppercase;}
+.rs-h-text{flex:1;min-width:0;}
+.rs-h-num{width:56px;text-align:right;flex-shrink:0;}
+.rs-list{max-height:60vh;overflow-y:auto;}
+.rs-list::-webkit-scrollbar{width:6px;}
+.rs-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+.rs-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:var(--r-sm);
+  border:1px solid transparent;transition:background 0.15s var(--ease);}
+.rs-row:hover{background:var(--surface-alt);border-color:var(--border);}
+.rs-en{flex:1;min-width:0;font-family:'JetBrains Mono',monospace;font-size:0.76rem;color:var(--text);
+  cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rs-en:hover{color:var(--on);text-decoration:underline;}
+.rs-en .rs-ja{font-family:'Noto Sans JP',sans-serif;font-size:0.68rem;color:var(--muted);margin-left:8px;}
+.rs-num{width:56px;text-align:right;flex-shrink:0;font-family:'JetBrains Mono',monospace;
+  font-size:0.72rem;font-weight:700;}
+.rs-num.fresh{color:var(--muted);font-weight:500;}
+.rs-num.fast{color:var(--ok);}
+.rs-num.slow{color:var(--ng);}
+.rs-num.miss-none{color:var(--muted);font-weight:500;}
+.rs-num.miss-some{color:var(--ng);}
+.rs-empty{text-align:center;padding:28px 0;font-size:0.82rem;color:var(--muted);}
 /* tab */
 .tabbar{display:flex;background:var(--surface-alt);padding:4px;border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-xs);gap:4px;}
 .tab{flex:1;padding:9px 0;text-align:center;font-size:0.83rem;font-weight:600;color:var(--sub);cursor:pointer;border:none;background:transparent;transition:all 0.2s var(--ease);border-radius:var(--r-sm);}
@@ -1257,6 +1318,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     <div class="rd-status">
       <span class="rd-mode-chip" id="rd-mode-chip">追いかけスクロール中</span>
       <span class="rd-progress-label" id="rd-progress-label">0%</span>
+      <button class="btn-ghost" id="rd-stats-btn">文ごとの記録</button>
       <button class="btn-ghost" id="rd-restart-btn">最初から</button>
     </div>
   </div>
@@ -1272,10 +1334,32 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
         <div class="rd-paper" id="rd-paper"></div>
       </div>
       <div class="rd-finish" id="rd-finish" hidden>
-        <div class="rd-finish-card">
-          <div class="rd-finish-title">読み切りました</div>
-          <div class="rd-finish-stats" id="rd-finish-stats"></div>
-          <button class="btn-primary" id="rd-finish-retry" style="width:auto;padding:10px 24px">もう一度やる</button>
+        <div class="rd-finish-card" id="rd-finish-card">
+          <div class="rd-fin-banner" id="rd-fin-best-banner"></div>
+          <div class="rd-fin-head">
+            <span class="rd-fin-emoji" id="rd-fin-emoji">🎉</span>
+            <span class="rd-fin-headmid">
+              <span class="rd-finish-title" id="rd-fin-title">読み切りました</span>
+              <span class="rd-fin-sub" id="rd-fin-sub"></span>
+            </span>
+            <span class="rd-fin-rank" id="rd-fin-rank"></span>
+          </div>
+          <div class="rd-fin-speedrow">
+            <span class="rd-fin-speed" id="rd-fin-speed">—</span>
+            <span class="rd-fin-unit">打 / 秒</span>
+          </div>
+          <div class="rd-fin-delta" id="rd-fin-delta"></div>
+          <div class="rd-fin-comment" id="rd-fin-comment"></div>
+          <div class="rd-fin-grid">
+            <div class="rd-fin-cell"><div class="rd-fin-l">所要時間</div><div class="rd-fin-v" id="rd-fin-time">—</div></div>
+            <div class="rd-fin-cell"><div class="rd-fin-l">総打鍵数</div><div class="rd-fin-v" id="rd-fin-keys">—</div></div>
+            <div class="rd-fin-cell"><div class="rd-fin-l">ミス打鍵</div><div class="rd-fin-v ng" id="rd-fin-miss">—</div></div>
+            <div class="rd-fin-cell"><div class="rd-fin-l">正確率</div><div class="rd-fin-v" id="rd-fin-acc">—</div></div>
+          </div>
+          <div class="rd-fin-btns">
+            <button class="btn-ghost" id="rd-fin-stats-btn">文ごとの記録</button>
+            <button class="btn-primary" id="rd-finish-retry" style="flex:2">もう一度やる</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1283,6 +1367,38 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="rd-panel-title">語句・表現</div>
       <div id="rd-vocab-list"></div>
     </aside>
+  </div>
+</div>
+
+<!-- READING STATS（文ごとの記録） -->
+<div id="rstats-screen" class="screen">
+  <div class="hrow">
+    <div>
+      <button class="back-link" id="rs-back-btn">← 長文に戻る</button>
+      <div class="page-title" style="margin-top:6px">文ごとの記録</div>
+      <div class="page-sub" id="rs-sub"></div>
+    </div>
+    <button class="btn-ghost" id="rs-reset-btn">この長文の記録を消す</button>
+  </div>
+  <div class="card">
+    <div class="filter-block">
+      <div class="filter-chips compact-chips" id="rs-sort-chips">
+        <button class="filter-chip on" data-rsort="doc">本文の順</button>
+        <button class="filter-chip" data-rsort="slow">遅い順</button>
+        <button class="filter-chip" data-rsort="miss">ミス多い順</button>
+        <button class="filter-chip" data-rsort="fresh">未挑戦を上に</button>
+      </div>
+    </div>
+    <div class="sel-stats" id="rs-summary" style="margin-top:4px"></div>
+    <div class="rs-head">
+      <span class="rs-h-text">英文（クリックで読み上げ）</span>
+      <span class="rs-h-num">最速</span>
+      <span class="rs-h-num">前回</span>
+      <span class="rs-h-num">時間</span>
+      <span class="rs-h-num">ミス</span>
+      <span class="rs-h-num">回数</span>
+    </div>
+    <div class="rs-list" id="rs-list"></div>
   </div>
 </div>
 
@@ -2042,11 +2158,11 @@ function hideImeHint() {
 // ══════════════════════════════════════════════
 const $ = id => document.getElementById(id);
 const homeScr=$('home-screen'),setupScr=$('setup-screen'),gameScr=$('game-screen'),resScr=$('result-screen');
-const readingScr=$('reading-screen');
+const readingScr=$('reading-screen'), rstatsScr=$('rstats-screen');
 const inp=$('inp');
 
 function showScreen(id) {
-  [homeScr,setupScr,gameScr,resScr,readingScr].forEach(s=>s.classList.remove('active'));
+  [homeScr,setupScr,gameScr,resScr,readingScr,rstatsScr].forEach(s=>s.classList.remove('active'));
   $(id+'-screen').classList.add('active');
   if(id!=='game') disableCursorHide();
 }
@@ -2056,6 +2172,7 @@ function currentScreen() {
   if(gameScr.classList.contains('active')) return 'game';
   if(resScr.classList.contains('active')) return 'result';
   if(readingScr.classList.contains('active')) return 'reading';
+  if(rstatsScr.classList.contains('active')) return 'rstats';
   return '';
 }
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -4349,7 +4466,10 @@ const READING_PASSAGES = [
 ];
 
 const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"()]/;
-const rdKey = id => 'typing-en-v2-reading-' + id;
+const rdKey      = id => 'typing-en-v2-reading-' + id;        // 途中経過
+const rdStatsKey = id => 'typing-en-v2-reading-stats-' + id;  // 文ごとの記録
+const rdBestKey  = id => 'typing-en-v2-reading-best-' + id;   // 自己ベスト
+const rdLastKey  = id => 'typing-en-v2-reading-last-' + id;   // 前回スコア
 
 let rdPassage = null;      // 現在の長文
 let rdChars = [];          // {el, expected}
@@ -4358,9 +4478,41 @@ let rdCursor = 0;
 let rdLocked = false;      // 最終ページに達して自動スクロールを止めた状態
 let rdCorrect = 0, rdMiss = 0, rdStart = null;
 let rdLastSeg = null, rdPersistTimer = null;
+let rdSegStart = null, rdSegMiss = 0, rdSegKeys = 0;  // いま打っている文の計測用
 
-function rdSaved(id){
-  try{ return JSON.parse(localStorage.getItem(rdKey(id)) || 'null'); }catch(e){ return null; }
+function rdJson(key){
+  try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null; }
+}
+function rdSaved(id){ return rdJson(rdKey(id)); }
+function rdStats(id){ return rdJson(rdStatsKey(id)) || {}; }
+
+// 秒数を「N分N秒」に（1分未満は「N秒」）
+function rdFmtTime(sec){
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}分${s % 60}秒` : `${s}秒`;
+}
+// 見出しから英語だけ取り出す（~ や + は「〜にあたる語」の目印なので読ませない）
+function rdEnglishOf(text){
+  return String(text)
+    .replace(/[^\x20-\x7E]/g, ' ')   // 日本語など非ASCIIを落とす
+    .replace(/[~+*]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,.;:!?'"()\-]+|[\s,.;:!?'"()\-]+$/g, '')
+    .trim();
+}
+// パネル・記録の英語部分だけを読み上げる（本体の読み上げ設定に関係なく鳴らす）
+function rdSpeak(text){
+  const en = rdEnglishOf(text);
+  if(!en || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(en);
+  u.lang = 'en-US';
+  u.rate = (typeof voiceRate === 'number' ? voiceRate : 1.0);
+  const v = (typeof enVoices !== 'undefined' && enVoices.length)
+    ? (enVoices.find(x => x.name === selectedVoiceName) || enVoices[0]) : null;
+  if(v) u.voice = v;
+  window.speechSynthesis.speak(u);
 }
 
 // ── ホームの長文カード ──
@@ -4372,16 +4524,19 @@ function renderReadingCards(){
     const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
     const saved = rdSaved(p.id);
     const pct = saved && saved.total ? Math.round((saved.cursor / saved.total) * 100) : 0;
+    const best = rdJson(rdBestKey(p.id));
     const card = document.createElement('div');
-    card.className = 'reading-card';
+    card.className = 'reading-card' + (best ? ' has-best' : '');
+    const bestPill = best
+      ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
     card.innerHTML = `
-      <span class="rc-tag">${escHtml(p.tag)}</span>
+      <div class="rc-head"><span class="rc-tag">${escHtml(p.tag)}</span>${bestPill}</div>
       <div class="rc-title">${escHtml(p.title)}</div>
       <div class="rc-sub">${escHtml(p.subtitle)}</div>
       <div class="rc-foot">
         <span class="rc-meta">${total.toLocaleString()} 字</span>
         <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
-        <span class="rc-meta">${pct}%</span>
+        <span class="rc-meta">${best ? best.speed.toFixed(1)+' 打/秒' : pct+'%'}</span>
       </div>`;
     card.addEventListener('click', ()=>enterReading(p.id));
     grid.appendChild(card);
@@ -4419,6 +4574,7 @@ function rdBuildPaper(){
   rdChars = []; rdSegs = [];
   rdCursor = 0; rdCorrect = 0; rdMiss = 0; rdStart = null;
   rdLocked = false; rdLastSeg = null;
+  rdSegStart = null; rdSegMiss = 0; rdSegKeys = 0;
   $('rd-mode-chip').textContent = '追いかけスクロール中';
   $('rd-mode-chip').classList.remove('locked');
   $('rd-finish').hidden = true;
@@ -4505,6 +4661,17 @@ function rdRenderPanels(){
       d.className = 'rd-item';
       d.dataset.ids = it.ids.join(',');
       d.innerHTML = `<div class="rd-item-term">${escHtml(it.term)}</div><div class="rd-item-desc">${escHtml(it.desc)}</div>`;
+      // クリックで英語部分だけ読み上げ（英語が無い見出しは読み上げない）
+      const en = rdEnglishOf(it.term);
+      if(en){
+        d.classList.add('speakable');
+        d.title = 'クリックで読み上げ';
+        d.addEventListener('click', ()=>{
+          rdSpeak(it.term);
+          d.classList.add('speaking');
+          setTimeout(()=>d.classList.remove('speaking'), 600);
+        });
+      }
       el.appendChild(d);
     });
   };
@@ -4582,14 +4749,66 @@ function rdRestore(){
   });
   rdCursor = d.cursor||0; rdCorrect = d.correct||0; rdMiss = d.miss||0;
 }
+// ── 1文打ち終わったときに記録する ──
+function rdCommitSeg(segId){
+  if(rdSegStart === null || rdSegKeys === 0){ rdSegStart = null; rdSegMiss = 0; rdSegKeys = 0; return; }
+  const sec = (Date.now() - rdSegStart) / 1000;
+  const cps = sec > 0 ? rdSegKeys / sec : 0;
+  const all = rdStats(rdPassage.id);
+  const p = all[segId] || {count:0, bestCps:0, lastCps:0, lastSec:0, miss:0};
+  p.count++;
+  p.lastCps = +cps.toFixed(2);
+  p.lastSec = +sec.toFixed(1);
+  p.miss    = rdSegMiss;
+  if(cps > p.bestCps) p.bestCps = +cps.toFixed(2);
+  all[segId] = p;
+  localStorage.setItem(rdStatsKey(rdPassage.id), JSON.stringify(all));
+  rdSegStart = null; rdSegMiss = 0; rdSegKeys = 0;
+}
+
 function rdFinish(){
   rdLock();
-  const min = Math.max((Date.now() - rdStart)/60000, 0.05);
-  const wpm = Math.round((rdCorrect/5)/min);
-  const tot = rdCorrect + rdMiss;
-  const acc = tot ? Math.round((rdCorrect/tot)*100) : 100;
-  $('rd-finish-stats').innerHTML =
-    `所要時間 <b>${Math.round(min*60)}秒</b><br>WPM <b>${wpm}</b><br>正確率 <b>${acc}%</b>`;
+  const sec  = Math.max((Date.now() - rdStart)/1000, 0.1);
+  const keys = rdCorrect + rdMiss;
+  const cps  = rdCorrect / sec;                 // 秒あたり何打（既存の単語練習と同じ指標）
+  const acc  = keys ? Math.round((rdCorrect/keys)*100) : 100;
+  const tier = getSpeedTier(cps);
+
+  const last = rdJson(rdLastKey(rdPassage.id));
+  const best = rdJson(rdBestKey(rdPassage.id));
+  const now  = {speed:+cps.toFixed(2), rank:tier.rank, tier:tier.tier, acc, sec:Math.round(sec), date:Date.now()};
+  const isBest = !best || now.speed > best.speed;
+
+  const card = $('rd-finish-card');
+  card.className = 'rd-finish-card tier-' + tier.tier;
+  $('rd-fin-emoji').textContent = tier.emoji;
+  $('rd-fin-title').textContent = tier.title;
+  $('rd-fin-sub').textContent   = `${rdPassage.title}・正確率 ${acc}%`;
+  $('rd-fin-rank').textContent  = tier.rank;
+  $('rd-fin-speed').textContent = cps.toFixed(1);
+  $('rd-fin-comment').innerHTML = tier.comment.replace(/\n/g,'<br>');
+  $('rd-fin-time').textContent  = rdFmtTime(sec);
+  $('rd-fin-keys').textContent  = keys.toLocaleString();
+  $('rd-fin-miss').textContent  = rdMiss.toLocaleString();
+  $('rd-fin-acc').textContent   = acc + '%';
+
+  const dl = $('rd-fin-delta');
+  if(last){
+    const d = +(now.speed - last.speed).toFixed(1);
+    dl.textContent = d > 0 ? `前回より +${d.toFixed(1)} 打/秒 ↑`
+                   : d < 0 ? `前回より ${d.toFixed(1)} 打/秒`
+                           : '前回と同じペース';
+  } else dl.textContent = '初めての記録';
+
+  const bb = $('rd-fin-best-banner');
+  if(isBest && last){
+    bb.textContent = `自己ベスト更新！ ${now.speed.toFixed(1)} 打/秒`;
+    bb.classList.add('show');
+  } else bb.classList.remove('show');
+
+  localStorage.setItem(rdLastKey(rdPassage.id), JSON.stringify(now));
+  if(isBest) localStorage.setItem(rdBestKey(rdPassage.id), JSON.stringify(now));
+
   $('rd-finish').hidden = false;
   renderReadingCards();
 }
@@ -4625,20 +4844,105 @@ function rdHandleKey(e){
   e.preventDefault();
   if(!rdStart) rdStart = Date.now();
 
+  const seg = rdCurrentSeg();
+  if(rdSegStart === null) rdSegStart = Date.now();   // その文の最初の打鍵から計測
+
   const ok = e.key === 'Enter' ? true : e.key.toLowerCase() === c.expected.toLowerCase();
   if(ok){ c.el.classList.add('correct'); rdCorrect++; }
-  else { c.el.classList.add('incorrect'); rdMiss++; }
+  else { c.el.classList.add('incorrect'); rdMiss++; rdSegMiss++; }
+  rdSegKeys++;
   rdCursor++;
+
+  if(seg && rdCursor > seg.end) rdCommitSeg(seg.id);   // その文を打ち終わった
 
   rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(); rdFollowCaret(); rdPersist();
   if(rdCursor >= rdChars.length) rdFinish();
 }
 
+// ── 文ごとの記録（管理画面） ──
+let rsSort = 'doc';
+function renderReadingStats(){
+  if(!rdPassage) return;
+  const stats = rdStats(rdPassage.id);
+  const lines = [];
+  rdPassage.docs.forEach(d => d.lines.forEach(l => lines.push(l)));
+
+  $('rs-sub').textContent = rdPassage.title;
+
+  const done = lines.filter(l => stats[l.id] && stats[l.id].count > 0);
+  const best = rdJson(rdBestKey(rdPassage.id));
+  const sum = $('rs-summary');
+  if(done.length){
+    const avg = done.reduce((a,l)=>a+stats[l.id].bestCps,0)/done.length;
+    const slowest = done.reduce((a,l)=> stats[l.id].bestCps < stats[a.id].bestCps ? l : a, done[0]);
+    sum.innerHTML = `挑戦済み <b>${done.length}</b> / <b>${lines.length}</b> 文　`+
+      `平均(最速) <b>${avg.toFixed(1)}</b> 打/秒　`+
+      `一番遅い文 <b>${stats[slowest.id].bestCps.toFixed(1)}</b> 打/秒` +
+      (best ? `　通し自己ベスト <b>${best.speed.toFixed(1)}</b> 打/秒` : '');
+  } else {
+    sum.innerHTML = `まだ記録がありません（全 <b>${lines.length}</b> 文）`;
+  }
+
+  const rows = lines.slice();
+  const cpsOf = l => (stats[l.id] && stats[l.id].count) ? stats[l.id].bestCps : -1;
+  if(rsSort === 'slow')       rows.sort((a,b)=>{const x=cpsOf(a),y=cpsOf(b); if(x<0)return 1; if(y<0)return -1; return x-y;});
+  else if(rsSort === 'miss')  rows.sort((a,b)=>((stats[b.id]&&stats[b.id].miss)||0)-((stats[a.id]&&stats[a.id].miss)||0));
+  else if(rsSort === 'fresh') rows.sort((a,b)=>(cpsOf(a)<0?0:1)-(cpsOf(b)<0?0:1));
+
+  const list = $('rs-list');
+  list.innerHTML = '';
+  if(!lines.length){ list.innerHTML = '<div class="rs-empty">文がありません</div>'; return; }
+  rows.forEach(l => {
+    const s = stats[l.id];
+    const has = s && s.count > 0;
+    const row = document.createElement('div');
+    row.className = 'rs-row';
+    const speedCls = !has ? 'fresh' : (s.bestCps >= 4 ? 'fast' : s.bestCps < 2 ? 'slow' : '');
+    row.innerHTML = `
+      <span class="rs-en" title="クリックで読み上げ">${escHtml(l.en)}<span class="rs-ja">${escHtml(l.ja)}</span></span>
+      <span class="rs-num ${speedCls}">${has ? s.bestCps.toFixed(1) : '—'}</span>
+      <span class="rs-num ${has?'':'fresh'}">${has ? s.lastCps.toFixed(1) : '—'}</span>
+      <span class="rs-num ${has?'':'fresh'}">${has ? s.lastSec.toFixed(1)+'s' : '—'}</span>
+      <span class="rs-num ${!has?'fresh':(s.miss?'miss-some':'miss-none')}">${has ? s.miss : '—'}</span>
+      <span class="rs-num ${has?'':'fresh'}">${has ? s.count : '—'}</span>`;
+    row.querySelector('.rs-en').addEventListener('click', ()=>rdSpeak(l.en));
+    list.appendChild(row);
+  });
+}
+$('rs-sort-chips').addEventListener('click', e=>{
+  const chip = e.target.closest('.filter-chip'); if(!chip) return;
+  rsSort = chip.dataset.rsort;
+  [...$('rs-sort-chips').children].forEach(c=>c.classList.toggle('on', c===chip));
+  renderReadingStats();
+});
+$('rs-back-btn').addEventListener('click', ()=>showScreen('reading'));
+$('rs-reset-btn').addEventListener('click', async ()=>{
+  if(!rdPassage) return;
+  const ok = await customConfirm({
+    title:'この長文の記録を消す',
+    desc:'文ごとのタイム・ミス・回数と、自己ベストを消します。\n本文の途中経過は残ります。',
+    okText:'消す', danger:true
+  });
+  if(!ok) return;
+  localStorage.removeItem(rdStatsKey(rdPassage.id));
+  localStorage.removeItem(rdBestKey(rdPassage.id));
+  localStorage.removeItem(rdLastKey(rdPassage.id));
+  renderReadingStats(); renderReadingCards();
+  toast('記録を消しました','suc');
+});
+
 $('rd-back-btn').addEventListener('click', ()=>{ renderReadingCards(); showScreen('home'); });
 $('rd-restart-btn').addEventListener('click', rdRestart);
 $('rd-finish-retry').addEventListener('click', rdRestart);
+$('rd-fin-stats-btn').addEventListener('click', ()=>{ renderReadingStats(); showScreen('rstats'); });
+$('rd-stats-btn').addEventListener('click', ()=>{ renderReadingStats(); showScreen('rstats'); });
 document.addEventListener('keydown', e=>{
-  if(currentScreen() !== 'reading') return;
+  const scr = currentScreen();
+  if(scr === 'rstats'){
+    if(e.key === 'Escape'){ e.preventDefault(); showScreen('reading'); }
+    return;
+  }
+  if(scr !== 'reading') return;
   if(e.key === 'Escape'){ e.preventDefault(); renderReadingCards(); showScreen('home'); return; }
   rdHandleKey(e);
 });
