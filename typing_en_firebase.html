@@ -288,6 +288,33 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 #home-screen.reorder-on .level-card:hover,#home-screen.reorder-on .reading-card:hover{transform:none;border-color:var(--on-soft);}
 #home-screen.reorder-on .level-card::after,#home-screen.reorder-on .reading-card::after{
   content:'⠿';position:absolute;top:6px;right:8px;font-size:0.72rem;color:var(--muted);line-height:1;}
+/* ── アーカイブモード（チェックを付けて一括で移す／戻す）── */
+.card-check{display:none;position:absolute;top:6px;right:7px;width:17px;height:17px;border-radius:5px;
+  border:1.5px solid var(--border2);background:var(--surface);z-index:2;}
+.card-check::after{content:'✓';display:none;color:#fff;font-size:0.72rem;font-weight:800;line-height:14px;text-align:center;}
+#home-screen.archive-on .card-check{display:block;}
+#home-screen.archive-on .level-card,#home-screen.archive-on .reading-card{cursor:pointer;}
+#home-screen.archive-on .level-card:hover,#home-screen.archive-on .reading-card:hover{transform:none;border-color:var(--on-soft);}
+/* チェックの位置とぶつかるランク表示は選択中だけ隠す */
+#home-screen.archive-on .level-rank-pill{display:none;}
+#home-screen.archive-on .level-card.sel,#home-screen.archive-on .reading-card.sel{border-color:var(--on);background:var(--on-bg);}
+.sel > .card-check{background:var(--on);border-color:var(--on);}
+.sel > .card-check::after{display:block;}
+.archive-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-radius:var(--r-sm);
+  background:var(--on-bg);border:1px solid var(--on-soft);}
+.archive-bar-info{flex:1;min-width:180px;font-size:0.76rem;font-weight:700;color:var(--on);}
+.btn-archive{font-family:inherit;font-size:0.75rem;font-weight:700;padding:6px 14px;border-radius:14px;
+  border:1px solid var(--on);background:var(--on);color:#fff;cursor:pointer;transition:all 0.16s var(--ease);}
+.btn-archive:hover:not(:disabled){background:var(--on-hover);border-color:var(--on-hover);}
+.btn-archive.restore{background:var(--surface);color:var(--on);}
+.btn-archive.restore:hover:not(:disabled){background:var(--surface-alt);}
+.btn-archive:disabled{opacity:0.35;cursor:default;}
+.archive-head{cursor:pointer;user-select:none;}
+.archive-count{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);}
+.archive-caret{font-size:0.7rem;font-weight:700;color:var(--sub);border:1px solid var(--border);
+  border-radius:12px;padding:2px 10px;background:var(--surface);}
+#archive-level-grid .level-card,#archive-reading-grid .reading-card{opacity:0.7;}
+#archive-level-grid .level-card:hover,#archive-reading-grid .reading-card:hover{opacity:1;}
 .card-ghost{opacity:0.3;border-style:dashed!important;border-color:var(--on-soft)!important;box-shadow:none!important;}
 .card-float{position:fixed;z-index:9999;pointer-events:none;margin:0;
   box-shadow:var(--sh3)!important;border-color:var(--on-soft)!important;transform:rotate(-1.2deg);opacity:0.97;}
@@ -1064,10 +1091,24 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </span>
       並べ替え
     </label>
+    <label class="reorder-switch" id="archive-switch">
+      <span class="toggle">
+        <input type="checkbox" id="archive-toggle">
+        <span class="toggle-track"></span><span class="toggle-thumb"></span>
+      </span>
+      アーカイブ
+    </label>
     <span class="reorder-note" id="reorder-note">ONにするとカードをドラッグして順番を入れ替えられます</span>
     <button type="button" class="reorder-reset" id="reorder-reset" style="display:none">並び順をリセット</button>
   </div>
-  <div class="home-section">
+  <div class="archive-bar" id="archive-bar" style="display:none">
+    <span class="archive-bar-info" id="archive-bar-info">カードをクリックして選びます（複数可）</span>
+    <button type="button" class="reorder-reset" id="archive-select-empty">単語なしを全選択</button>
+    <button type="button" class="reorder-reset" id="archive-select-clear">選択解除</button>
+    <button type="button" class="btn-archive" id="archive-move-btn" disabled>アーカイブに移す</button>
+    <button type="button" class="btn-archive restore" id="archive-restore-btn" disabled>一覧に戻す</button>
+  </div>
+  <div class="home-section" id="reading-section">
     <div class="home-section-head">
       <span class="home-section-title">長文リーディング</span>
       <span class="home-section-note">問題文の書式のまま、英文を上から通して打つ練習</span>
@@ -1085,6 +1126,18 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div id="home-no-result" class="empty-state">
         該当するレベルが見つかりません
       </div>
+    </div>
+  </div>
+
+  <div class="home-section" id="archive-section" style="display:none">
+    <div class="home-section-head archive-head" id="archive-head">
+      <span class="home-section-title">アーカイブ <span class="archive-count" id="archive-count">0</span></span>
+      <span class="home-section-note">普段使わないカードの置き場。アーカイブをONにして選び「一覧に戻す」で戻せます</span>
+      <span class="archive-caret" id="archive-caret">開く</span>
+    </div>
+    <div id="archive-body" hidden>
+      <div class="reading-grid" id="archive-reading-grid" style="margin-bottom:10px"></div>
+      <div class="level-grid" id="archive-level-grid"></div>
     </div>
   </div>
 
@@ -2129,6 +2182,9 @@ let currentLevel=null, words=[], enabled=new Set(), totalRounds=20;
 let skipParens=true;          // カッコ ( ) は打たずに飛ばす（既定ON）
 let currentTarget='';         // いま打っている英文（カッコを外した判定用。記録キーは元のen）
 let reorderMode=false;        // ホームのカード並べ替えモード
+let archiveMode=false;        // ホームのアーカイブ選択モード
+let archiveOpen=false;        // アーカイブ置き場を開いているか
+const archiveSel = new Set(); // 選択中のカード（'lv:3' / 'rd:passage-id'）
 let wordReorderMode=false;    // 単語リストの並べ替えモード
 let queue=[],curIdx=0,misses=0,clears=0,t0=0,pausedElapsed=0;
 let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
@@ -2288,7 +2344,9 @@ function applySavedOrder(items, savedOrder, keyOf){
 
 function renderHomeScreen() {
   const grid=$('home-level-grid');
-  grid.innerHTML='';
+  const arcGrid=$('archive-level-grid');
+  grid.innerHTML=''; if(arcGrid) arcGrid.innerHTML='';
+  const archived = loadArchivedLevels();
   const order = loadSettings().homeOrder;
   const levels = applySavedOrder(
     Array.from({length:NUM_LEVELS},(_,i)=>i+1), order, lv=>lv);
@@ -2312,24 +2370,32 @@ function renderHomeScreen() {
         ${lvs.addedAt ? statCell('追加', fmtShortDate(lvs.addedAt)) : ''}` : '';
     card.innerHTML=`
       ${rankPill}
+      <span class="card-check"></span>
       <div class="level-title">${escHtml(title)}</div>
       <div class="level-stats">
         <span class="lv-stat lv-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</span>${stats}
       </div>`;
-    card.addEventListener('click',()=>{ if(!reorderMode) enterLevel(lv); });
-    grid.appendChild(card);
+    card.dataset.empty = wlist.length ? '0' : '1';
+    card.addEventListener('click',()=>{
+      if(reorderMode) return;
+      if(archiveMode){ toggleArchiveSel(card); return; }
+      enterLevel(lv);
+    });
+    (archived.has(lv) && arcGrid ? arcGrid : grid).appendChild(card);
   });
   // 長文カードも同じタイミングで描き直す（ログイン後の再描画でも進捗が揃うように）
   if(typeof renderReadingCards === 'function') renderReadingCards();
   if(typeof applyReorderMode === 'function') applyReorderMode();
+  if(typeof applyArchiveMode === 'function') applyArchiveMode();
 }
 function filterHomeGrid(q) {
   const kw=q.trim().toLowerCase();
   let found=0;
-  document.querySelectorAll('#home-level-grid .level-card').forEach(card=>{
+  // アーカイブ置き場のカードも同じ条件で絞り込む（探し物がそちらにある場合のため）
+  document.querySelectorAll('#home-level-grid .level-card, #archive-level-grid .level-card').forEach(card=>{
     const match=!kw||card.dataset.title.includes(kw)||card.dataset.lv.includes(kw);
     card.style.display=match?'':'none';
-    if(match) found++;
+    if(match && card.closest('#home-level-grid')) found++;
   });
   $('home-no-result').style.display=found===0?'block':'none';
 }
@@ -2380,7 +2446,91 @@ function applyReorderMode(){
 function saveCardOrder(){
   const levels = [...document.querySelectorAll('#home-level-grid .level-card')].map(c=>Number(c.dataset.lv));
   const reads  = [...document.querySelectorAll('#reading-card-grid .reading-card')].map(c=>c.dataset.id);
-  saveSettings({ homeOrder: levels, readingOrder: reads });
+  // アーカイブ中のカードも並び順に残す（戻した時に元の位置へ帰るように）
+  const arcL   = [...document.querySelectorAll('#archive-level-grid .level-card')].map(c=>Number(c.dataset.lv));
+  const arcR   = [...document.querySelectorAll('#archive-reading-grid .reading-card')].map(c=>c.dataset.id);
+  saveSettings({ homeOrder: levels.concat(arcL), readingOrder: reads.concat(arcR) });
+}
+
+// ══════════════════════════════════════════════
+//  アーカイブ（増えすぎたカードを別置き場へ移す）
+//   スイッチONの間だけカードにチェックが出て、選んだ分を一括で移す／戻す。
+//   移した先は「アーカイブ」セクション。記録は消さず、表示場所が変わるだけ。
+// ══════════════════════════════════════════════
+function loadArchivedLevels(){
+  const a = loadSettings().archivedLevels;
+  return new Set(Array.isArray(a) ? a.map(Number) : []);
+}
+function loadArchivedReadings(){
+  const a = loadSettings().archivedReadings;
+  return new Set(Array.isArray(a) ? a.map(String) : []);
+}
+function arcKeyOf(card){
+  return card.dataset.lv !== undefined ? 'lv:'+card.dataset.lv : 'rd:'+card.dataset.id;
+}
+function allHomeCards(){
+  return document.querySelectorAll('#home-level-grid .level-card, #reading-card-grid .reading-card, #archive-level-grid .level-card, #archive-reading-grid .reading-card');
+}
+function toggleArchiveSel(card){
+  const k = arcKeyOf(card);
+  if(archiveSel.has(k)) archiveSel.delete(k); else archiveSel.add(k);
+  card.classList.toggle('sel', archiveSel.has(k));
+  updateArchiveBar();
+}
+function syncArchiveSelUI(){
+  allHomeCards().forEach(c => c.classList.toggle('sel', archiveMode && archiveSel.has(arcKeyOf(c))));
+}
+function updateArchiveBar(){
+  const n = archiveSel.size;
+  const info = $('archive-bar-info');
+  if(info) info.textContent = n ? `${n}件を選択中` : 'カードをクリックして選びます（複数可）';
+  const mv = $('archive-move-btn');    if(mv) mv.disabled = !n;
+  const rs = $('archive-restore-btn'); if(rs) rs.disabled = !n;
+}
+function updateArchiveSection(){
+  const sec = $('archive-section');
+  if(!sec) return;
+  const n = document.querySelectorAll('#archive-level-grid .level-card, #archive-reading-grid .reading-card').length;
+  $('archive-count').textContent = n + '件';
+  sec.style.display = (n > 0 || archiveMode) ? '' : 'none';
+  if(archiveMode) archiveOpen = true;          // 選択中は中身が見えないと戻せない
+  $('archive-body').hidden = !archiveOpen;
+  $('archive-caret').textContent = archiveOpen ? '閉じる' : '開く';
+}
+function applyArchiveMode(){
+  const home = $('home-screen');
+  if(home) home.classList.toggle('archive-on', archiveMode);
+  const sw = $('archive-switch'); if(sw) sw.classList.toggle('on', archiveMode);
+  const cb = $('archive-toggle'); if(cb) cb.checked = archiveMode;
+  const bar = $('archive-bar');   if(bar) bar.style.display = archiveMode ? '' : 'none';
+  const note = $('reorder-note');
+  if(note && archiveMode){
+    note.textContent = 'カードをクリックして選び、下のボタンでアーカイブに移す／一覧に戻すができます';
+  }
+  syncArchiveSelUI();
+  updateArchiveBar();
+  updateArchiveSection();
+}
+// toArchive: true=アーカイブへ移す / false=一覧に戻す
+function applyArchiveChange(toArchive){
+  if(!archiveSel.size) return;
+  const lv = loadArchivedLevels(), rd = loadArchivedReadings();
+  let n = 0;
+  archiveSel.forEach(k => {
+    const kind = k.slice(0,2), val = k.slice(3);
+    if(kind === 'lv'){
+      if(toArchive){ if(!lv.has(+val)){ lv.add(+val); n++; } }
+      else if(lv.delete(+val)) n++;
+    } else {
+      if(toArchive){ if(!rd.has(val)){ rd.add(val); n++; } }
+      else if(rd.delete(val)) n++;
+    }
+  });
+  saveSettings({ archivedLevels:[...lv], archivedReadings:[...rd] });
+  archiveSel.clear();
+  renderHomeScreen();
+  if(!n) toast(toArchive ? 'すでにアーカイブにあります' : 'すでに一覧にあります','err');
+  else toast(toArchive ? `${n}件をアーカイブに移しました` : `${n}件を一覧に戻しました`,'suc');
 }
 
 // 一覧の要素をポインタ操作で並べ替える（マウス・タッチ共通）
@@ -2448,7 +2598,35 @@ makeGridSortable('reading-card-grid', '.reading-card', {axis:'x'});
 
 $('reorder-toggle').addEventListener('change', e=>{
   reorderMode = e.target.checked;
+  if(reorderMode && archiveMode){ archiveMode = false; archiveSel.clear(); applyArchiveMode(); }
   applyReorderMode();
+});
+
+// ── アーカイブのスイッチと一括操作 ──
+$('archive-toggle').addEventListener('change', e=>{
+  archiveMode = e.target.checked;
+  if(archiveMode && reorderMode){ reorderMode = false; applyReorderMode(); }
+  archiveSel.clear();
+  if(!archiveMode) archiveOpen = false;      // 抜けたらアーカイブ置き場は畳む
+  applyArchiveMode();
+  if(!archiveMode) applyReorderMode();       // 説明文を元に戻す
+});
+$('archive-move-btn').addEventListener('click', ()=>applyArchiveChange(true));
+$('archive-restore-btn').addEventListener('click', ()=>applyArchiveChange(false));
+$('archive-select-clear').addEventListener('click', ()=>{
+  archiveSel.clear(); syncArchiveSelUI(); updateArchiveBar();
+});
+// 単語を1つも登録していないレベルは、まとめて片付けたいことが多い
+$('archive-select-empty').addEventListener('click', ()=>{
+  const empties = document.querySelectorAll('#home-level-grid .level-card[data-empty="1"]');
+  empties.forEach(c=>archiveSel.add(arcKeyOf(c)));
+  syncArchiveSelUI(); updateArchiveBar();
+  toast(empties.length ? `単語なしの ${empties.length} 件を選びました` : '一覧に単語なしのレベルはありません', empties.length ? 'suc' : 'err');
+});
+$('archive-head').addEventListener('click', ()=>{
+  archiveOpen = !archiveOpen;
+  $('archive-body').hidden = !archiveOpen;
+  $('archive-caret').textContent = archiveOpen ? '閉じる' : '開く';
 });
 $('reorder-reset').addEventListener('click', ()=>{
   saveSettings({ homeOrder: [], readingOrder: [] });
@@ -5148,7 +5326,9 @@ function rdSpeak(text){
 function renderReadingCards(){
   const grid = $('reading-card-grid');
   if(!grid) return;
-  grid.innerHTML = '';
+  const arcGrid = $('archive-reading-grid');
+  grid.innerHTML = ''; if(arcGrid) arcGrid.innerHTML = '';
+  const archived = loadArchivedReadings();
   const passages = applySavedOrder(READING_PASSAGES, loadSettings().readingOrder, p=>p.id);
   passages.forEach(p => {
     const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
@@ -5165,6 +5345,7 @@ function renderReadingCards(){
     const statCell = (label, value, dim) =>
       `<span class="rc-stat${dim?' dim':''}"><span class="rc-stat-l">${label}</span>${value}</span>`;
     card.innerHTML = `
+      <span class="card-check"></span>
       <div class="rc-head"><span class="rc-tag">${escHtml(p.tag)}</span>${bestPill}</div>
       <div class="rc-title">${escHtml(p.title)}</div>
       <div class="rc-sub">${escHtml(p.subtitle)}</div>
@@ -5179,9 +5360,17 @@ function renderReadingCards(){
         ${p.added ? statCell('追加', addedTxt) : ''}
         ${saved && saved.elapsedMs ? statCell('経過', rdFmtTime(saved.elapsedMs/1000)) : ''}
       </div>`;
-    card.addEventListener('click', ()=>{ if(!reorderMode) enterReading(p.id); });
-    grid.appendChild(card);
+    card.addEventListener('click', ()=>{
+      if(reorderMode) return;
+      if(archiveMode){ toggleArchiveSel(card); return; }
+      enterReading(p.id);
+    });
+    (archived.has(p.id) && arcGrid ? arcGrid : grid).appendChild(card);
   });
+  // 長文を全部アーカイブしたら、見出しごと畳む（選択中は残す）
+  const sec = $('reading-section');
+  if(sec) sec.style.display = (grid.children.length === 0 && !archiveMode) ? 'none' : '';
+  if(typeof updateArchiveSection === 'function') updateArchiveSection();
 }
 
 // ── 長文を開く ──
