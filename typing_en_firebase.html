@@ -241,6 +241,7 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .reading-card .rc-sub{font-size:0.74rem;color:var(--sub);line-height:1.5;}
 .reading-card .rc-foot{display:flex;align-items:center;gap:10px;margin-top:4px;}
 .reading-card .rc-meta{font-family:'JetBrains Mono',monospace;font-size:0.64rem;color:var(--muted);font-weight:600;}
+.reading-card .rc-meta.resume{color:var(--on);font-weight:700;}   /* 途中でやめた続きがある */
 .reading-card .rc-progress{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .reading-card .rc-progress-fill{height:100%;width:0%;background:var(--on);border-radius:2px;}
 /* カード下部の「練習 / 最終 / 追加」＝1行にまとめて高さを取らない */
@@ -329,6 +330,12 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
   color:var(--sub);border:1px solid var(--border);white-space:nowrap;transition:all 0.2s var(--ease);}
 .rd-mode-chip.locked{background:var(--ok-bg);color:var(--ok);border-color:#b8dcc5;}
 .rd-progress-label{font-family:'JetBrains Mono',monospace;font-size:0.88rem;font-weight:700;min-width:44px;text-align:right;}
+/* 経過時間チップ（手が止まると自動で止まる／クリックで秒数変更） */
+.rd-timer-chip{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:0.78rem;
+  font-weight:700;padding:5px 11px;border-radius:20px;background:var(--surface-alt);color:var(--sub);
+  border:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;transition:all 0.2s var(--ease);}
+.rd-timer-chip:hover{border-color:var(--border2);}
+.rd-timer-chip.paused{background:var(--gold-bg);color:var(--gold);border-color:#e3d09b;}
 #rd-bar-fill{height:100%;background:linear-gradient(90deg,var(--ok) 0%,#4ba86e 100%);width:0%;
   transition:width 0.2s var(--ease);border-radius:2px;}
 .rd-hint{font-size:0.76rem;color:var(--muted);line-height:1.6;}
@@ -633,6 +640,10 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .game-prog .prog-sep{opacity:0.4;margin:0 3px;}
 .game-prog .prog-total{color:var(--muted);font-weight:500;}
 .esc-hint{font-size:0.74rem;color:var(--muted)}
+/* 手が止まった時の一時停止表示（練習画面） */
+.pause-chip{display:none;font-size:0.74rem;font-weight:700;padding:4px 11px;border-radius:20px;
+  background:var(--gold-bg);color:var(--gold);border:1px solid #e3d09b;white-space:nowrap;}
+.pause-chip.show{display:inline-flex;align-items:center;gap:5px;}
 kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-bottom-width:2px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:0.7rem;background:var(--surface);color:var(--sub);box-shadow:0 1px 0 var(--border);font-weight:600;}
 .bar-track{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
 #bar-fill{height:100%;background:linear-gradient(90deg,var(--on) 0%,#e0836a 100%);width:0%;transition:width 0.32s var(--ease);border-radius:2px;box-shadow:0 0 8px rgba(201,100,66,0.4);}
@@ -1259,6 +1270,20 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
+      <div class="voice-info">
+        <div class="voice-title">手が止まったら計測を一時停止する</div>
+        <div class="voice-sub" style="display:block">この秒数だけ入力が止まると、ストップウォッチを自動で止めます。次の1打で再開します。他の画面に移った時や、ブラウザを離れた時もその場で止まります。長文リーディングにも同じ設定が効きます。</div>
+      </div>
+      <div class="round-row" style="margin-top:10px">
+        <button class="round-chip idle-chip" data-sec="5">5秒</button>
+        <button class="round-chip idle-chip on" data-sec="10">10秒</button>
+        <button class="round-chip idle-chip" data-sec="20">20秒</button>
+        <button class="round-chip idle-chip" data-sec="30">30秒</button>
+        <button class="round-chip idle-chip" data-sec="60">60秒</button>
+        <button class="round-chip idle-chip" data-sec="0">止めない</button>
+      </div>
+    </div>
+    <div class="card">
       <div class="voice-row">
         <div class="voice-info">
           <div class="voice-title">英語を読み上げる</div>
@@ -1367,6 +1392,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <div class="page-sub" id="rd-sub"></div>
     </div>
     <div class="rd-status">
+      <span class="rd-timer-chip" id="rd-timer" title="手が止まると自動で計測を止めます（クリックで秒数を変更）">⏱ 0秒</span>
       <span class="rd-mode-chip" id="rd-mode-chip">追いかけスクロール中</span>
       <span class="rd-progress-label" id="rd-progress-label">0%</span>
       <button class="btn-ghost" id="rd-stats-btn">文ごとの記録</button>
@@ -1374,7 +1400,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
     </div>
   </div>
   <div class="bar-track"><div id="rd-bar-fill"></div></div>
-  <div class="rd-hint">英文だけを上から入力。行末の <b>␣</b> は Space（Enterでも可）で次の行へ。カッコなど薄い文字は打たずに飛ばします。左右の語句はクリックで読み上げ。</div>
+  <div class="rd-hint">英文だけを上から入力。行末の <b>␣</b> は Space（Enterでも可）で次の行へ。カッコなど薄い文字は打たずに飛ばします。左右の語句はクリックで読み上げ。<br>手が止まると経過時間の計測が自動で止まります（右上の <b>⏱</b> をクリックで秒数変更）。途中でやめても、次に開いた時は続きから再開できます。<b>最初から</b>で丸ごとリセット。</div>
   <div class="rd-layout">
     <aside class="rd-panel" id="rd-grammar-panel">
       <div class="rd-panel-title">文法ポイント</div>
@@ -1459,6 +1485,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   <div class="game-top">
     <span class="game-lv-badge" id="game-badge"></span>
     <span class="game-prog" id="game-prog">1 / 20</span>
+    <span class="pause-chip" id="game-pause-chip">⏸ 一時停止中 — 打てば再開</span>
     <span class="esc-hint"><kbd>ESC</kbd> で中断</span>
   </div>
   <div class="bar-track"><div id="bar-fill"></div></div>
@@ -2108,6 +2135,10 @@ let gameActive=false,totalKeystrokes=0,correctKeystrokes=0,currentHintData=[];
 let currentWordMisses=0, currentWordStart=0;
 let sessionWordResults=[];              // 今セッションの単語ごとの速度ログ
 let currentMode='en';                   // 'en' | 'kana'
+// 手が止まった時に計測を自動で止める秒数（0＝止めない）
+const IDLE_CHOICES = [5,10,20,30,60,0];
+let idlePauseSec = 10;
+let gamePausedAt = null, gameIdleTimer = null;
 // 大文字・小文字の判定モード（グローバル設定）
 //   false（既定）… 区別しない。小文字だけで打っても正解、入力欄は正しい形に自動で直す
 //   true          … 区別する。頭の大文字は Shift を押して打つ必要がある
@@ -3197,6 +3228,61 @@ function computeMinBestCpsAllWords(){
   return mn === Infinity ? 0 : mn;
 }
 
+// ══════════════════════════════════════════════
+//  無操作で計測を止める（ストップウォッチの自動一時停止）
+//   止まっていた分は開始時刻を後ろへずらして、経過時間に混ぜない
+// ══════════════════════════════════════════════
+function applyIdleSetting(sec){
+  idlePauseSec = sec;
+  saveSettings({ idlePauseSec: sec });
+  document.querySelectorAll('.idle-chip').forEach(b => b.classList.toggle('on', +b.dataset.sec === sec));
+  // 動いている計測にはその場で反映する（止まっているものを勝手に動かさない）
+  gameRearm();
+  rdRearm();
+  rdUpdateTimerChip();
+}
+function initIdleSetting(){
+  const s = loadSettings();
+  idlePauseSec = (typeof s.idlePauseSec === 'number') ? s.idlePauseSec : 10;
+  document.querySelectorAll('.idle-chip').forEach(b => {
+    b.classList.toggle('on', +b.dataset.sec === idlePauseSec);
+    b.addEventListener('click', ()=>{
+      const sec = +b.dataset.sec;
+      applyIdleSetting(sec);
+      toast(sec > 0 ? `手が止まってから${sec}秒で計測を止めます` : '手が止まっても計測を止めません','suc');
+    });
+  });
+  rdUpdateTimerChip();
+}
+
+// ── 単語練習の計測 ──
+function gamePause(){
+  clearTimeout(gameIdleTimer); gameIdleTimer = null;
+  if(gamePausedAt || !gameActive) return;
+  gamePausedAt = Date.now();
+  $('game-pause-chip').classList.add('show');
+}
+function gameResume(){
+  if(!gamePausedAt) return;
+  const d = Date.now() - gamePausedAt;
+  t0 += d;                  // セッション全体の計測
+  currentWordStart += d;    // 単語ごとの計測
+  gamePausedAt = null;
+  $('game-pause-chip').classList.remove('show');
+}
+function gameRearm(){           // 無操作タイマーだけ引き直す（止まっている物は動かさない）
+  clearTimeout(gameIdleTimer); gameIdleTimer = null;
+  if(idlePauseSec > 0 && gameActive && !gamePausedAt) gameIdleTimer = setTimeout(gamePause, idlePauseSec * 1000);
+}
+function gameTouch(){
+  gameResume();
+  gameRearm();
+}
+function gameStopIdle(){        // 中断・完了時：止まっていた分を精算してタイマーを外す
+  gameResume();
+  clearTimeout(gameIdleTimer); gameIdleTimer = null;
+}
+
 function startGame(){
   const q = buildQueue();
   if (!q) {
@@ -3227,6 +3313,7 @@ function startGame(){
   }
   $('c-clear').textContent=0; $('c-miss').textContent=0;
   showScreen('game'); enableCursorHide(); showWord(0); t0=Date.now();
+  gamePausedAt=null; $('game-pause-chip').classList.remove('show'); gameTouch();
   setTimeout(()=>forceEnglishInput(), 80);
 }
 $('start-btn').addEventListener('click',startGame);
@@ -3277,6 +3364,7 @@ function showWord(idx){
 
 inp.addEventListener('input',()=>{
   if(!queue.length||!gameActive) return;
+  gameTouch();                            // 打った＝再開。無操作タイマーも数え直す
   const recKey=queue[curIdx].en;          // 記録は元の英文をキーにする
   const target=currentTarget || recKey;   // 判定はカッコを外した英文で行う
   let typed=normalizeEn(inp.value);
@@ -3541,6 +3629,7 @@ const TIER_ORDER = ['f','e','d','c','b','a','s','ss'];
 function tierRank(t){ const i=TIER_ORDER.indexOf(t); return i<0?0:i; }
 
 function showResult(){
+  gameStopIdle();
   pausedElapsed+=Date.now()-t0;
   const es=pausedElapsed/1000, er=Math.round(es), total=curIdx;
   const acc=Math.round((correctKeystrokes/Math.max(totalKeystrokes,1))*100);
@@ -3835,7 +3924,7 @@ document.addEventListener('keydown',e=>{
     if(scr==='result'){e.preventDefault();startGame();return;}
   }
   if(e.key==='Escape'){
-    if(scr==='game'&&gameActive){e.preventDefault();gameActive=false;disableCursorHide();restoreInput();if(currentLevel) renderWordList();showScreen('setup');return;}
+    if(scr==='game'&&gameActive){e.preventDefault();gameStopIdle();gameActive=false;disableCursorHide();restoreInput();if(currentLevel) renderWordList();showScreen('setup');return;}
     if(scr==='result'){e.preventDefault();if(currentLevel) renderWordList();showScreen('setup');return;}
     if(scr==='setup'){e.preventDefault();goHome();return;}
   }
@@ -4949,6 +5038,9 @@ let rdLocked = false;      // 最終ページに達して自動スクロール�
 let rdCorrect = 0, rdMiss = 0, rdStart = null;
 let rdLastSeg = null, rdPersistTimer = null;
 let rdSegStart = null, rdSegMiss = 0, rdSegKeys = 0;  // いま打っている文の計測用
+let rdPausedAt = null;     // 手が止まって計測を停めた時刻（動いている間は null）
+let rdIdleTimer = null;
+let rdRestoredMs = 0;      // 前回までの経過時間（途中から再開する時に引き継ぐ）
 
 function rdJson(key){
   try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null; }
@@ -5079,12 +5171,13 @@ function renderReadingCards(){
       <div class="rc-foot">
         <span class="rc-meta">${total.toLocaleString()} 字</span>
         <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
-        <span class="rc-meta">${best ? best.speed.toFixed(1)+' 打/秒' : pct+'%'}</span>
+        <span class="rc-meta${pct > 0 ? ' resume' : ''}">${pct > 0 ? '続き '+pct+'%' : (best ? best.speed.toFixed(1)+' 打/秒' : '0%')}</span>
       </div>
       <div class="rc-stats">
         ${statCell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays)}
         ${log.last ? statCell('最終', fmtShortDate(log.last)) : ''}
         ${p.added ? statCell('追加', addedTxt) : ''}
+        ${saved && saved.elapsedMs ? statCell('経過', rdFmtTime(saved.elapsedMs/1000)) : ''}
       </div>`;
     card.addEventListener('click', ()=>{ if(!reorderMode) enterReading(p.id); });
     grid.appendChild(card);
@@ -5100,13 +5193,25 @@ function enterReading(id){
   rdBuildPaper();
   rdRenderPanels();
   rdRestore();
-  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true);
+  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true); rdUpdateTimerChip();
   showScreen('reading');
+  // 途中でやめた続きから開いた時は、どこから再開するのかを知らせる
+  if(rdCursor > 0){
+    const pct = Math.round((rdCursor / rdChars.length) * 100);
+    const el  = rdRestoredMs > 0 ? `・経過 ${rdFmtTime(rdRestoredMs/1000)}` : '';
+    toast(`続きから再開します（${pct}%${el}）打てば計測も続きから`,'suc');
+  }
   requestAnimationFrame(()=>{
     const vp = $('rd-viewport');
     if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
     else if(rdCursor > 0) rdFollowCaret();
   });
+}
+// 長文画面から離れる時：計測を止めて、その時点の続きを確実に保存する
+function rdLeaveReading(){
+  rdPause();
+  rdStopIdle();
+  rdPersistNow();
 }
 
 function rdMakeChar(expected, lineEnd){
@@ -5123,6 +5228,7 @@ function rdBuildPaper(){
   rdCursor = 0; rdCorrect = 0; rdMiss = 0; rdStart = null;
   rdLocked = false; rdLastSeg = null;
   rdSegStart = null; rdSegMiss = 0; rdSegKeys = 0;
+  rdStopIdle(); rdPausedAt = null; rdRestoredMs = 0;
   $('rd-mode-chip').textContent = '追いかけスクロール中';
   $('rd-mode-chip').classList.remove('locked');
   $('rd-finish').hidden = true;
@@ -5283,16 +5389,64 @@ function rdFollowCaret(){
   if(rel > target) vp.scrollTop += (rel - target);
   if(vp.scrollTop >= vp.scrollHeight - vp.clientHeight - 2) rdLock();
 }
+// ── 経過時間（手が止まっている間は進めない／中断した分は引き継ぐ）──
+function rdElapsedMs(){
+  if(!rdStart) return rdRestoredMs;            // まだ1打も打っていない
+  return (rdPausedAt || Date.now()) - rdStart;
+}
+function rdUpdateTimerChip(){
+  const el = document.getElementById('rd-timer');
+  if(!el) return;
+  const ms = rdElapsedMs();
+  const running = !!rdStart && !rdPausedAt;
+  el.classList.toggle('paused', !running && ms > 0);
+  el.textContent = (running || ms === 0 ? '⏱ ' : '⏸ ') + rdFmtTime(ms/1000);
+  el.title = (idlePauseSec > 0
+      ? `手が止まって${idlePauseSec}秒で計測を止めます`
+      : '手が止まっても計測を止めません')
+    + '（クリックで秒数を変更）';
+}
+function rdPause(){
+  clearTimeout(rdIdleTimer); rdIdleTimer = null;
+  if(rdPausedAt || !rdStart) return;
+  rdPausedAt = Date.now();
+  rdUpdateTimerChip();
+  rdPersistNow();                              // 止まった時点の経過時間を残す
+}
+function rdResume(){
+  if(!rdPausedAt) return;
+  const d = Date.now() - rdPausedAt;
+  rdStart += d;                                // 止まっていた分は経過時間に入れない
+  if(rdSegStart !== null) rdSegStart += d;     // 文ごとの記録も同じだけずらす
+  rdPausedAt = null;
+  rdUpdateTimerChip();
+}
+function rdRearm(){             // 無操作タイマーだけ引き直す（止まっている物は動かさない）
+  clearTimeout(rdIdleTimer); rdIdleTimer = null;
+  if(idlePauseSec > 0 && rdStart && !rdPausedAt && currentScreen() === 'reading'){
+    rdIdleTimer = setTimeout(rdPause, idlePauseSec * 1000);
+  }
+}
+function rdTouch(){
+  rdResume();
+  rdRearm();
+}
+function rdStopIdle(){ clearTimeout(rdIdleTimer); rdIdleTimer = null; }
+
+function rdPersistNow(){
+  clearTimeout(rdPersistTimer); rdPersistTimer = null;
+  if(!rdPassage || !rdChars.length) return;
+  if(rdCursor === 0 && rdElapsedMs() === 0) return;   // 何も打っていない状態は残さない
+  const states = rdChars.map(c => c.el.classList.contains('correct') ? 'c'
+                                : c.el.classList.contains('incorrect') ? 'i' : 'p');
+  localStorage.setItem(rdKey(rdPassage.id), JSON.stringify({
+    cursor: rdCursor, total: rdChars.length, states, correct: rdCorrect, miss: rdMiss,
+    elapsedMs: Math.round(rdElapsedMs())
+  }));
+}
 function rdPersist(){
   clearTimeout(rdPersistTimer);
-  rdPersistTimer = setTimeout(()=>{
-    if(!rdPassage) return;
-    const states = rdChars.map(c => c.el.classList.contains('correct') ? 'c'
-                                  : c.el.classList.contains('incorrect') ? 'i' : 'p');
-    localStorage.setItem(rdKey(rdPassage.id), JSON.stringify({
-      cursor: rdCursor, total: rdChars.length, states, correct: rdCorrect, miss: rdMiss
-    }));
-  }, 500);
+  rdPersistTimer = setTimeout(rdPersistNow, 500);
 }
 function rdRestore(){
   const d = rdSaved(rdPassage.id);
@@ -5306,6 +5460,7 @@ function rdRestore(){
     else if(s==='i') rdChars[i].el.classList.add('incorrect');
   });
   rdCursor = d.cursor||0; rdCorrect = d.correct||0; rdMiss = d.miss||0;
+  rdRestoredMs = d.elapsedMs || 0;              // 前回までの経過時間を引き継ぐ
 }
 // ── 1文打ち終わったときに記録する ──
 function rdCommitSeg(segId){
@@ -5326,7 +5481,8 @@ function rdCommitSeg(segId){
 
 function rdFinish(){
   rdLock();
-  const sec  = Math.max((Date.now() - rdStart)/1000, 0.1);
+  rdStopIdle();
+  const sec  = Math.max(rdElapsedMs()/1000, 0.1);   // 止まっていた時間は含めない
   const keys = rdCorrect + rdMiss;
   const cps  = rdCorrect / sec;                 // 秒あたり何打（既存の単語練習と同じ指標）
   const acc  = keys ? Math.round((rdCorrect/keys)*100) : 100;
@@ -5368,17 +5524,24 @@ function rdFinish(){
   if(isBest) localStorage.setItem(rdBestKey(rdPassage.id), JSON.stringify(now));
   rdLogFinish();   // 通しで終えた回数と最終練習日
 
+  // 読み切ったので「途中経過」は破棄し、計測も止める
+  clearTimeout(rdPersistTimer); rdPersistTimer = null;
+  localStorage.removeItem(rdKey(rdPassage.id));
+  if(rdStart && !rdPausedAt) rdPausedAt = Date.now();
+  rdUpdateTimerChip();
+
   $('rd-finish').hidden = false;
   renderReadingCards();
 }
 function rdRestart(){
-  rdBuildPaper();
-  clearTimeout(rdPersistTimer);
+  rdBuildPaper();                       // 経過時間・一時停止・途中経過をすべて初期化する
+  clearTimeout(rdPersistTimer); rdPersistTimer = null;
   if(rdPassage) localStorage.removeItem(rdKey(rdPassage.id));
-  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true);
+  rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true); rdUpdateTimerChip();
   const vp = $('rd-viewport');
   if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
   renderReadingCards();
+  toast('最初からにしました（経過時間も0にリセット）','suc');
 }
 
 function rdHandleKey(e){
@@ -5388,6 +5551,7 @@ function rdHandleKey(e){
   if(e.key === 'Backspace'){
     e.preventDefault();
     if(rdCursor > 0){
+      rdTouch();               // 打ち直しも操作のうち（止まっていれば再開）
       rdCursor--;
       const c = rdChars[rdCursor];
       c.el.classList.remove('correct','incorrect');
@@ -5401,7 +5565,9 @@ function rdHandleKey(e){
   if(e.key !== 'Enter' && e.key.length !== 1) return;
   if(e.key === 'Enter' && !atEnd) return;   // 行末だけEnterでも進める
   e.preventDefault();
-  if(!rdStart){ rdStart = Date.now(); rdLogTouch(); }   // 打ち始めた日を最終練習日に
+  // 打ち始めた日を最終練習日に。途中から再開した時は前回までの経過時間を引き継ぐ
+  if(!rdStart){ rdStart = Date.now() - rdRestoredMs; rdLogTouch(); }
+  rdTouch();                                          // 止まっていれば再開し、無操作タイマーを引き直す
 
   const seg = rdCurrentSeg();
   if(rdSegStart === null) rdSegStart = Date.now();   // その文の最初の打鍵から計測
@@ -5415,6 +5581,7 @@ function rdHandleKey(e){
   if(seg && rdCursor > seg.end) rdCommitSeg(seg.id);   // その文を打ち終わった
 
   rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(); rdFollowCaret(); rdPersist();
+  rdUpdateTimerChip();
   if(rdCursor >= rdChars.length) rdFinish();
 }
 
@@ -5490,7 +5657,14 @@ $('rs-reset-btn').addEventListener('click', async ()=>{
   toast('記録を消しました','suc');
 });
 
-$('rd-back-btn').addEventListener('click', ()=>{ renderReadingCards(); showScreen('home'); });
+$('rd-back-btn').addEventListener('click', ()=>{ rdLeaveReading(); renderReadingCards(); showScreen('home'); });
+// 経過時間チップ：クリックで「何秒止まったら計測を止めるか」を切り替える
+$('rd-timer').addEventListener('click', ()=>{
+  const i = IDLE_CHOICES.indexOf(idlePauseSec);
+  const next = IDLE_CHOICES[(i + 1) % IDLE_CHOICES.length];
+  applyIdleSetting(next);
+  toast(next > 0 ? `手が止まってから${next}秒で計測を止めます` : '手が止まっても計測を止めません','suc');
+});
 $('rd-restart-btn').addEventListener('click', rdRestart);
 $('rd-finish-retry').addEventListener('click', rdRestart);
 $('rd-fin-stats-btn').addEventListener('click', ()=>{ renderReadingStats(); showScreen('rstats'); });
@@ -5502,15 +5676,34 @@ document.addEventListener('keydown', e=>{
     return;
   }
   if(scr !== 'reading') return;
-  if(e.key === 'Escape'){ e.preventDefault(); renderReadingCards(); showScreen('home'); return; }
+  if(e.key === 'Escape'){ e.preventDefault(); rdLeaveReading(); renderReadingCards(); showScreen('home'); return; }
   rdHandleKey(e);
 });
+// 「文ごとの記録」を見に行っている間も計測は止めておく
+$('rd-stats-btn').addEventListener('click', rdLeaveReading);
+$('rd-fin-stats-btn').addEventListener('click', rdStopIdle);
+
+// 経過時間の表示を毎秒更新（長文画面を開いている時だけ）
+setInterval(()=>{ if(currentScreen() === 'reading') rdUpdateTimerChip(); }, 1000);
+
+// 画面を離れた・別のウィンドウに移った時は、その場で計測を止める
+function pauseAllTimers(){
+  const scr = currentScreen();
+  if(scr === 'game' && gameActive) gamePause();
+  if(scr === 'reading') rdPause();
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) pauseAllTimers(); });
+window.addEventListener('blur', pauseAllTimers);
 
 renderHomeScreen();
 renderReadingCards();
 initVoiceSettings();
 initCaseStrictSetting();
-window.addEventListener('beforeunload',()=>{ if(currentLevel) saveLevelEnabled(currentLevel,enabled); });
+initIdleSetting();
+window.addEventListener('beforeunload',()=>{
+  if(currentLevel) saveLevelEnabled(currentLevel,enabled);
+  if(currentScreen() === 'reading') rdLeaveReading();   // 閉じても続きが残るように
+});
 </script>
 </body>
 </html>
