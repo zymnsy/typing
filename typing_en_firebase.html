@@ -406,7 +406,7 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
   padding:3px 9px;border-radius:5px;margin-bottom:12px;}
 .rd-mailhead{background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:18px;}
 .rd-mailrow{display:flex;gap:10px;font-size:0.82rem;padding:2px 0;}
-.rd-mailrow .rd-ml{width:58px;flex:none;font-weight:700;color:var(--sub);}
+.rd-mailrow .rd-ml{width:78px;flex:none;font-weight:700;color:var(--sub);}
 .rd-mailrow .rd-mv{font-family:'JetBrains Mono',monospace;color:var(--text);word-break:break-all;}
 .rd-webchrome{margin-bottom:18px;}
 .rd-url{font-family:'JetBrains Mono',monospace;font-size:0.76rem;background:var(--surface-alt);border:1px solid var(--border);
@@ -418,6 +418,11 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rd-line{margin-bottom:14px;}
 .rd-line.newpara{margin-top:22px;}
 .rd-line.heading{margin-bottom:18px;}
+/* 設問（Q196-200）と4択の選択肢 */
+.rd-line.qhead{margin-top:26px;margin-bottom:10px;}
+.rd-line.qhead .rd-en{font-weight:700;}
+.rd-line.choice{margin-bottom:6px;padding-left:26px;}
+.rd-line.choice .rd-en{font-size:0.94rem;line-height:1.75;}
 .rd-en{font-family:'JetBrains Mono',monospace;font-size:1rem;line-height:1.9;letter-spacing:0.01em;}
 .rd-line.heading .rd-en{font-size:1.2rem;font-weight:800;letter-spacing:0.03em;}
 .rd-paper.hide-ja .rd-ja{display:none;}   /* 設定で日本語訳を隠した時 */
@@ -5312,6 +5317,136 @@ const READING_PASSAGES = [
     ]
   },
   {
+    id: 'toeic9-t2-q196',
+    title: 'TOEIC 公式9 TEST2 Part7 Q196-200',
+    subtitle: '手紙 + メール + 請求書（設問と4択つき）',
+    tag: 'PART 7',
+    added: '2026-08-16',
+    intro: 'Questions 196-200 refer to the following letter, e-mail, and utility bill.',
+    docs: [
+      {
+        kind:'letter', tag:'Letter 1 of 3',
+        lines:[
+          {id:'L0', en:"September 15", ja:"9月15日"},
+          {id:'L1', en:"Edward Maunce, Operations Manager", ja:"エドワード・モーンス 業務部長", newPara:true},
+          {id:'L2', en:"Bronski Solutions, Inc.", ja:"ブロンスキ・ソリューションズ社"},
+          {id:'L3', en:"21 Woerdens Road", ja:"ウォーデンズ通り21番地"},
+          {id:'L4', en:"Martindale, IN 46176", ja:"インディアナ州マーティンデール 46176"},
+          {id:'L5', en:"Dear Mr. Maunce,", ja:"モーンス様", newPara:true},
+          {id:'L6', en:"Your company's monthly electricity charges fluctuated significantly over the past year.", ja:"御社の毎月の電気料金は、この1年で大きく変動しました。", newPara:true},
+          {id:'L7', en:"Many of our commercial customers with this kind of usage pattern have switched to Commercial SB billing.", ja:"このような使用パターンの法人のお客様の多くは、法人向けSB課金に切り替えておられます。"},
+          {id:'L8', en:"Under this plan, a company pays the same amount each month regardless of usage levels.", ja:"このプランでは、使用量に関係なく毎月同じ金額をお支払いいただきます。"},
+          {id:'L9', en:"This makes budgeting much easier.", ja:"これにより予算組みがずっと簡単になります。"},
+          {id:'L10', en:"Contact me if your company is interested in Commercial SB billing.", ja:"法人向けSB課金にご関心がありましたら、ご連絡ください。"},
+          {id:'L11', en:"Also, please note that next month all customers will be subject to a small 1% rate increase.", ja:"また、来月からすべてのお客様に1%のわずかな料金値上げが適用されますので、ご承知おきください。", newPara:true},
+          {id:'L12', en:"The revenue generated from this increase will fund important repairs to our power delivery infrastructure.", ja:"この値上げで得られる収入は、送電設備の重要な修繕に充てられます。"},
+          {id:'L13', en:"Sincerely,", ja:"敬具", newPara:true},
+          {id:'L14', en:"Patrice Tsui", ja:"パトリス・ツイ"},
+          {id:'L15', en:"Commercial Accounts Representative", ja:"法人営業担当"},
+          {id:'L16', en:"Oaklawn Electric Supply", ja:"オークローン電力"},
+        ]
+      },
+      {
+        kind:'email', tag:'E-mail 2 of 3',
+        meta:{ to:'Sunita Colman, Vice President of Operations', from:'Edward Maunce, Operations Manager',
+               date:'September 30', subject:'Electricity service', attachment:'Service company letter - copy' },
+        lines:[
+          {id:'M1', en:"Hello Sunita,", ja:"スニタさんへ"},
+          {id:'M2', en:"Please take a moment to read the attached copy of a letter I just received.", ja:"先ほど受け取った手紙の写しを添付しましたので、目を通してください。", newPara:true},
+          {id:'M3', en:"I like Ms. Tsui's suggestion, and I believe we should move forward with it.", ja:"ツイさんの提案は良いと思いますし、進めるべきだと考えています。"},
+          {id:'M4', en:"Do you agree?", ja:"ご賛同いただけますか。"},
+          {id:'M5', en:"Looking back at our recent records, I notice we experienced a major jump in costs starting in the exact month our temporary interns first arrived and began working on those short-term projects.", ja:"最近の記録を振り返ると、臨時のインターンが来て短期の案件に取りかかったまさにその月から、費用が大きく跳ね上がっていることに気づきます。"},
+          {id:'M6', en:"Thanks,", ja:"よろしくお願いします。", newPara:true},
+          {id:'M7', en:"Ed", ja:"エド"},
+          {id:'M8', en:"Operations Manager, Bronski Solutions, Inc.", ja:"ブロンスキ・ソリューションズ社 業務部長"},
+        ]
+      },
+      {
+        kind:'bill', tag:'Utility bill 3 of 3',
+        lines:[
+          {id:'U0', en:"Oaklawn Electric Supply", ja:"オークローン電力", heading:true},
+          {id:'U1', en:"Customer No.: 45881", ja:"お客様番号: 45881"},
+          {id:'U2', en:"Customer Name: Bronski Solutions, Inc.", ja:"お客様名: ブロンスキ・ソリューションズ社"},
+          {id:'U3', en:"Bill Date: September 5", ja:"請求日: 9月5日"},
+          {id:'U4', en:"Amount Due: $4,400", ja:"請求額: 4,400ドル"},
+          {id:'U5', en:"Monthly Cost ($)", ja:"月別費用(ドル)　※ここは棒グラフ。打つのは横軸の月名だけです", newPara:true},
+          {id:'U6', en:"January February March April May June July August", ja:"1〜4月は2,000ドル前後で推移し、5月に約3,650ドルへ急増。6月が約3,900ドルで最大、7月・8月は下がっていく。"},
+        ]
+      },
+      {
+        kind:'questions', tag:'Questions 196-200',
+        lines:[
+          {id:'Q196',  en:"196. What is one purpose of the letter?", ja:"この手紙の目的の一つは何ですか。", qhead:true},
+          {id:'Q196A', en:"(A) To apologize for a billing error", ja:"請求の誤りを謝罪するため", choice:true},
+          {id:'Q196B', en:"(B) To promote ideas for reducing energy usage", ja:"エネルギー使用量を減らす案を勧めるため", choice:true},
+          {id:'Q196C', en:"(C) To request payment for a past-due bill", ja:"支払期限を過ぎた請求の支払いを求めるため", choice:true},
+          {id:'Q196D', en:"(D) To explain a new way of paying for services", ja:"サービス料金の新しい支払い方法を説明するため", choice:true},
+          {id:'Q197',  en:"197. What does Ms. Tsui suggest is a common concern among commercial customers?", ja:"ツイさんは、法人顧客によくある悩みは何だと述べていますか。", qhead:true},
+          {id:'Q197A', en:"(A) Large variations in monthly bills", ja:"月々の請求額の大きな変動", choice:true},
+          {id:'Q197B', en:"(B) Long wait times for customer service", ja:"顧客サービスの待ち時間の長さ", choice:true},
+          {id:'Q197C', en:"(C) Frequent service disruptions", ja:"頻繁なサービスの停止", choice:true},
+          {id:'Q197D', en:"(D) Corporate restrictions on electricity usage", ja:"企業の電力使用に対する規制", choice:true},
+          {id:'Q198',  en:"198. According to the letter, what will money from higher rates be used for?", ja:"手紙によると、値上げで得た資金は何に使われますか。", qhead:true},
+          {id:'Q198A', en:"(A) To increase technicians' wages", ja:"技術者の賃金を上げるため", choice:true},
+          {id:'Q198B', en:"(B) To bid on new equipment", ja:"新しい機器の入札をするため", choice:true},
+          {id:'Q198C', en:"(C) To pay for maintenance", ja:"保守の費用に充てるため", choice:true},
+          {id:'Q198D', en:"(D) To research alternative energy sources", ja:"代替エネルギー源を研究するため", choice:true},
+          {id:'Q199',  en:"199. What does Mr. Maunce think Bronski Solutions, Inc., should do?", ja:"モーンスさんは、ブロンスキ・ソリューションズ社は何をすべきだと考えていますか。", qhead:true},
+          {id:'Q199A', en:"(A) Choose Commercial SB billing", ja:"法人向けSB課金を選ぶ", choice:true},
+          {id:'Q199B', en:"(B) Start an effort to reduce expenses", ja:"経費削減の取り組みを始める", choice:true},
+          {id:'Q199C', en:"(C) Decrease the number of interns hired", ja:"採用するインターンの人数を減らす", choice:true},
+          {id:'Q199D', en:"(D) Stop being a client of Oaklawn Electric Supply", ja:"オークローン電力の顧客であることをやめる", choice:true},
+          {id:'Q200',  en:"200. In what month were some temporary staff most likely hired?", ja:"臨時スタッフが雇われたのは、おそらく何月ですか。", qhead:true},
+          {id:'Q200A', en:"(A) In May", ja:"5月", choice:true},
+          {id:'Q200B', en:"(B) In June", ja:"6月", choice:true},
+          {id:'Q200C', en:"(C) In July", ja:"7月", choice:true},
+          {id:'Q200D', en:"(D) In August", ja:"8月", choice:true},
+        ]
+      }
+    ],
+    vocab: [
+      {term:"fluctuate", desc:"変動する、上下する", ids:['L6']},
+      {term:"significantly", desc:"大幅に、著しく", ids:['L6']},
+      {term:"commercial customer", desc:"法人顧客(事業用の契約者)", ids:['L7','Q197']},
+      {term:"usage pattern", desc:"使用の傾向・パターン", ids:['L7']},
+      {term:"regardless of ~", desc:"〜に関係なく", ids:['L8']},
+      {term:"budgeting", desc:"予算立て、資金繰り", ids:['L9']},
+      {term:"be subject to ~", desc:"〜の対象になる、〜を受ける", ids:['L11']},
+      {term:"rate increase", desc:"料金の値上げ", ids:['L11','Q198']},
+      {term:"revenue", desc:"収入、収益", ids:['L12']},
+      {term:"fund ~(動詞)", desc:"〜に資金を出す", ids:['L12']},
+      {term:"infrastructure", desc:"設備、基盤", ids:['L12']},
+      {term:"Accounts Representative", desc:"営業担当者(取引先担当)", ids:['L15']},
+      {term:"take a moment to do", desc:"少し時間を取って〜する", ids:['M2']},
+      {term:"attached", desc:"添付の", ids:['M2','M5']},
+      {term:"move forward with ~", desc:"〜を前に進める、実行に移す", ids:['M3']},
+      {term:"looking back at ~", desc:"〜を振り返ると", ids:['M5']},
+      {term:"a major jump in costs", desc:"費用の大幅な増加", ids:['M5','Q200']},
+      {term:"temporary intern", desc:"臨時のインターン", ids:['M5','Q199','Q200']},
+      {term:"short-term project", desc:"短期の案件", ids:['M5']},
+      {term:"Amount Due", desc:"請求額、支払うべき金額", ids:['U4']},
+      {term:"past-due bill", desc:"支払期限を過ぎた請求", ids:['Q196C']},
+      {term:"disruption", desc:"中断、停止", ids:['Q197C']},
+      {term:"bid on ~", desc:"〜の入札をする", ids:['Q198B']},
+      {term:"alternative energy", desc:"代替エネルギー", ids:['Q198D']},
+      {term:"expenses", desc:"経費、支出", ids:['Q199B']},
+    ],
+    grammar: [
+      {term:"過去形で「この1年の変動」", desc:"over the past year と過去形で、済んだ1年間の出来事としてまとめる", ids:['L6']},
+      {term:"現在完了(have switched)", desc:"「これまでに切り替えてきた(今もその状態)」を表す", ids:['L7']},
+      {term:"regardless of ~", desc:"前置詞句で「〜に関係なく」。of の後は名詞", ids:['L8']},
+      {term:"make + O + 形容詞", desc:"This makes budgeting much easier で「Oを〜の状態にする」。much は比較級の強調", ids:['L9']},
+      {term:"命令文 + if 節", desc:"Contact me if … と、依頼を先に置いて条件を後ろに添える", ids:['L10']},
+      {term:"please note that ~", desc:"「〜をご承知おきください」。that節で本題を続ける定型", ids:['L11']},
+      {term:"過去分詞の後置修飾", desc:"The revenue generated from this increase = 「この値上げで生まれる収入」", ids:['L12']},
+      {term:"分詞構文(Looking back at ~)", desc:"文頭の分詞で「〜を振り返ると」と状況を添える", ids:['M5']},
+      {term:"名詞 + that節の省略", desc:"I notice (that) we experienced … の that が省略された形", ids:['M5']},
+      {term:"間接疑問(What does A think B should do?)", desc:"think の後ろは平叙文の語順 B should do", ids:['Q199']},
+      {term:"most likely(推量の副詞)", desc:"「おそらく〜だろう」。根拠から推測させる設問の合図", ids:['Q200']},
+      {term:"In what month ~?", desc:"「何月に〜」。前置詞を文頭に置いた疑問文", ids:['Q200']},
+    ]
+  },
+  {
     id: 'dear-mr-president',
     title: 'Dear Mr. President',
     subtitle: '歌詞32行を上から順に通して打つ',
@@ -5682,7 +5817,9 @@ function rdBuildPaper(){
         `<div class="rd-mailrow"><span class="rd-ml">To:</span><span class="rd-mv">${escHtml(doc.meta.to)}</span></div>`+
         `<div class="rd-mailrow"><span class="rd-ml">From:</span><span class="rd-mv">${escHtml(doc.meta.from)}</span></div>`+
         `<div class="rd-mailrow"><span class="rd-ml">Date:</span><span class="rd-mv">${escHtml(doc.meta.date)}</span></div>`+
-        `<div class="rd-mailrow"><span class="rd-ml">Subject:</span><span class="rd-mv">${escHtml(doc.meta.subject)}</span></div>`;
+        `<div class="rd-mailrow"><span class="rd-ml">Subject:</span><span class="rd-mv">${escHtml(doc.meta.subject)}</span></div>`+
+        (doc.meta.attachment
+          ? `<div class="rd-mailrow"><span class="rd-ml">Attachment:</span><span class="rd-mv">${escHtml(doc.meta.attachment)}</span></div>` : '');
       block.appendChild(h);
     } else if(doc.kind === 'web'){
       const c = document.createElement('div');
@@ -5695,7 +5832,8 @@ function rdBuildPaper(){
 
     doc.lines.forEach(line => {
       const row = document.createElement('div');
-      row.className = 'rd-line' + (line.newPara?' newpara':'') + (line.heading?' heading':'');
+      row.className = 'rd-line' + (line.newPara?' newpara':'') + (line.heading?' heading':'')
+                    + (line.qhead?' qhead':'') + (line.choice?' choice':'');
       const en = document.createElement('div');
       en.className = 'rd-en';
       if(line.bullet){
