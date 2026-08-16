@@ -1727,6 +1727,7 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
       <span class="rd-progress-label" id="rd-progress-label">0%</span>
       <button class="btn-ghost" id="rd-stats-btn">文ごとの記録</button>
       <button class="btn-ghost" id="rd-restart-btn">最初から</button>
+      <button class="btn-ghost" id="rd-home-btn">一覧に戻る</button>
     </div>
   </div>
   <div class="bar-track"><div id="rd-bar-fill"></div></div>
@@ -1765,7 +1766,8 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
           </div>
           <div class="rd-fin-btns">
             <button class="btn-ghost" id="rd-fin-stats-btn">文ごとの記録</button>
-            <button class="btn-primary" id="rd-finish-retry" style="flex:2">もう一度やる</button>
+            <button class="btn-ghost" id="rd-finish-retry">もう一度やる</button>
+            <button class="btn-primary" id="rd-fin-home" style="flex:2">一覧に戻る</button>
           </div>
         </div>
       </div>
@@ -1931,8 +1933,9 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
     </div>
   </div>
   <div class="res-btns">
-    <button class="btn-ghost" id="r-back">← 設定</button>
-    <button class="btn-primary" id="r-retry">もう一度</button>
+    <button class="btn-ghost" id="r-back">設定</button>
+    <button class="btn-ghost" id="r-retry">もう一度</button>
+    <button class="btn-primary" id="r-home">一覧に戻る</button>
   </div>
   <div class="space-start-hint"><kbd>Space</kbd> でもう一度　<kbd>ESC</kbd> で設定に戻る</div>
   <div class="card" id="word-speed-card">
@@ -4405,6 +4408,7 @@ $('btn-best-reset').addEventListener('click', async () => {
 });
 
 $('r-retry').addEventListener('click',startGame);
+$('r-home').addEventListener('click',goHome);   // 結果から一覧へ直行
 $('r-back').addEventListener('click',()=>{
   // ゲームで更新された統計を練習設定にも反映
   if (currentLevel && $('pane-practice').style.display !== 'none') renderWordList();
@@ -7136,6 +7140,14 @@ function leaveReadingToSetup(){
   else { renderHomeScreen(); showScreen('home'); }
 }
 $('rd-back-btn').addEventListener('click', leaveReadingToSetup);
+// 本文・完走カードから一覧へ直行（続きは保存される）
+function leaveReadingToHome(){
+  rdLeaveReading();
+  renderHomeScreen();
+  showScreen('home');
+}
+$('rd-home-btn').addEventListener('click', leaveReadingToHome);
+$('rd-fin-home').addEventListener('click', leaveReadingToHome);
 // 経過時間チップ：クリックで「何秒止まったら計測を止めるか」を切り替える
 $('rd-timer').addEventListener('click', ()=>{
   const i = IDLE_CHOICES.indexOf(idlePauseSec);
