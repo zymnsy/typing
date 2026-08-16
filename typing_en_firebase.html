@@ -64,6 +64,11 @@ async function saveAllToCloud() {
     if (ws != null) payload['wordstats_lv'+lv] = JSON.parse(ws);
   }
   payload['settings'] = JSON.parse(localStorage.getItem('typing-en-v2-settings') || 'null');
+  // 長文まわり（CSVから入れた自作の長文と、文ごとの非表示・書き換え）
+  const rdCustom = localStorage.getItem('typing-en-v2-reading-custom');
+  const rdEdits  = localStorage.getItem('typing-en-v2-reading-edits');
+  if (rdCustom != null) payload['readingCustom'] = JSON.parse(rdCustom);
+  if (rdEdits  != null) payload['readingEdits']  = JSON.parse(rdEdits);
   payload['updatedAt'] = Date.now();
   try {
     await setDoc(userDocRef(currentUser.uid), payload, { merge: true });
@@ -87,6 +92,8 @@ async function loadFromCloud() {
       if (d['wordstats_lv'+lv] != null) localStorage.setItem('typing-en-v2-wordstats-lv'+lv, JSON.stringify(d['wordstats_lv'+lv]));
     }
     if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
+    if (d['readingCustom'] != null) localStorage.setItem('typing-en-v2-reading-custom', JSON.stringify(d['readingCustom']));
+    if (d['readingEdits']  != null) localStorage.setItem('typing-en-v2-reading-edits',  JSON.stringify(d['readingEdits']));
   } catch(e) { console.warn('Cloud load failed:', e); }
 }
 
@@ -112,6 +119,7 @@ onAuthStateChanged(auth, async user => {
     cloudLoadDone = true;
     showSyncBadge('ok');
     // ホーム画面を再描画（データ更新後）
+    if (typeof rebuildPassages === 'function') rebuildPassages();
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
     // クラウドから来た設定を画面に反映（大文字・小文字の判定モード）
     if (typeof applyCaseStrictSetting === 'function') applyCaseStrictSetting();
@@ -200,7 +208,8 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .page-sub{font-size:0.83rem;color:var(--sub);margin-top:4px;line-height:1.5;}
 /* search */
 .search-wrap{position:relative;}
-.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:0.9rem;opacity:0.55;pointer-events:none;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);display:flex;
+  color:var(--muted);opacity:0.9;pointer-events:none;}
 .search-input{width:100%;padding:11px 14px 11px 38px;border:1px solid var(--border);border-radius:var(--r);
   font-family:'Noto Sans JP',sans-serif;font-size:0.9rem;color:var(--text);
   background:var(--surface);outline:none;transition:all 0.18s var(--ease);box-shadow:var(--sh-xs);}
@@ -514,6 +523,54 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
   font-size:0.8rem;font-weight:700;color:var(--sub);}
 .rst-stat-l{font-family:'Noto Sans JP',sans-serif;font-size:0.68rem;font-weight:600;color:var(--muted);}
 .rst-stat.dim{color:var(--muted);font-weight:500;}
+/* 長文の「文ごとの表示・編集」 */
+.rse-count{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--sub);
+  text-transform:none;letter-spacing:0;}
+.rse-head{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-bottom:1px solid var(--border);font-size:0.64rem;font-weight:700;color:var(--muted);
+  letter-spacing:0.06em;text-transform:uppercase;}
+.rse-h-show{width:40px;flex-shrink:0;}
+.rse-h-num{width:34px;flex-shrink:0;text-align:right;}
+.rse-h-body{flex:1;min-width:0;}
+.rse-h-act{width:44px;flex-shrink:0;}
+.rse-list{max-height:56vh;overflow-y:auto;margin-top:2px;}
+.rse-list::-webkit-scrollbar{width:6px;}
+.rse-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+.rse-doc{font-size:0.66rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;
+  text-transform:uppercase;padding:12px 10px 5px;}
+.rse-row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:var(--r-sm);
+  border:1px solid transparent;transition:background 0.15s var(--ease);}
+.rse-row:hover{background:var(--surface-alt);border-color:var(--border);}
+.rse-row.off .rse-body{opacity:0.4;}
+.rse-row.edited{background:var(--on-bg);border-color:var(--on-soft);}
+.rse-row .toggle{width:34px;height:19px;flex-shrink:0;margin-top:5px;}
+.rse-row .toggle-thumb{width:15px;height:15px;}
+.rse-row .toggle input:checked ~ .toggle-thumb{transform:translateX(15px);}
+.rse-num{width:34px;flex-shrink:0;text-align:right;padding-top:7px;
+  font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:700;color:var(--muted);}
+.rse-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.rse-en,.rse-ja{width:100%;border:1px solid transparent;background:transparent;border-radius:6px;
+  padding:4px 7px;resize:none;overflow:hidden;outline:none;line-height:1.5;
+  font-family:'Noto Sans JP',sans-serif;transition:all 0.15s var(--ease);}
+.rse-en{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:600;color:var(--text);min-height:29px;}
+.rse-ja{font-size:0.76rem;color:var(--sub);min-height:27px;}
+.rse-en:hover,.rse-ja:hover{background:var(--surface-alt);}
+.rse-en:focus,.rse-ja:focus{background:var(--surface);border-color:var(--on-soft);
+  box-shadow:0 0 0 3px rgba(201,100,66,0.10);}
+.rse-act{width:44px;flex-shrink:0;padding-top:4px;display:flex;justify-content:flex-end;}
+.rse-foot{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;
+  border-top:1px solid var(--border);}
+.rse-dirty{flex:1;font-size:0.75rem;font-weight:700;color:var(--on);visibility:hidden;}
+.rse-foot.dirty .rse-dirty{visibility:visible;}
+.btn-save{padding:9px 20px;background:var(--text);color:#fff;border:none;border-radius:var(--r-sm);
+  font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;
+  transition:all 0.15s var(--ease);box-shadow:var(--sh-xs);}
+.btn-save:hover:not(:disabled){background:#000;box-shadow:var(--sh2);}
+.btn-save:disabled{opacity:0.35;cursor:default;}
+@media(max-width:760px){
+  .rse-h-num,.rse-num{width:24px;}
+  .rse-h-act,.rse-act{width:36px;}
+}
 /* 長文リーディングの管理画面 */
 .rm-note{font-size:0.72rem;color:var(--muted);margin-left:auto;}
 .rm-head{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;
@@ -529,7 +586,7 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rm-h-show{width:40px;flex-shrink:0;}
 .rm-h-title{flex:1;min-width:0;}
 .rm-h-num{width:54px;text-align:right;flex-shrink:0;}
-.rm-h-act{width:184px;text-align:right;flex-shrink:0;}
+.rm-h-act{width:330px;text-align:right;flex-shrink:0;}
 .rm-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:pointer;}
 .rm-title:hover b{color:var(--on);}
 .rm-title b{font-size:0.86rem;font-weight:700;letter-spacing:-0.01em;}
@@ -538,14 +595,13 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
   font-size:0.72rem;font-weight:700;color:var(--sub);}
 .rm-num.dim{color:var(--muted);font-weight:500;}
 .rm-num.resume{color:var(--on);}
-.rm-act{width:184px;flex-shrink:0;display:flex;justify-content:flex-end;gap:2px;}
+.rm-act{width:330px;flex-shrink:0;display:flex;justify-content:flex-end;gap:2px;flex-wrap:wrap;}
 .link-btn.danger{color:var(--ng);}
 .link-btn.danger:hover{background:var(--ng-bg);}
 .link-btn:disabled{opacity:0.3;cursor:default;background:none;}
 @media(max-width:760px){
   .rm-h-num,.rm-num{width:42px;}
-  .rm-h-act,.rm-act{width:104px;}
-  .rm-act{flex-wrap:wrap;}
+  .rm-h-act,.rm-act{width:112px;}
   .rm-note{display:none;}
 }
 /* tab */
@@ -861,7 +917,8 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .reset-label{font-size:0.75rem;color:var(--muted)}
 .csv-row{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
 .btn-csv{padding:8px 15px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:500;color:var(--sub);cursor:pointer;transition:all 0.15s var(--ease);}
-.btn-csv:hover{border-color:var(--on-soft);color:var(--on);background:var(--on-bg);}
+.btn-csv:hover:not(:disabled){border-color:var(--on-soft);color:var(--on);background:var(--on-bg);}
+.btn-csv:disabled{opacity:0.4;cursor:default;}
 /* title edit */
 .title-edit-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:11px 13px;background:var(--surface-alt);border-radius:var(--r-sm);border:1px solid var(--border);transition:border-color 0.18s var(--ease);}
 .title-edit-row:focus-within{border-color:var(--on-soft);background:var(--surface);}
@@ -937,7 +994,7 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .sync-badge.off     {background:#efede6;color:var(--muted)}
 .sync-badge.idle    {opacity:0}
 @keyframes syncPulse{0%,100%{opacity:0.4;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
-body{padding-top:54px}  /* ログインバーの高さ分ずらす */
+body{padding-top:68px}  /* ログインバーの高さ＋余白 */
 
 /* ── IME ヒント ── */
 .ime-hint{
@@ -1060,7 +1117,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 @keyframes toastOut{to{opacity:0;transform:translateY(10px) scale(0.92)}}
 
 @media(max-width:600px){
-  body{padding:16px;padding-top:58px;}
+  body{padding:16px;padding-top:70px;}
   .login-bar{padding:8px 14px;gap:8px;}
   .login-bar .brand{font-size:0.8rem;}
   .login-bar .brand-icon{width:22px;height:22px;font-size:0.68rem;}
@@ -1129,14 +1186,13 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
 <!-- HOME -->
 <div id="home-screen" class="screen active">
-  <div class="hrow">
-    <div>
-      <div class="page-title">英語タイピング練習</div>
-      <div class="page-sub">レベルを選んで練習しましょう</div>
-    </div>
-  </div>
   <div class="search-wrap">
-    <span class="search-icon">🔍</span>
+    <span class="search-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="15" height="15" fill="none"
+        stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="7" cy="7" r="4.6"></circle><path d="M10.4 10.4 14 14"></path>
+      </svg>
+    </span>
     <input type="text" id="level-search" class="search-input" placeholder="タイトル・番号で検索…"
       oninput="filterHomeGrid(this.value)">
   </div>
@@ -1155,7 +1211,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </span>
       アーカイブ
     </label>
-    <span class="reorder-note" id="reorder-note">ONにするとカードをドラッグして順番を入れ替えられます</span>
+    <span class="reorder-note" id="reorder-note"></span>
     <button type="button" class="reorder-reset" id="reorder-reset" style="display:none">並び順をリセット</button>
   </div>
   <div class="archive-bar" id="archive-bar" style="display:none">
@@ -1167,8 +1223,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   </div>
   <div class="home-section" id="reading-section">
     <div class="home-section-head">
-      <span class="home-section-title">長文リーディング</span>
-      <span class="home-section-note">問題文の書式のまま、英文を上から通して打つ練習</span>
+      <span class="home-section-title">長文</span>
       <button class="reorder-reset" id="reading-manage-btn" style="margin-left:auto">管理</button>
     </div>
     <div class="reading-grid" id="reading-card-grid"></div>
@@ -1176,8 +1231,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
   <div class="home-section">
     <div class="home-section-head">
-      <span class="home-section-title">単語・フレーズ練習</span>
-      <span class="home-section-note">レベルごとに単語リストを登録して出題</span>
+      <span class="home-section-title">単語</span>
     </div>
     <div id="home-grid-wrap">
       <div class="level-grid" id="home-level-grid"></div>
@@ -1190,7 +1244,6 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   <div class="home-section" id="archive-section" style="display:none">
     <div class="home-section-head archive-head" id="archive-head">
       <span class="home-section-title">アーカイブ <span class="archive-count" id="archive-count">0</span></span>
-      <span class="home-section-note">普段使わないカードの置き場。アーカイブをONにして選び「一覧に戻す」で戻せます</span>
       <span class="archive-caret" id="archive-caret">開く</span>
     </div>
     <div id="archive-body" hidden>
@@ -1619,10 +1672,41 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       </div>
     </div>
     <div class="card">
+      <div class="sec-label">文ごとの表示・編集 <span class="rse-count" id="rse-count"></span></div>
+      <div class="select-actions">
+        <button class="link-btn" id="rse-all-show">すべて表示</button>
+        <button class="link-btn" id="rse-all-hide">すべて非表示</button>
+        <button class="link-btn danger" id="rse-reset">編集をもとに戻す</button>
+        <span class="rm-note">非表示にした文は出題されません。保存すると、この長文の続きは最初に戻ります</span>
+      </div>
+      <div class="rse-head">
+        <span class="rse-h-show">表示</span>
+        <span class="rse-h-num">#</span>
+        <span class="rse-h-body">打つ英文 ／ 日本語訳</span>
+        <span class="rse-h-act"></span>
+      </div>
+      <div class="rse-list" id="rse-list"></div>
+      <div class="rse-foot">
+        <span class="rse-dirty" id="rse-dirty">未保存の変更があります</span>
+        <button class="btn-ghost" id="rse-cancel">変更を取り消す</button>
+        <button class="btn-save" id="rse-save">変更を保存する</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-label">この長文の CSV</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn-csv" id="rse-csv-export">CSVエクスポート</button>
+        <button class="btn-csv" id="rse-csv-import">CSVで入れ替える</button>
+        <input type="file" id="rse-csv-file" accept=".csv,.txt" style="display:none">
+      </div>
+      <div class="add-hint" id="rse-csv-hint"></div>
+      <div class="msg" id="rse-csv-msg"></div>
+    </div>
+    <div class="card">
       <div class="sec-label">長文リスト全体</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <span style="font-size:0.78rem;color:var(--sub);flex:1;min-width:200px;line-height:1.55;">
-          どの長文を一覧に出すかをまとめて切り替えたり、記録を整理できます。</span>
+          どの長文を一覧に出すかをまとめて切り替えたり、CSVから長文を足せます。</span>
         <button class="btn-ghost" id="rst-goto-list">長文リストの管理へ</button>
       </div>
     </div>
@@ -1730,8 +1814,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
   <div class="hrow">
     <div>
       <button class="back-link" id="rm-back-btn">← 一覧に戻る</button>
-      <div class="page-title" style="margin-top:6px">長文リーディングの管理</div>
-      <div class="page-sub">一覧に出す長文の切り替えと、記録の整理</div>
+      <div class="page-title" style="margin-top:6px">長文の管理</div>
     </div>
     <button class="btn-ghost" id="rm-clear-all-btn">すべての途中経過を消す</button>
   </div>
@@ -1749,9 +1832,27 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
       <span class="rm-h-num">続き</span>
       <span class="rm-h-num">練習</span>
       <span class="rm-h-num">最速</span>
-      <span class="rm-h-act">記録の整理</span>
+      <span class="rm-h-act">文の編集・記録・CSV</span>
     </div>
     <div class="rm-list" id="rm-list"></div>
+  </div>
+  <div class="card">
+    <div class="sec-label">CSV インポート / エクスポート</div>
+    <div class="title-edit-row" style="margin-bottom:10px">
+      <span class="title-edit-label">長文の名前</span>
+      <input type="text" class="title-edit-input" id="rm-csv-title"
+        placeholder="空ならファイル名がそのまま名前になります" maxlength="60">
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn-csv" id="rm-csv-import">CSVから長文を追加</button>
+      <input type="file" id="rm-csv-file" accept=".csv,.txt" style="display:none">
+    </div>
+    <div class="add-hint">
+      1行目はヘッダー <b>ja,en</b>。2行目以降が1文ずつで、<b>en</b> が打つ英文、<b>ja</b> が下に出る日本語訳。<br>
+      <b>show</b> 列を足して <b>0</b> にすると、その文を最初から非表示にできます。<br>
+      空行はそこで段落を分けます。単語練習のCSVをそのまま長文にできます。
+    </div>
+    <div class="msg" id="rm-csv-msg"></div>
   </div>
 </div>
 
@@ -2658,9 +2759,7 @@ function applyReorderMode(){
   const sw = $('reorder-switch');   if(sw) sw.classList.toggle('on', reorderMode);
   const cb = $('reorder-toggle');   if(cb) cb.checked = reorderMode;
   const note = $('reorder-note');
-  if(note) note.textContent = reorderMode
-    ? 'カードをドラッグして並べ替えます（この間はクリックしても開きません）'
-    : 'ONにするとカードをドラッグして順番を入れ替えられます';
+  if(note) note.textContent = '';
   const rst = $('reorder-reset');   if(rst) rst.style.display = reorderMode ? '' : 'none';
   const search = $('level-search');
   if(search){
@@ -2730,9 +2829,7 @@ function applyArchiveMode(){
   const cb = $('archive-toggle'); if(cb) cb.checked = archiveMode;
   const bar = $('archive-bar');   if(bar) bar.style.display = archiveMode ? '' : 'none';
   const note = $('reorder-note');
-  if(note && archiveMode){
-    note.textContent = 'カードをクリックして選び、下のボタンでアーカイブに移す／一覧に戻すができます';
-  }
+  if(note) note.textContent = '';
   syncArchiveSelUI();
   updateArchiveBar();
   updateArchiveSection();
@@ -5128,7 +5225,7 @@ $('reset-all-btn').addEventListener('click', async () => {
 //  問題文の書式のまま、英文だけを上から通して打つモード。
 //  単語レベル（1〜100）とはデータも記録も完全に別系統。
 // ══════════════════════════════════════════════
-const READING_PASSAGES = [
+const RD_BUILTIN_PASSAGES = [
   {
     id: 'toeic11-t2-q196',
     title: 'TOEIC 公式11 TEST2 Part7 Q196-200',
@@ -5533,6 +5630,133 @@ const READING_PASSAGES = [
     ]
   },
   {
+    id: 'so-what',
+    title: 'So What',
+    subtitle: '歌詞82行を上から順に通して打つ',
+    tag: 'LYRICS',
+    added: '2026-08-16',
+    intro: '単語練習の「So What」と同じ英文を、歌詞の並び順のまま上から通して打ちます。',
+    docs: [
+      {
+        kind:'lyrics', tag:'Lyrics',
+        lines:[
+          {id:"S1", en:"I guess I just lost my husband", ja:"夫を亡くしたばかりだと思う"},
+          {id:"S2", en:"I don't know where he went", ja:"彼がどこに行ったのか分かりません"},
+          {id:"S3", en:"So I'm gonna drink my money", ja:"だから私のお金を飲みます"},
+          {id:"S4", en:"I'm not gonna pay his rent / nope", ja:"私は彼の家賃を払うつもりはありません（いいえ）"},
+          {id:"S5", en:"I got a brand new attitude", ja:"まったく新しい姿勢を身につけた"},
+          {id:"S6", en:"And I'm gonna wear it tonight", ja:"そして今夜それを着るつもりです"},
+          {id:"S7", en:"I wanna get in trouble", ja:"トラブルに巻き込まれたい"},
+          {id:"S8", en:"I wanna start a fight", ja:"戦いを始めたい"},
+          {id:"S9", en:"I wanna start a fight", ja:"戦いを始めたい"},
+          {id:"S10", en:"I wanna start a fight", ja:"戦いを始めたい"},
+          {id:"S11", en:"So, so what?", ja:"それで、それで何？", newPara:true},
+          {id:"S12", en:"I'm still a rock star", ja:"私はまだロックスターです"},
+          {id:"S13", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S14", en:"And I don't need you", ja:"そして、私にはあなたは必要ありません"},
+          {id:"S15", en:"And guess what", ja:"そして、何を推測しますか"},
+          {id:"S16", en:"I'm having more fun", ja:"もっと楽しくなりました"},
+          {id:"S17", en:"And now that we're done", ja:"これで完了です"},
+          {id:"S18", en:"I'm gonna show you tonight", ja:"今夜見せてあげるよ"},
+          {id:"S19", en:"I'm alright, I'm just fine", ja:"大丈夫、大丈夫です"},
+          {id:"S20", en:"And you're a tool", ja:"そしてあなたは道具です"},
+          {id:"S21", en:"So, so what?", ja:"それで、それで何？"},
+          {id:"S22", en:"I am a rock star", ja:"私はロックスターです"},
+          {id:"S23", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S24", en:"And I don't want you tonight", ja:"そして今夜はあなたはいらない"},
+          {id:"S25", en:"check my flow", ja:"自分の流れを確認する", newPara:true},
+          {id:"S26", en:"The waiter just took my table", ja:"ウェイターがちょうど私のテーブルに着いたところです", newPara:true},
+          {id:"S27", en:"And gave to Jessica Simp- / shit!", ja:"そしてジェシカ・シンプにあげました - (クソ!)"},
+          {id:"S28", en:"I guess I'll go sit with tomboy", ja:"おてんば娘と一緒に座ろうと思う"},
+          {id:"S29", en:"At least he'll know how to hit", ja:"少なくとも彼は打ち方を知っているだろう"},
+          {id:"S30", en:"What if this song's on the radio", ja:"この曲がラジオで流れたらどうなるだろう"},
+          {id:"S31", en:"Then somebody's gonna die", ja:"そうしたら誰かが死ぬだろう"},
+          {id:"S32", en:"I'm gonna get in trouble", ja:"困ってしまいますよ"},
+          {id:"S33", en:"My ex will start a fight", ja:"私の元は喧嘩を始めるでしょう"},
+          {id:"S34", en:"he's gonna start a fight", ja:"彼は戦いを始めるつもりだ", newPara:true},
+          {id:"S35", en:"we're all gonna get in a fight!", ja:"みんなで喧嘩するんだよ！"},
+          {id:"S36", en:"So, so what?", ja:"それで、それで何？", newPara:true},
+          {id:"S37", en:"I'm still a rock star", ja:"私はまだロックスターです"},
+          {id:"S38", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S39", en:"And I don't need you", ja:"そして、私にはあなたは必要ありません"},
+          {id:"S40", en:"And guess what", ja:"そして、何を推測しますか"},
+          {id:"S41", en:"I'm having more fun", ja:"もっと楽しくなりました"},
+          {id:"S42", en:"And now that we're done", ja:"これで完了です"},
+          {id:"S43", en:"I'm gonna show you tonight", ja:"今夜見せてあげるよ"},
+          {id:"S44", en:"I'm alright, I'm just fine", ja:"大丈夫、大丈夫です"},
+          {id:"S45", en:"And you're a tool", ja:"そしてあなたは道具です"},
+          {id:"S46", en:"So, so what?", ja:"それで、それで何？"},
+          {id:"S47", en:"I am a rock star", ja:"私はロックスターです"},
+          {id:"S48", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S49", en:"And I don't want you tonight", ja:"そして今夜はあなたはいらない"},
+          {id:"S50", en:"You weren't there", ja:"あなたはそこにいなかった", newPara:true},
+          {id:"S51", en:"You never were", ja:"あなたは決してそうではありませんでした"},
+          {id:"S52", en:"You want it all", ja:"全部欲しいよね"},
+          {id:"S53", en:"But that's not fair", ja:"でもそれは不公平だ"},
+          {id:"S54", en:"I gave you love", ja:"私はあなたに愛を与えました"},
+          {id:"S55", en:"I gave my all", ja:"私は全力を尽くしました"},
+          {id:"S56", en:"You weren't there", ja:"あなたはそこにいなかった"},
+          {id:"S57", en:"You let me fall", ja:"あなたは私を落ちさせた"},
+          {id:"S58", en:"So, so what?", ja:"それで、それで何？", newPara:true},
+          {id:"S59", en:"I'm still a rock star", ja:"私はまだロックスターです"},
+          {id:"S60", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S61", en:"And I don't need you", ja:"そして、私にはあなたは必要ありません"},
+          {id:"S62", en:"And guess what", ja:"そして、何を推測しますか"},
+          {id:"S63", en:"I'm having more fun", ja:"もっと楽しくなりました"},
+          {id:"S64", en:"And now that we're done", ja:"これで完了です"},
+          {id:"S65", en:"I'm gonna show you tonight", ja:"今夜見せてあげるよ"},
+          {id:"S66", en:"I'm alright, I'm just fine", ja:"大丈夫、大丈夫です"},
+          {id:"S67", en:"And you're a tool", ja:"そしてあなたは道具です"},
+          {id:"S68", en:"So, so what?", ja:"それで、それで何？"},
+          {id:"S69", en:"I am a rock star", ja:"私はロックスターです"},
+          {id:"S70", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S71", en:"And I don't want you tonight", ja:"そして今夜はあなたはいらない"},
+          {id:"S72", en:"No, no", ja:"いや、いや、", newPara:true},
+          {id:"S73", en:"No, no", ja:"いや、いや、"},
+          {id:"S74", en:"I don't want you tonight", ja:"今夜はあなたはいらない"},
+          {id:"S75", en:"You weren't there", ja:"あなたはそこにいなかった"},
+          {id:"S76", en:"I'm gonna show you tonight", ja:"今夜見せてあげるよ"},
+          {id:"S77", en:"I'm alright, I'm just fine", ja:"大丈夫、大丈夫です"},
+          {id:"S78", en:"And you're a tool", ja:"そしてあなたは道具です"},
+          {id:"S79", en:"So, so what?", ja:"それで、それで何？"},
+          {id:"S80", en:"I am a rock star", ja:"私はロックスターです"},
+          {id:"S81", en:"I got my rock moves", ja:"ロックの動きを手に入れた"},
+          {id:"S82", en:"And I don't want you tonight", ja:"そして今夜はあなたはいらない"},
+        ]
+      }
+    ],
+    vocab: [
+      {term:"gonna", desc:"going to の口語つづり。be gonna do で「〜するつもり」", ids:['S3','S6','S18','S31','S32','S34','S35']},
+      {term:"wanna", desc:"want to の口語つづり。wanna do で「〜したい」", ids:['S7','S8']},
+      {term:"brand new", desc:"まっさらの、買ったばかりの", ids:['S5']},
+      {term:"attitude", desc:"態度、心構え。ここは「開き直った生き方」", ids:['S5']},
+      {term:"get in trouble", desc:"面倒を起こす、まずいことになる", ids:['S7','S32']},
+      {term:"start a fight", desc:"けんかを始める、もめごとを起こす", ids:['S8','S33','S34']},
+      {term:"so what?", desc:"「だから何?」と開き直る言い方", ids:['S11','S21']},
+      {term:"guess what", desc:"「ねえ聞いて」と話を切り出す口語", ids:['S15']},
+      {term:"now that ~", desc:"「もう〜なのだから」。理由を表す接続表現", ids:['S17']},
+      {term:"alright", desc:"all right のくだけたつづり。「大丈夫」", ids:['S19']},
+      {term:"tool", desc:"口語で「使い走り、いいように使われる人」", ids:['S20']},
+      {term:"ex", desc:"元夫・元恋人（ex-husband などの省略）", ids:['S33']},
+      {term:"tomboy", desc:"おてんば娘、男の子っぽい女の子", ids:['S28']},
+      {term:"at least", desc:"少なくとも、せめて", ids:['S29']},
+      {term:"what if ~", desc:"「もし〜だったらどうなる?」", ids:['S30']},
+      {term:"not fair", desc:"不公平だ、ずるい", ids:['S53']},
+      {term:"give one's all", desc:"全力を出しきる、すべてを捧げる", ids:['S55']},
+    ],
+    grammar: [
+      {term:"be gonna do（未来）", desc:"be going to do の口語。話し手の意志や、もう決まっている予定を表す", ids:['S3','S6','S18']},
+      {term:"I guess (that) ~", desc:"guess の後ろの接続詞 that が省略された形。「〜だと思う」", ids:['S1','S28']},
+      {term:"間接疑問（where + 主語 + 動詞）", desc:"know の目的語になると疑問文の語順が消え、where he went になる", ids:['S2']},
+      {term:"I got ~（口語）", desc:"I have got ~ の have が落ちた形。「〜を持っている」", ids:['S5','S13']},
+      {term:"now that + 節", desc:"「もう〜なのだから」。前提となる事実を示して理由にする", ids:['S17']},
+      {term:"What if + 節", desc:"「もし〜だったらどうなるだろう」。心配や仮定を投げかける", ids:['S30']},
+      {term:"未来を表す will", desc:"My ex will start a fight は「きっと〜するだろう」という予測", ids:['S33']},
+      {term:"let + O + 動詞の原形", desc:"You let me fall で「私が落ちるままにした」。放置のニュアンス", ids:['S57']},
+      {term:"be動詞の過去否定（weren't）", desc:"You weren't there は仮定ではなく「実際にいなかった」という過去の事実", ids:['S50','S56']},
+    ]
+  },
+  {
     id: "initialism",
     title: "Initialism 頭字語",
     subtitle: "5行を上から順に通して打つ",
@@ -5555,6 +5779,65 @@ const READING_PASSAGES = [
     grammar: []
   }
 ];
+
+// ══════════════════════════════════════════════
+//  長文の保存データ
+//   ・RD_CUSTOM_KEY … CSVから取り込んだ自作の長文（元データ）
+//   ・RD_EDITS_KEY  … 文ごとの「非表示」と「打つ英文・訳の書き換え」
+//   組み込みの長文も自作の長文も、同じ編集データを上から重ねて表示する。
+//   編集を消せば元に戻せるように、元データ自体は書き換えない。
+// ══════════════════════════════════════════════
+const RD_CUSTOM_KEY = 'typing-en-v2-reading-custom';
+const RD_EDITS_KEY  = 'typing-en-v2-reading-edits';
+
+function loadCustomPassages(){
+  try { const r = localStorage.getItem(RD_CUSTOM_KEY); if(r) return JSON.parse(r) || []; } catch(e){}
+  return [];
+}
+function saveCustomPassages(list){
+  localStorage.setItem(RD_CUSTOM_KEY, JSON.stringify(list));
+  rebuildPassages();
+}
+function loadReadingEdits(){
+  try { const r = localStorage.getItem(RD_EDITS_KEY); if(r) return JSON.parse(r) || {}; } catch(e){}
+  return {};
+}
+function saveReadingEdits(all){
+  localStorage.setItem(RD_EDITS_KEY, JSON.stringify(all));
+  rebuildPassages();
+}
+function rdEditsOf(id){
+  const e = loadReadingEdits()[id];
+  return { hidden: (e && e.hidden) || [], lines: (e && e.lines) || {} };
+}
+// 元の長文に編集を重ねた「実際に打つ形」を作る（元のオブジェクトは触らない）
+function rdApplyEdits(p, ed){
+  if(!ed) return p;
+  const hidden = new Set(ed.hidden || []);
+  const over   = ed.lines || {};
+  if(!hidden.size && !Object.keys(over).length) return p;
+  const docs = p.docs
+    .map(d => Object.assign({}, d, {
+      lines: d.lines
+        .filter(l => !hidden.has(l.id))
+        .map(l => over[l.id] ? Object.assign({}, l, over[l.id]) : l)
+    }))
+    .filter(d => d.lines.length);
+  return Object.assign({}, p, { docs });
+}
+// 一覧・練習で使う長文（組み込み ＋ 自作、どちらも編集を反映済み）
+let READING_PASSAGES = [];
+function rebuildPassages(){
+  const edits = loadReadingEdits();
+  READING_PASSAGES = RD_BUILTIN_PASSAGES.concat(loadCustomPassages())
+    .map(p => rdApplyEdits(p, edits[p.id]));
+}
+// 編集する前の元データ（文ごとの編集画面で「全部の文」を出すために使う）
+function rdBasePassage(id){
+  return RD_BUILTIN_PASSAGES.find(p => p.id === id) || loadCustomPassages().find(p => p.id === id) || null;
+}
+function rdIsCustom(id){ return loadCustomPassages().some(p => p.id === id); }
+rebuildPassages();
 
 // 打つ対象の文字。丸カッコ ( ) は打たずに飛ばす（Shift併用で打ちにくく実用でも使わないため）
 const RD_TYPABLE = /[a-zA-Z0-9 '\-!?.,;:/"]/;
@@ -6263,6 +6546,8 @@ function switchRTab(tab){
   $('rst-tab-manage').classList.toggle('active', tab === 'manage');
   $('rpane-practice').style.display = tab === 'practice' ? 'flex' : 'none';
   $('rpane-manage').style.display   = tab === 'manage' ? 'flex' : 'none';
+  // 隠れている間は高さを測れないので、描画が済んでから入力欄を伸ばし直す
+  if(tab === 'manage' && typeof rseGrowAll === 'function') requestAnimationFrame(rseGrowAll);
 }
 function rdLineCount(p){ return p.docs.reduce((n,d)=>n+d.lines.length, 0); }
 function openReadingSetup(id){
@@ -6315,6 +6600,9 @@ function renderReadingSetup(){
   $('rst-visible-toggle').checked = !loadArchivedReadings().has(p.id);
   $('rst-clear-progress').disabled = !hasResume;
   $('rst-clear-stats').disabled = !(best || log.plays);
+
+  renderSentenceEditor();
+  renderPassageCsvPane();
 }
 function setReadingStartMode(mode){
   if(mode === 'resume' && $('rst-start-resume').disabled) return;
@@ -6363,6 +6651,357 @@ $('rst-goto-list').addEventListener('click', ()=>{
 });
 
 // ══════════════════════════════════════════════
+//  文ごとの表示・編集（練習設定 → 長文管理タブ）
+//   非表示と書き換えは編集データに残し、元の長文はそのまま置いておく。
+//   だから「編集をもとに戻す」でいつでも元の英文に帰れる。
+// ══════════════════════════════════════════════
+let rseDraft = null;   // 編集中の下書き {id, hidden:Set, lines:{lineId:{en?,ja?}}}
+
+function rseNormJson(hidden, lines){
+  return JSON.stringify({ hidden:[...hidden].sort(), lines });
+}
+function rseLoadDraft(id){
+  const ed = rdEditsOf(id);
+  rseDraft = { id, hidden:new Set(ed.hidden), lines: JSON.parse(JSON.stringify(ed.lines)) };
+}
+function rseIsDirty(){
+  if(!rseDraft) return false;
+  const ed = rdEditsOf(rseDraft.id);
+  return rseNormJson(rseDraft.hidden, rseDraft.lines) !== rseNormJson(new Set(ed.hidden), ed.lines);
+}
+function rseSyncFoot(){
+  const foot = document.querySelector('.rse-foot');
+  const dirty = rseIsDirty();
+  if(foot) foot.classList.toggle('dirty', dirty);
+  const save = $('rse-save');   if(save)   save.disabled = !dirty;
+  const cancel = $('rse-cancel'); if(cancel) cancel.disabled = !dirty;
+}
+function rseAutoGrow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
+// 表示されていない間は高さが測れないので、タブを開いた時にまとめて伸ばし直す
+function rseGrowAll(){
+  const list = $('rse-list'); if(!list) return;
+  list.querySelectorAll('textarea').forEach(rseAutoGrow);
+}
+function rseUpdateCount(){
+  const base = rdBasePassage(rdSetupId);
+  const el = $('rse-count'); if(!el) return;
+  if(!base || !rseDraft){ el.textContent = ''; return; }
+  const total = base.docs.reduce((n,d)=>n+d.lines.length, 0);
+  el.textContent = `${total - rseDraft.hidden.size} / ${total} 文を出題`;
+}
+function renderSentenceEditor(){
+  const list = $('rse-list'); if(!list) return;
+  const base = rdBasePassage(rdSetupId);
+  list.innerHTML = '';
+  if(!base){ list.innerHTML = '<div class="rs-empty">長文がありません</div>'; return; }
+  if(!rseDraft || rseDraft.id !== rdSetupId) rseLoadDraft(rdSetupId);
+
+  const multiDoc = base.docs.length > 1;
+  let n = 0;
+  base.docs.forEach((d, di) => {
+    if(multiDoc){
+      const h = document.createElement('div');
+      h.className = 'rse-doc';
+      h.textContent = d.tag || ('本文 ' + (di + 1));
+      list.appendChild(h);
+    }
+    d.lines.forEach(l => {
+      n++;
+      const on = !rseDraft.hidden.has(l.id);
+      const ov = rseDraft.lines[l.id] || {};
+      const row = document.createElement('div');
+      row.className = 'rse-row' + (on ? '' : ' off') + (Object.keys(ov).length ? ' edited' : '');
+      row.innerHTML = `
+        <label class="toggle" title="この文を出題する">
+          <input type="checkbox" class="rse-show"${on ? ' checked' : ''}>
+          <span class="toggle-track"></span><span class="toggle-thumb"></span>
+        </label>
+        <span class="rse-num">${n}</span>
+        <div class="rse-body">
+          <textarea class="rse-en" rows="1" spellcheck="false" placeholder="打つ英文"></textarea>
+          <textarea class="rse-ja" rows="1" placeholder="日本語訳（空でも可）"></textarea>
+        </div>
+        <span class="rse-act">
+          <button class="link-btn rse-revert" title="この文の書き換えをもとに戻す">戻す</button>
+        </span>`;
+      const enEl   = row.querySelector('.rse-en');
+      const jaEl   = row.querySelector('.rse-ja');
+      const revert = row.querySelector('.rse-revert');
+      enEl.value = ov.en !== undefined ? ov.en : l.en;
+      jaEl.value = ov.ja !== undefined ? ov.ja : (l.ja || '');
+      revert.disabled = !Object.keys(ov).length;
+
+      const onEdit = ()=>{
+        const nv = {};
+        if(enEl.value !== l.en) nv.en = enEl.value;
+        if((jaEl.value || '') !== (l.ja || '')) nv.ja = jaEl.value;
+        if(Object.keys(nv).length) rseDraft.lines[l.id] = nv;
+        else delete rseDraft.lines[l.id];
+        row.classList.toggle('edited', !!rseDraft.lines[l.id]);
+        revert.disabled = !rseDraft.lines[l.id];
+        rseSyncFoot();
+      };
+      [enEl, jaEl].forEach(t => {
+        t.addEventListener('input', ()=>{ rseAutoGrow(t); onEdit(); });
+        // 1行＝1文なので、Enterで改行させずに確定させる
+        t.addEventListener('keydown', ev=>{ if(ev.key === 'Enter'){ ev.preventDefault(); t.blur(); } });
+      });
+      revert.addEventListener('click', ()=>{
+        delete rseDraft.lines[l.id];
+        enEl.value = l.en; jaEl.value = l.ja || '';
+        rseAutoGrow(enEl); rseAutoGrow(jaEl);
+        row.classList.remove('edited'); revert.disabled = true;
+        rseSyncFoot();
+      });
+      row.querySelector('.rse-show').addEventListener('change', e=>{
+        if(e.target.checked) rseDraft.hidden.delete(l.id); else rseDraft.hidden.add(l.id);
+        row.classList.toggle('off', !e.target.checked);
+        rseUpdateCount(); rseSyncFoot();
+      });
+      list.appendChild(row);
+    });
+  });
+  rseUpdateCount();
+  rseSyncFoot();
+  rseGrowAll();
+}
+function rseSetAll(visible){
+  const base = rdBasePassage(rdSetupId); if(!base || !rseDraft) return;
+  rseDraft.hidden = new Set();
+  if(!visible) base.docs.forEach(d => d.lines.forEach(l => rseDraft.hidden.add(l.id)));
+  renderSentenceEditor();
+}
+function rseSave(){
+  if(!rseDraft) return;
+  const base = rdBasePassage(rseDraft.id); if(!base) return;
+  const total = base.docs.reduce((n,d)=>n+d.lines.length, 0);
+  if(rseDraft.hidden.size >= total){
+    toast('すべて非表示にはできません。1文以上を表示にしてください','err');
+    return;
+  }
+  const id = rseDraft.id;
+  const all = loadReadingEdits();
+  const hidden = [...rseDraft.hidden];
+  if(!hidden.length && !Object.keys(rseDraft.lines).length) delete all[id];
+  else all[id] = { hidden, lines: rseDraft.lines };
+  saveReadingEdits(all);
+  // 文が増減すると続きの位置がずれるので、途中経過は捨てて最初からにする
+  localStorage.removeItem(rdKey(id));
+  if(rdPassage && rdPassage.id === id) rdRestoredMs = 0;
+  rseDraft = null;
+  renderHomeScreen(); renderReadingSetup();
+  toast('保存しました（この長文は次回、最初から始まります）','suc');
+}
+$('rse-save').addEventListener('click', rseSave);
+$('rse-cancel').addEventListener('click', ()=>{ rseDraft = null; renderSentenceEditor(); });
+$('rse-all-show').addEventListener('click', ()=>rseSetAll(true));
+$('rse-all-hide').addEventListener('click', ()=>rseSetAll(false));
+$('rse-reset').addEventListener('click', async ()=>{
+  const id = rdSetupId; if(!id) return;
+  const ed = rdEditsOf(id);
+  if(!ed.hidden.length && !Object.keys(ed.lines).length && !rseIsDirty()){
+    toast('この長文はまだ編集されていません','err'); return;
+  }
+  const ok = await customConfirm({
+    title:'編集をもとに戻す',
+    desc:'文ごとの非表示と書き換えをすべて取り消して、元の英文に戻します。\n途中経過（続き）も消えます。',
+    okText:'もとに戻す', danger:true
+  });
+  if(!ok) return;
+  const all = loadReadingEdits(); delete all[id]; saveReadingEdits(all);
+  localStorage.removeItem(rdKey(id));
+  if(rdPassage && rdPassage.id === id) rdRestoredMs = 0;
+  rseDraft = null;
+  renderHomeScreen(); renderReadingSetup();
+  toast('もとに戻しました','suc');
+});
+
+// ══════════════════════════════════════════════
+//  長文の CSV（ja,en,show の3列。空行はそこで段落を分ける）
+// ══════════════════════════════════════════════
+function rdCsvMsg(id, type, text){
+  const el = $(id); if(!el) return;
+  el.textContent = text; el.className = 'msg ' + type;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(()=>{ el.className = 'msg'; el.textContent = ''; }, 6000);
+}
+function rdDownloadCsv(name, text){
+  const blob = new Blob(['﻿' + text], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+// 画面に出ている名前をファイル名に使えるようにする
+function rdSafeFileName(s){
+  return String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').slice(0, 60) || 'passage';
+}
+function rdPassageToCsv(id){
+  const base = rdBasePassage(id); if(!base) return '';
+  const ed = rdEditsOf(id);
+  const hidden = new Set(ed.hidden), over = ed.lines || {};
+  const rows = ['ja,en,show'];
+  base.docs.forEach((d, di) => {
+    if(di > 0) rows.push(',,');                       // 段落（本文）の区切り
+    d.lines.forEach((l, li) => {
+      if(li > 0 && l.newPara) rows.push(',,');
+      const ov = over[l.id] || {};
+      const en = ov.en !== undefined ? ov.en : l.en;
+      const ja = ov.ja !== undefined ? ov.ja : (l.ja || '');
+      rows.push(csvEscape(ja) + ',' + csvEscape(en) + ',' + (hidden.has(l.id) ? '0' : '1'));
+    });
+  });
+  return rows.join('\r\n');
+}
+// 打ちにくい記号（全角クォート・ダッシュ）はASCIIに寄せておく
+function rdCleanEn(s){
+  return String(s)
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—−]/g, '-')
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+// CSV本文 → 文の配列。空行は「次の文から段落を変える」印として読む
+function rdParseCsvLines(text){
+  const raw = text.replace(/^﻿/, '').split(/\r?\n/);
+  let iJa = 0, iEn = 1, iShow = -1, start = 0;
+  const head = raw.length ? parseCSVLine(raw[0]).map(s => s.trim().toLowerCase().replace(/^"|"$/g,'')) : [];
+  if(head.includes('en') && head.includes('ja')){
+    iJa = head.indexOf('ja'); iEn = head.indexOf('en'); iShow = head.indexOf('show');
+    start = 1;
+  }
+  const out = [];
+  let pendingPara = false, n = 0;
+  for(let i = start; i < raw.length; i++){
+    const f = parseCSVLine(raw[i]);
+    const ja = (f[iJa] || '').trim();
+    const en = rdCleanEn(f[iEn] || '');
+    if(!en){ if(out.length) pendingPara = true; continue; }   // 空行＝段落の区切り
+    if(en.length > 500) continue;
+    n++;
+    const line = { id:'L' + n, en, ja };
+    if(pendingPara){ line.newPara = true; pendingPara = false; }
+    const show = iShow >= 0 ? (f[iShow] || '').trim() : '';
+    if(iShow >= 0 && (show === '0' || show.toLowerCase() === 'false')) line._hide = true;
+    out.push(line);
+  }
+  return out;
+}
+// 取り込んだ文から長文オブジェクトと「最初から非表示にする文」を作る
+function rdBuildPassageFromLines(lines, title, id){
+  const hide = lines.filter(l => l._hide).map(l => l.id);
+  const clean = lines.map(l => { const c = Object.assign({}, l); delete c._hide; return c; });
+  const p = {
+    id, title,
+    subtitle: `${clean.length}行を上から順に通して打つ`,
+    tag: 'CSV',
+    added: new Date().toISOString().slice(0, 10),
+    intro: `CSVから取り込んだ「${title}」を、並び順のまま上から通して打ちます。`,
+    docs: [{ kind:'plain', tag: title, lines: clean }],
+    vocab: [], grammar: []
+  };
+  return { passage: p, hide };
+}
+function rdReadCsvFile(file, done){
+  const r = new FileReader();
+  r.onload = ev => done(null, ev.target.result);
+  r.onerror = () => done(new Error('ファイルを読めませんでした'));
+  r.readAsText(file, 'UTF-8');
+}
+
+// ── 練習設定タブ側：この長文のCSV ──
+function renderPassageCsvPane(){
+  const hint = $('rse-csv-hint'), imp = $('rse-csv-import');
+  if(!hint || !imp) return;
+  const custom = rdIsCustom(rdSetupId);
+  imp.disabled = !custom;
+  imp.title = custom ? '' : '組み込みの長文は入れ替えできません';
+  hint.innerHTML = custom
+    ? '書き出しは <b>ja,en,show</b> の3列（show が 0 の文は非表示）。<br>入れ替えると、この長文の記録と続きは消えます。'
+    : '書き出しは <b>ja,en,show</b> の3列（show が 0 の文は非表示）。<br>組み込みの長文は入れ替えできません。文の書き換えは上の「文ごとの表示・編集」からできます。';
+}
+$('rse-csv-export').addEventListener('click', ()=>{
+  const base = rdBasePassage(rdSetupId); if(!base) return;
+  rdDownloadCsv(`長文_${rdSafeFileName(base.title)}.csv`, rdPassageToCsv(rdSetupId));
+  rdCsvMsg('rse-csv-msg','suc','CSVを書き出しました');
+});
+$('rse-csv-import').addEventListener('click', ()=>$('rse-csv-file').click());
+$('rse-csv-file').addEventListener('change', e=>{
+  const file = e.target.files[0]; e.target.value = '';
+  if(!file) return;
+  const id = rdSetupId;
+  rdReadCsvFile(file, async (err, text)=>{
+    if(err){ rdCsvMsg('rse-csv-msg','err',err.message); return; }
+    const lines = rdParseCsvLines(text);
+    if(!lines.length){ rdCsvMsg('rse-csv-msg','err','読み取れる行がありませんでした（ヘッダーは ja,en）'); return; }
+    const list = loadCustomPassages();
+    const idx = list.findIndex(p => p.id === id);
+    if(idx < 0){ rdCsvMsg('rse-csv-msg','err','この長文は入れ替えできません'); return; }
+    const ok = await customConfirm({
+      title:'CSVで入れ替える',
+      desc:`「${list[idx].title}」の中身を ${lines.length} 行に入れ替えます。\nこの長文の記録と続きは消えます。`,
+      okText:'入れ替える', danger:true
+    });
+    if(!ok) return;
+    const built = rdBuildPassageFromLines(lines, list[idx].title, id);
+    list[idx] = built.passage;
+    saveCustomPassages(list);
+    const all = loadReadingEdits();
+    if(built.hide.length) all[id] = { hidden: built.hide, lines:{} }; else delete all[id];
+    saveReadingEdits(all);
+    [rdKey(id), rdStatsKey(id), rdBestKey(id), rdLastKey(id), rdLogKey(id)].forEach(k=>localStorage.removeItem(k));
+    rseDraft = null;
+    renderHomeScreen(); renderReadingSetup();
+    rdCsvMsg('rse-csv-msg','suc',`${lines.length} 行に入れ替えました`);
+  });
+});
+
+// ── 管理画面側：CSVから長文を追加 ──
+$('rm-csv-import').addEventListener('click', ()=>$('rm-csv-file').click());
+$('rm-csv-file').addEventListener('change', e=>{
+  const file = e.target.files[0]; e.target.value = '';
+  if(!file) return;
+  rdReadCsvFile(file, (err, text)=>{
+    if(err){ rdCsvMsg('rm-csv-msg','err',err.message); return; }
+    const lines = rdParseCsvLines(text);
+    if(!lines.length){ rdCsvMsg('rm-csv-msg','err','読み取れる行がありませんでした（ヘッダーは ja,en）'); return; }
+    const typed = ($('rm-csv-title').value || '').trim();
+    const title = typed || file.name.replace(/\.(csv|txt)$/i, '') || '名前のない長文';
+    const id = 'custom-' + Date.now().toString(36);
+    const built = rdBuildPassageFromLines(lines, title, id);
+    saveCustomPassages(loadCustomPassages().concat([built.passage]));
+    if(built.hide.length){
+      const all = loadReadingEdits();
+      all[id] = { hidden: built.hide, lines:{} };
+      saveReadingEdits(all);
+    }
+    $('rm-csv-title').value = '';
+    renderHomeScreen(); renderReadingManage();
+    rdCsvMsg('rm-csv-msg','suc',`「${title}」を ${lines.length} 行で追加しました`);
+  });
+});
+async function rdDeleteCustomPassage(id){
+  const list = loadCustomPassages();
+  const p = list.find(x => x.id === id); if(!p) return;
+  const ok = await customConfirm({
+    title:'この長文を削除する',
+    desc:`「${p.title}」を一覧から消します。\n記録も続きも消え、元に戻せません。`,
+    okText:'削除する', danger:true
+  });
+  if(!ok) return;
+  saveCustomPassages(list.filter(x => x.id !== id));
+  const all = loadReadingEdits(); delete all[id]; saveReadingEdits(all);
+  [rdKey(id), rdStatsKey(id), rdBestKey(id), rdLastKey(id), rdLogKey(id)].forEach(k=>localStorage.removeItem(k));
+  if(rdSetupId === id) rdSetupId = null;
+  if(rdPassage && rdPassage.id === id) rdPassage = null;
+  renderHomeScreen(); renderReadingManage();
+  toast(`「${p.title}」を削除しました`,'suc');
+}
+
+// ══════════════════════════════════════════════
 //  長文リーディングの管理画面
 //   一覧に出す／出さない（＝アーカイブ）の切り替えと、記録・途中経過の整理
 // ══════════════════════════════════════════════
@@ -6390,6 +7029,11 @@ function renderReadingManage(){
     const pct   = prog.pct;
     const best  = rdJson(rdBestKey(p.id));
     const log   = rdLog(p.id);
+    const base  = rdBasePassage(p.id);
+    const ed    = rdEditsOf(p.id);
+    const total = base ? base.docs.reduce((n,d)=>n+d.lines.length, 0) : 0;
+    const edited = ed.hidden.length || Object.keys(ed.lines).length;
+    const editNote = edited ? `・${total - ed.hidden.length}/${total} 文` : '';
     const row = document.createElement('div');
     row.className = 'rm-row' + (on ? '' : ' off');
     row.dataset.id = p.id;
@@ -6400,18 +7044,32 @@ function renderReadingManage(){
       </label>
       <span class="rm-title" title="クリックで練習設定を開く">
         <b>${escHtml(p.title)}</b>
-        <span class="rm-sub">${escHtml(p.tag)}・${escHtml(p.subtitle)}</span>
+        <span class="rm-sub">${escHtml(p.tag)}・${escHtml(p.subtitle)}${escHtml(editNote)}</span>
       </span>
       <span class="rm-num">${rdCharCount(p).toLocaleString()}</span>
       <span class="rm-num${prog.hasResume ? ' resume' : ' dim'}">${prog.hasResume ? pct+'%' : '—'}</span>
       <span class="rm-num${log.plays ? '' : ' dim'}">${log.plays ? log.plays+'回' : '—'}</span>
       <span class="rm-num${best ? '' : ' dim'}">${best ? best.speed.toFixed(1) : '—'}</span>
       <span class="rm-act">
+        <button class="link-btn" data-act="edit">文を編集</button>
+        <button class="link-btn" data-act="csv">CSV</button>
         <button class="link-btn" data-act="progress"${prog.hasResume ? '' : ' disabled'}>続きを消す</button>
         <button class="link-btn danger" data-act="stats"${(best || log.plays) ? '' : ' disabled'}>記録を消す</button>
+        ${rdIsCustom(p.id) ? '<button class="link-btn danger" data-act="delete">削除</button>' : ''}
       </span>`;
     row.querySelector('.rm-show').addEventListener('change', e=>setReadingVisible(p.id, e.target.checked));
     row.querySelector('.rm-title').addEventListener('click', ()=>openReadingSetup(p.id));
+    row.querySelector('[data-act="edit"]').addEventListener('click', ()=>{
+      rmBackTo = 'home';
+      rdSetupId = p.id; rseDraft = null;
+      renderReadingSetup(); showScreen('rsetup'); switchRTab('manage');
+    });
+    row.querySelector('[data-act="csv"]').addEventListener('click', ()=>{
+      rdDownloadCsv(`長文_${rdSafeFileName(p.title)}.csv`, rdPassageToCsv(p.id));
+      rdCsvMsg('rm-csv-msg','suc',`「${p.title}」をCSVに書き出しました`);
+    });
+    const delBtn = row.querySelector('[data-act="delete"]');
+    if(delBtn) delBtn.addEventListener('click', ()=>rdDeleteCustomPassage(p.id));
     row.querySelector('[data-act="progress"]').addEventListener('click', ()=>{
       localStorage.removeItem(rdKey(p.id));
       if(rdPassage && rdPassage.id === p.id) rdRestoredMs = 0;
