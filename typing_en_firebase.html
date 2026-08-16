@@ -895,9 +895,14 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
   box-shadow:0 1px 0 rgba(24,23,26,0.02),0 4px 16px rgba(24,23,26,0.04);
   font-size:0.78rem;
 }
+/* サイト名＝ホーム（レベル選択）へのリンク */
 .login-bar .brand{
   display:flex;align-items:center;gap:7px;font-weight:700;font-size:0.83rem;color:var(--text);letter-spacing:-0.01em;flex-shrink:0;
+  font-family:'Noto Sans JP',sans-serif;background:none;border:none;padding:4px 8px;margin-left:-8px;
+  border-radius:9px;cursor:pointer;transition:background 0.15s var(--ease),opacity 0.15s var(--ease);
 }
+.login-bar .brand:hover{background:var(--on-bg);}
+.login-bar .brand:active{opacity:0.75;}
 .login-bar .brand-icon{
   width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--on) 0%,#dd7a5b 100%);color:#fff;font-size:0.72rem;font-weight:800;
@@ -1110,7 +1115,7 @@ body{padding-top:54px}  /* ログインバーの高さ分ずらす */
 
 <!-- ログインバー -->
 <div class="login-bar">
-  <span class="brand"><span class="brand-icon">EN</span>Typing</span>
+  <button type="button" class="brand" id="brand-home-btn" title="レベル選択に戻る"><span class="brand-icon">EN</span>Typing</button>
   <span class="spacer"></span>
   <span id="sync-badge" class="sync-badge off">オフライン</span>
   <span id="user-info" style="display:none"></span>
@@ -6384,6 +6389,17 @@ function pauseAllTimers(){
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) pauseAllTimers(); });
 window.addEventListener('blur', pauseAllTimers);
+
+// 左上のサイト名は、どの画面からでも一覧（レベル選択）に戻る入口
+$('brand-home-btn').addEventListener('click', ()=>{
+  const scr = currentScreen();
+  if(scr === 'home') return;
+  if(scr === 'game' && gameActive){          // 練習中なら中断してから戻る
+    gameStopIdle(); gameActive = false; disableCursorHide(); restoreInput();
+  }
+  if(scr === 'reading') rdLeaveReading();    // 長文は続きを保存してから戻る
+  goHome();
+});
 
 renderHomeScreen();
 renderReadingCards();
