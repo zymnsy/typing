@@ -265,6 +265,26 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rc-stat-l,.lv-stat-l{font-family:'Noto Sans JP',sans-serif;font-size:0.6rem;font-weight:600;
   color:var(--muted);letter-spacing:0.02em;}
 .rc-stat.dim,.lv-stat.dim{color:var(--muted);font-weight:600;}
+/* ── 進み具合の色分け：未着手（灰）／途中（オレンジ）／完了（緑）── */
+/* 一覧をひと目で仕分けられるよう、左の色帯・背景の薄い色・状態バッジの3点セットで示す */
+.rc-status,.lv-status,.status-legend b{font-family:'Noto Sans JP',sans-serif;
+  font-size:0.6rem;font-weight:800;letter-spacing:0.04em;line-height:1.7;
+  padding:1px 7px;border-radius:6px;white-space:nowrap;
+  background:var(--surface-alt);color:var(--muted);border:1px solid var(--border);}
+.rc-status{margin-right:auto;}
+.st-doing .rc-status,.st-doing .lv-status,.status-legend b.lg-doing{
+  background:var(--on-bg);color:var(--on);border-color:var(--on-soft);}
+.st-done .rc-status,.st-done .lv-status,.status-legend b.lg-done{
+  background:var(--ok-bg);color:var(--ok);border-color:var(--ok-soft);}
+.reading-card::before,.level-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:var(--r-sm) 0 0 var(--r-sm);background:transparent;}
+.reading-card.st-doing::before,.level-card.st-doing::before{background:var(--on);}
+.reading-card.st-done::before,.level-card.st-done::before{background:var(--ok);}
+.reading-card.st-doing,.level-card.st-doing{background:#fffaf7;border-color:#f0cdbb;}
+.reading-card.st-done,.level-card.st-done{background:#f7fbf8;border-color:#cae4d5;}
+.reading-card.st-done .rc-progress-fill{background:var(--ok);}
+/* 見出し横の内訳（未着手 12・途中 1・完了 3） */
+.status-legend{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;}
 /* 単語・フレーズのレベルカード */
 .level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:7px}
 .level-card{padding:9px 11px 9px;border-radius:var(--r-sm);background:var(--surface);
@@ -1224,6 +1244,7 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
   <div class="home-section" id="reading-section">
     <div class="home-section-head">
       <span class="home-section-title">長文</span>
+      <span class="home-section-note status-legend" id="reading-legend"></span>
       <button class="reorder-reset" id="reading-manage-btn" style="margin-left:auto">管理</button>
     </div>
     <div class="reading-grid" id="reading-card-grid"></div>
@@ -1232,6 +1253,7 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
   <div class="home-section">
     <div class="home-section-head">
       <span class="home-section-title">単語</span>
+      <span class="home-section-note status-legend" id="word-legend"></span>
     </div>
     <div id="home-grid-wrap">
       <div class="level-grid" id="home-level-grid"></div>
@@ -2679,18 +2701,23 @@ function renderHomeScreen() {
   grid.innerHTML=''; if(arcGrid) arcGrid.innerHTML='';
   const archived = loadArchivedLevels();
   const order = loadSettings().homeOrder;
+  const counts = {new:0, doing:0, done:0};
   const levels = applySavedOrder(
     Array.from({length:NUM_LEVELS},(_,i)=>i+1), order, lv=>lv);
   levels.forEach(lv=>{
     const title=loadLevelTitle(lv);
     const wlist=loadLevelWords(lv);
     const best=loadLevelBest(lv);
+    const lvs=loadLevelSettings(lv);
+    // 単語は途中経過が残らないので「未着手 / 完了」の2状態。単語なしのレベルは対象外
+    const st = wlist.length ? statusOf(lvs.plays, false) : null;
+    if(st && !archived.has(lv)) counts[st]++;
     const card=document.createElement('div');
-    card.className='level-card'+(best?' has-best':'')+(wlist.length?'':' is-empty');
+    card.className='level-card'+(st?' st-'+st:'')+(best?' has-best':'')+(wlist.length?'':' is-empty');
     card.dataset.lv=lv;
     card.dataset.title=title.toLowerCase();
+    if(st) card.dataset.status=st;
     const rankPill = best ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
-    const lvs=loadLevelSettings(lv);
     const lastScore=loadLastScore(lv);
     const statCell=(label,value,dim)=>
       `<span class="lv-stat${dim?' dim':''}"><span class="lv-stat-l">${label}</span>${value}</span>`;
@@ -2699,12 +2726,14 @@ function renderHomeScreen() {
         ${statCell('練習', lvs.plays ? lvs.plays+' 回' : 'まだ', !lvs.plays)}
         ${lastScore && lastScore.date ? statCell('最終', fmtShortDate(lastScore.date)) : ''}
         ${lvs.addedAt ? statCell('追加', fmtShortDate(lvs.addedAt)) : ''}` : '';
+    const stPill = st
+      ? `<span class="lv-status">${st==='done' && lvs.plays>1 ? '完了 '+lvs.plays+'回' : STATUS_LABEL[st]}</span>` : '';
     card.innerHTML=`
       ${rankPill}
       <span class="card-check"></span>
       <div class="level-title">${escHtml(title)}</div>
       <div class="level-stats">
-        <span class="lv-stat lv-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</span>${stats}
+        ${stPill}<span class="lv-stat lv-count">${wlist.length>0?wlist.length+' 語':'単語なし'}</span>${stats}
       </div>`;
     card.dataset.empty = wlist.length ? '0' : '1';
     card.addEventListener('click',()=>{
@@ -2714,6 +2743,7 @@ function renderHomeScreen() {
     });
     (archived.has(lv) && arcGrid ? arcGrid : grid).appendChild(card);
   });
+  renderStatusLegend('word-legend', counts);
   // 長文カードも同じタイミングで描き直す（ログイン後の再描画でも進捗が揃うように）
   if(typeof renderReadingCards === 'function') renderReadingCards();
   if(typeof applyReorderMode === 'function') applyReorderMode();
@@ -7476,6 +7506,25 @@ function rdSpeak(text){
   rdSpeakNow(en);
 }
 
+// ── 進み具合を3状態に畳む（未着手 / 途中 / 完了）──
+// done  : 通しで1回でも打ち終えた
+// doing : まだ終えていないが途中経過が残っている
+// new   : 一度も触っていない
+function statusOf(plays, hasResume){
+  if(plays > 0) return 'done';
+  if(hasResume) return 'doing';
+  return 'new';
+}
+const STATUS_LABEL = {new:'未着手', doing:'途中', done:'完了'};
+// 見出し横の内訳。0件の状態は出さない
+function renderStatusLegend(elId, counts){
+  const el = $(elId);
+  if(!el) return;
+  el.innerHTML = ['doing','new','done']
+    .filter(k => counts[k])
+    .map(k => `<b class="lg-${k}">${STATUS_LABEL[k]} ${counts[k]}</b>`).join('');
+}
+
 // ── ホームの長文カード ──
 function renderReadingCards(){
   const grid = $('reading-card-grid');
@@ -7483,30 +7532,45 @@ function renderReadingCards(){
   const arcGrid = $('archive-reading-grid');
   grid.innerHTML = ''; if(arcGrid) arcGrid.innerHTML = '';
   const archived = loadArchivedReadings();
+  const counts = {new:0, doing:0, done:0};
   const passages = applySavedOrder(READING_PASSAGES, loadSettings().readingOrder, p=>p.id);
   passages.forEach(p => {
     const total = p.docs.reduce((n,d)=>n+d.lines.reduce((m,l)=>m+l.en.length,0), 0);
     const prog = rdProgressOf(p.id);
     const pct = prog.pct;
     const best = rdJson(rdBestKey(p.id));
+    const log = rdLog(p.id);
+    const st = statusOf(log.plays, prog.hasResume);
+    if(!archived.has(p.id)) counts[st]++;
     const card = document.createElement('div');
-    card.className = 'reading-card' + (best ? ' has-best' : '');
+    card.className = 'reading-card st-' + st + (best ? ' has-best' : '');
     card.dataset.id = p.id;
+    card.dataset.status = st;
     const bestPill = best
       ? `<span class="level-rank-pill t-${best.tier}">${escHtml(best.rank.replace('RANK ',''))}</span>` : '';
-    const log = rdLog(p.id);
+    // 完了したあとに打ち直している途中なら「完了・再挑戦中」と分かるようにする
+    const stLabel = (st === 'done' && prog.hasResume && pct < 100) ? '完了・再挑戦中'
+                  : (st === 'done' && log.plays > 1) ? '完了 '+log.plays+'回'
+                  : STATUS_LABEL[st];
     const addedTxt = p.added ? fmtShortDate(new Date(p.added).getTime()) : '—';
     const statCell = (label, value, dim) =>
       `<span class="rc-stat${dim?' dim':''}"><span class="rc-stat-l">${label}</span>${value}</span>`;
+    // 右端の数字：打ちかけなら「続き ○%」、終えていれば自己ベスト（無ければ「完走」）
+    const midway = prog.hasResume && pct < 100;
+    const footRight = midway ? '続き '+pct+'%'
+                    : best ? best.speed.toFixed(1)+' 打/秒'
+                    : st === 'done' ? '完走' : '0%';
+    // 完了したのに続きを消してある時は、バーを満タンのまま見せる
+    const barPct = (st === 'done' && !midway) ? 100 : pct;
     card.innerHTML = `
       <span class="card-check"></span>
-      <div class="rc-head"><span class="rc-tag">${escHtml(p.tag)}</span>${bestPill}</div>
+      <div class="rc-head"><span class="rc-tag">${escHtml(p.tag)}</span><span class="rc-status">${stLabel}</span>${bestPill}</div>
       <div class="rc-title">${escHtml(p.title)}</div>
       <div class="rc-sub">${escHtml(p.subtitle)}</div>
       <div class="rc-foot">
         <span class="rc-meta">${total.toLocaleString()} 字</span>
-        <span class="rc-progress"><span class="rc-progress-fill" style="width:${pct}%"></span></span>
-        <span class="rc-meta${prog.hasResume ? ' resume' : ''}">${prog.hasResume ? '続き '+pct+'%' : (best ? best.speed.toFixed(1)+' 打/秒' : '0%')}</span>
+        <span class="rc-progress"><span class="rc-progress-fill" style="width:${barPct}%"></span></span>
+        <span class="rc-meta${midway ? ' resume' : ''}">${footRight}</span>
       </div>
       <div class="rc-stats">
         ${statCell('練習', log.plays ? log.plays+' 回' : 'まだ', !log.plays)}
@@ -7521,6 +7585,7 @@ function renderReadingCards(){
     });
     (archived.has(p.id) && arcGrid ? arcGrid : grid).appendChild(card);
   });
+  renderStatusLegend('reading-legend', counts);
   // 長文を全部アーカイブしたら、見出しごと畳む（選択中は残す）
   const sec = $('reading-section');
   if(sec) sec.style.display = (grid.children.length === 0 && !archiveMode) ? 'none' : '';
