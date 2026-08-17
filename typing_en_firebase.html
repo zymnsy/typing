@@ -1769,6 +1769,7 @@ body{padding-top:68px}  /* ログインバーの高さ＋余白 */
             <button class="btn-ghost" id="rd-finish-retry">もう一度やる</button>
             <button class="btn-primary" id="rd-fin-home" style="flex:2">一覧に戻る</button>
           </div>
+          <div class="space-start-hint"><kbd>Space</kbd> で一覧に戻る</div>
         </div>
       </div>
     </div>
@@ -8678,6 +8679,10 @@ document.addEventListener('keydown', e=>{
   }
   if(scr !== 'reading') return;
   if(e.key === 'Escape'){ e.preventDefault(); leaveReadingToSetup(); return; }
+  // 完走カードが出ている間は Space で一覧に戻る（本文の入力はもう受け付けていない）
+  if(!$('rd-finish').hidden && (e.key === ' ' || e.code === 'Space')){
+    e.preventDefault(); leaveReadingToHome(); return;
+  }
   rdHandleKey(e);
 });
 // 「文ごとの記録」を見に行っている間も計測は止めておく
