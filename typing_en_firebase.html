@@ -33,10 +33,26 @@ const provider = new GoogleAuthProvider();
 let currentUser = null;
 let unsubscribeSnapshot = null;
 
+// このPCが新しいコードを読み込めているかを診断画面で見分けるための版数
+const CODE_VERSION = '2026-08-18b';
+
 // ── ユーザードキュメント参照 ──
 function userDocRef(uid) {
   return doc(db, 'users', uid, 'data', 'typing');
 }
+// 長文の記録は本体と別のドキュメントに置く。
+// 本体は単語100レベル分でFirestoreの1MB上限に近づくことがあり、
+// 同じドキュメントに入れると上限に当たった時に記録ごと保存が失敗するため。
+function readingDocRef(uid) {
+  return doc(db, 'users', uid, 'data', 'reading');
+}
+
+// 診断画面に出すための、直近の同期の結果
+const syncDiag = {
+  savedAt: 0, saveOk: null, saveErr: '',
+  loadedAt: 0, loadOk: null, loadErr: '',
+  where: '', bytes: 0, cloudCount: null
+};
 
 // ── 長文（リーディング）まわりのキー ──
 // typing-en-v2-reading-<id>       途中経過（続きから再開するための位置）
@@ -146,8 +162,21 @@ async function saveAllToCloud() {
   const rdEdits  = localStorage.getItem('typing-en-v2-reading-edits');
   if (rdCustom != null) payload['readingCustom'] = JSON.parse(rdCustom);
   if (rdEdits  != null) payload['readingEdits']  = JSON.parse(rdEdits);
-  // 長文の記録（自己ベスト・前回スコア・文ごと・練習回数）と途中経過
-  payload['readingAllJson'] = collectReadingJson();
+  // 長文の記録（自己ベスト・前回スコア・文ごと・練習回数）と途中経過。
+  // まず専用ドキュメントに書き、権限などで書けなかった時だけ本体に同梱する
+  const readingJson = collectReadingJson();
+  syncDiag.bytes = readingJson.length;
+  let readingSaved = false;
+  try {
+    await setDoc(readingDocRef(currentUser.uid),
+      { json: readingJson, v: CODE_VERSION, updatedAt: Date.now() });
+    readingSaved = true;
+    syncDiag.where = '専用ドキュメント';
+  } catch(e) {
+    syncDiag.where = '本体に同梱';
+    console.warn('reading doc save failed, falling back:', e);
+  }
+  if (!readingSaved) payload['readingAllJson'] = readingJson;
   // 長文ごとの練習設定（日本語訳を出す／パネルを出す など）
   const lvSet = {};
   for (let lv = 1; lv <= 100; lv++) {
@@ -158,16 +187,42 @@ async function saveAllToCloud() {
   payload['updatedAt'] = Date.now();
   try {
     await setDoc(userDocRef(currentUser.uid), payload, { merge: true });
-  } catch(e) { console.warn('Cloud save failed:', e); }
+    syncDiag.saveOk = true; syncDiag.saveErr = ''; syncDiag.savedAt = Date.now();
+    showSyncBadge('ok');
+  } catch(e) {
+    // ここが黙って失敗すると「同期済み」と出たまま何も保存されない状態になるので必ず知らせる
+    syncDiag.saveOk = false;
+    syncDiag.saveErr = (e && (e.code || e.message)) || String(e);
+    syncDiag.savedAt = Date.now();
+    console.warn('Cloud save failed:', e);
+    showSyncBadge('error');
+  }
 }
 
 // ── Firestoreからローカルに復元 ──
 async function loadFromCloud() {
   if (!currentUser) return;
+  // 長文の記録は専用ドキュメントから。無ければ本体に同梱された分を使う（旧データ互換）
+  let readingJson = null;
+  try {
+    const rs = await getDoc(readingDocRef(currentUser.uid));
+    if (rs.exists() && typeof rs.data().json === 'string') {
+      readingJson = rs.data().json;
+      syncDiag.where = '専用ドキュメント';
+    }
+  } catch(e) {
+    syncDiag.loadErr = '記録の読み込みに失敗: ' + ((e && (e.code || e.message)) || String(e));
+    console.warn('reading doc load failed:', e);
+  }
   try {
     const snap = await getDoc(userDocRef(currentUser.uid));
-    if (!snap.exists()) return; // 初回は何もしない
-    const d = snap.data();
+    const d = snap.exists() ? snap.data() : {};
+    if (readingJson == null && typeof d['readingAllJson'] === 'string') {
+      readingJson = d['readingAllJson'];
+      syncDiag.where = '本体に同梱';
+    }
+    applyReadingJson(readingJson);
+    if (!snap.exists()) { syncDiag.loadOk = true; syncDiag.loadedAt = Date.now(); return; }
     for (let lv = 1; lv <= 100; lv++) {
       if (d['words_lv'+lv]   != null) localStorage.setItem('typing-en-v2-words-lv'+lv,   JSON.stringify(d['words_lv'+lv]));
       if (d['enabled_lv'+lv] != null) localStorage.setItem('typing-en-v2-enabled-lv'+lv, JSON.stringify(d['enabled_lv'+lv]));
@@ -180,18 +235,6 @@ async function loadFromCloud() {
     if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
     if (d['readingCustom'] != null) localStorage.setItem('typing-en-v2-reading-custom', JSON.stringify(d['readingCustom']));
     if (d['readingEdits']  != null) localStorage.setItem('typing-en-v2-reading-edits',  JSON.stringify(d['readingEdits']));
-    // 長文の記録と途中経過を書き戻す
-    if (typeof d['readingAllJson'] === 'string') {
-      let all = {};
-      try { all = JSON.parse(d['readingAllJson']) || {}; } catch(e) {}
-      Object.keys(all).forEach(k => {
-        if (!isReadingSyncKey(k) || all[k] == null) return;
-        let local = null;
-        try { local = JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) {}
-        const merged = mergeReadingEntry(k, local, unpackReading(all[k]));
-        if (merged != null) localStorage.setItem(k, JSON.stringify(merged));
-      });
-    }
     if (typeof d['levelSettingsJson'] === 'string') {
       let ls = {};
       try { ls = JSON.parse(d['levelSettingsJson']) || {}; } catch(e) {}
@@ -200,7 +243,37 @@ async function loadFromCloud() {
         localStorage.setItem(k, JSON.stringify(ls[k]));
       });
     }
-  } catch(e) { console.warn('Cloud load failed:', e); }
+    syncDiag.loadOk = true; syncDiag.loadedAt = Date.now();
+  } catch(e) {
+    syncDiag.loadOk = false;
+    syncDiag.loadErr = (e && (e.code || e.message)) || String(e);
+    console.warn('Cloud load failed:', e);
+  }
+}
+
+// クラウドから来た長文の記録をローカルに突き合わせて書き戻す
+function applyReadingJson(json) {
+  if (typeof json !== 'string') { syncDiag.cloudCount = 0; return; }
+  let all = {};
+  try { all = JSON.parse(json) || {}; } catch(e) { syncDiag.cloudCount = 0; return; }
+  const keys = Object.keys(all).filter(k => isReadingSyncKey(k) && all[k] != null);
+  syncDiag.cloudCount = keys.length;
+  keys.forEach(k => {
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) {}
+    const merged = mergeReadingEntry(k, local, unpackReading(all[k]));
+    if (merged != null) localStorage.setItem(k, JSON.stringify(merged));
+  });
+}
+
+// このPCが持っている長文の記録の件数
+function localReadingCount() {
+  let n = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && isReadingSyncKey(k)) n++;
+  }
+  return n;
 }
 
 // ── localStorage書き換えを監視してクラウド同期 ──
@@ -251,8 +324,8 @@ onAuthStateChanged(auth, async user => {
     await loadFromCloud();
     cloudLoadDone = true;
     // このPCにしか無かった記録を、突き合わせた結果ごとクラウドへ上げ直す
-    saveAllToCloud();
-    showSyncBadge('ok');
+    // （成功/失敗に応じてバッジは saveAllToCloud の中で切り替わる）
+    await saveAllToCloud();
     // ホーム画面を再描画（データ更新後）
     if (typeof rebuildPassages === 'function') rebuildPassages();
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
@@ -289,11 +362,66 @@ function updateLoginUI(user) {
 function showSyncBadge(state) {
   const b = document.getElementById('sync-badge');
   if (!b) return;
+  b.title = 'クリックすると同期の状態を確認できます';
   if (state === 'syncing') { b.textContent = '同期中'; b.className = 'sync-badge syncing'; }
   else if (state === 'ok')  { b.textContent = '✓ 同期済み'; b.className = 'sync-badge ok';
     setTimeout(() => { if(b.textContent==='✓ 同期済み') b.className='sync-badge idle'; }, 2000); }
+  else if (state === 'error') { b.textContent = '⚠ 同期できていません'; b.className = 'sync-badge error'; }
   else { b.textContent = 'オフライン'; b.className = 'sync-badge off'; }
 }
+
+// ── 同期の診断（バッジをクリックで開く）──
+// どこで止まっているのかを、開発者ツールを開かずに確かめられるようにする
+function buildSyncDiagText() {
+  const t = ts => ts ? new Date(ts).toLocaleTimeString('ja-JP') : '—';
+  const mark = v => v === true ? '成功' : v === false ? '失敗' : '未実行';
+  const L = [];
+  L.push(['このPCのコード版', CODE_VERSION + '（2台で違う場合は古い方を Ctrl+Shift+R / Cmd+Shift+R で読み直す）']);
+  L.push(['ログイン', currentUser ? (currentUser.email || currentUser.displayName || '') : 'していません']);
+  L.push(['アカウントID', currentUser ? currentUser.uid : '—']);
+  L.push(['このPCの長文の記録', localReadingCount() + ' 件']);
+  L.push(['クラウドにあった記録', syncDiag.cloudCount == null ? '未確認' : syncDiag.cloudCount + ' 件']);
+  L.push(['記録の置き場所', syncDiag.where || '—']);
+  L.push(['記録の大きさ', syncDiag.bytes ? Math.round(syncDiag.bytes/1024) + ' KB' : '—']);
+  L.push(['読み込み', mark(syncDiag.loadOk) + '（' + t(syncDiag.loadedAt) + '）' + (syncDiag.loadErr ? ' ' + syncDiag.loadErr : '')]);
+  L.push(['保存', mark(syncDiag.saveOk) + '（' + t(syncDiag.savedAt) + '）' + (syncDiag.saveErr ? ' ' + syncDiag.saveErr : '')]);
+  return L;
+}
+function openSyncDiag() {
+  document.getElementById('sync-diag')?.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'sync-diag';
+  wrap.className = 'sync-diag-back';
+  const rows = buildSyncDiagText()
+    .map(([k, v]) => `<tr><th>${k}</th><td>${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td></tr>`).join('');
+  wrap.innerHTML =
+    `<div class="sync-diag-card">
+       <h3>同期の状態</h3>
+       <table class="sync-diag-table">${rows}</table>
+       <div class="sync-diag-btns">
+         <button type="button" id="sync-diag-now">今すぐ同期する</button>
+         <button type="button" id="sync-diag-close">閉じる</button>
+       </div>
+     </div>`;
+  document.body.appendChild(wrap);
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  document.getElementById('sync-diag-close').onclick = () => wrap.remove();
+  document.getElementById('sync-diag-now').onclick = async () => {
+    const btn = document.getElementById('sync-diag-now');
+    btn.disabled = true; btn.textContent = '同期しています…';
+    await loadFromCloud();
+    await saveAllToCloud();
+    if (typeof renderReadingCards === 'function') renderReadingCards();
+    if (typeof renderHomeScreen === 'function') renderHomeScreen();
+    wrap.remove(); openSyncDiag();
+  };
+}
+function attachSyncDiagClick() {
+  const b = document.getElementById('sync-badge');
+  if (b && !b._diagBound) { b._diagBound = true; b.addEventListener('click', openSyncDiag); }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attachSyncDiagClick);
+else attachSyncDiagClick();
 
 // グローバルに公開（既存コードから呼べるように）
 window._fbSaveAll = saveAllToCloud;
@@ -1149,7 +1277,35 @@ kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border2);border-
 .sync-badge.syncing {background:var(--gold-bg);color:var(--gold)}
 .sync-badge.syncing::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--gold);animation:syncPulse 1.1s ease-in-out infinite;}
 .sync-badge.off     {background:#efede6;color:var(--muted)}
-.sync-badge.idle    {opacity:0}
+.sync-badge.error   {background:var(--on-bg);color:var(--on)}
+.sync-badge.idle    {opacity:0.5}
+.sync-badge{cursor:pointer}
+
+/* 同期の診断 */
+.sync-diag-back{
+  position:fixed;inset:0;z-index:9000;background:rgba(24,23,26,0.45);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.sync-diag-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:22px 24px;max-width:560px;width:100%;max-height:85vh;overflow:auto;
+  box-shadow:0 18px 50px rgba(0,0,0,0.18);
+}
+.sync-diag-card h3{font-size:1.05rem;margin-bottom:14px;color:var(--text)}
+.sync-diag-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.sync-diag-table th{
+  text-align:left;padding:7px 10px 7px 0;color:var(--sub);font-weight:500;
+  white-space:nowrap;vertical-align:top;width:11em;
+}
+.sync-diag-table td{padding:7px 0;color:var(--text);word-break:break-word}
+.sync-diag-table tr+tr th,.sync-diag-table tr+tr td{border-top:1px solid var(--border)}
+.sync-diag-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.sync-diag-btns button{
+  padding:8px 16px;border-radius:8px;border:1px solid var(--border2);
+  background:var(--surface-alt);color:var(--text);font-size:0.82rem;font-weight:600;cursor:pointer;
+}
+.sync-diag-btns button#sync-diag-now{background:var(--on);border-color:var(--on);color:#fff}
+.sync-diag-btns button:disabled{opacity:0.6;cursor:default}
 @keyframes syncPulse{0%,100%{opacity:0.4;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
 body{padding-top:68px}  /* ログインバーの高さ＋余白 */
 
