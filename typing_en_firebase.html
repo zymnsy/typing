@@ -38,6 +38,83 @@ function userDocRef(uid) {
   return doc(db, 'users', uid, 'data', 'typing');
 }
 
+// ── 長文（リーディング）まわりのキー ──
+// typing-en-v2-reading-<id>       途中経過（続きから再開するための位置）
+// typing-en-v2-reading-stats-<id> 文ごとの記録
+// typing-en-v2-reading-best-<id>  自己ベスト
+// typing-en-v2-reading-last-<id>  前回スコア
+// typing-en-v2-reading-log-<id>   練習回数と最終練習日
+// custom / edits は専用フィールドがあるのでここでは扱わない
+const RD_SYNC_PREFIX = 'typing-en-v2-reading-';
+const RD_OWN_FIELDS  = ['typing-en-v2-reading-custom', 'typing-en-v2-reading-edits'];
+function isReadingSyncKey(k) {
+  return k.startsWith(RD_SYNC_PREFIX) && !RD_OWN_FIELDS.includes(k);
+}
+// 途中経過の states は ['c','i','p',…] と1文字ずつの配列で長いので、
+// クラウドには "cipcc…" と1本の文字列に詰めて送る（容量を約4分の1にする）
+function packReading(v) {
+  if (v && Array.isArray(v.states)) return Object.assign({}, v, { states: v.states.join('') });
+  return v;
+}
+function unpackReading(v) {
+  if (v && typeof v.states === 'string') return Object.assign({}, v, { states: v.states.split('') });
+  return v;
+}
+function isProgressEntry(v) { return !!(v && (Array.isArray(v.states) || typeof v.states === 'string')); }
+
+// クラウドから降ってきた値でローカルを単純に上書きすると、
+// 「このPCで出したがまだ上げていない記録」が消える。良い方・新しい方を残す。
+function mergeReadingEntry(key, local, cloud) {
+  if (local == null) return cloud;
+  if (cloud == null) return local;
+  if (/^typing-en-v2-reading-best-/.test(key)) {          // 自己ベスト＝速い方
+    return (cloud.speed || 0) > (local.speed || 0) ? cloud : local;
+  }
+  if (/^typing-en-v2-reading-last-/.test(key)) {          // 前回スコア＝新しい方
+    return (cloud.date || 0) > (local.date || 0) ? cloud : local;
+  }
+  if (/^typing-en-v2-reading-log-/.test(key)) {           // 練習回数＝多い方、最終日＝新しい方
+    return { plays: Math.max(local.plays || 0, cloud.plays || 0),
+             last:  Math.max(local.last  || 0, cloud.last  || 0) };
+  }
+  if (/^typing-en-v2-reading-stats-/.test(key)) {         // 文ごとの記録＝1文ずつ突き合わせる
+    const out = Object.assign({}, local);
+    Object.keys(cloud).forEach(seg => {
+      const a = local[seg], b = cloud[seg];
+      if (!a) { out[seg] = b; return; }
+      out[seg] = {
+        count:   Math.max(a.count || 0, b.count || 0),
+        bestCps: Math.max(a.bestCps || 0, b.bestCps || 0),
+        lastCps: (b.count || 0) >= (a.count || 0) ? b.lastCps : a.lastCps,
+        lastSec: (b.count || 0) >= (a.count || 0) ? b.lastSec : a.lastSec,
+        miss:    (b.count || 0) >= (a.count || 0) ? b.miss    : a.miss
+      };
+    });
+    return out;
+  }
+  // 途中経過＝進んでいる方を残す（日時を持っていないので進み具合で判断する）
+  return (cloud.cursor || 0) > (local.cursor || 0) ? cloud : local;
+}
+
+// 長文の記録＋途中経過を1本のJSON文字列にまとめる
+function collectReadingJson() {
+  const all = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !isReadingSyncKey(k)) continue;
+    try { all[k] = packReading(JSON.parse(localStorage.getItem(k))); } catch(e) {}
+  }
+  let json = JSON.stringify(all);
+  // Firestoreの1ドキュメント上限（約1MB）に当てないための安全弁。
+  // あふれたら「途中経過」を落とし、記録（ベスト・前回・文ごと・回数）は必ず残す
+  if (json.length > 700000) {
+    Object.keys(all).forEach(k => { if (isProgressEntry(all[k])) delete all[k]; });
+    json = JSON.stringify(all);
+    console.warn('長文データが大きいため、途中経過はクラウドに保存しませんでした');
+  }
+  return json;
+}
+
 // ── Firestoreに全データ保存 ──
 async function saveAllToCloud() {
   if (!currentUser) return;
@@ -69,6 +146,15 @@ async function saveAllToCloud() {
   const rdEdits  = localStorage.getItem('typing-en-v2-reading-edits');
   if (rdCustom != null) payload['readingCustom'] = JSON.parse(rdCustom);
   if (rdEdits  != null) payload['readingEdits']  = JSON.parse(rdEdits);
+  // 長文の記録（自己ベスト・前回スコア・文ごと・練習回数）と途中経過
+  payload['readingAllJson'] = collectReadingJson();
+  // 長文ごとの練習設定（日本語訳を出す／パネルを出す など）
+  const lvSet = {};
+  for (let lv = 1; lv <= 100; lv++) {
+    const s = localStorage.getItem('typing-en-v2-settings-lv'+lv);
+    if (s != null) lvSet['typing-en-v2-settings-lv'+lv] = JSON.parse(s);
+  }
+  payload['levelSettingsJson'] = JSON.stringify(lvSet);
   payload['updatedAt'] = Date.now();
   try {
     await setDoc(userDocRef(currentUser.uid), payload, { merge: true });
@@ -94,20 +180,67 @@ async function loadFromCloud() {
     if (d['settings'] != null) localStorage.setItem('typing-en-v2-settings', JSON.stringify(d['settings']));
     if (d['readingCustom'] != null) localStorage.setItem('typing-en-v2-reading-custom', JSON.stringify(d['readingCustom']));
     if (d['readingEdits']  != null) localStorage.setItem('typing-en-v2-reading-edits',  JSON.stringify(d['readingEdits']));
+    // 長文の記録と途中経過を書き戻す
+    if (typeof d['readingAllJson'] === 'string') {
+      let all = {};
+      try { all = JSON.parse(d['readingAllJson']) || {}; } catch(e) {}
+      Object.keys(all).forEach(k => {
+        if (!isReadingSyncKey(k) || all[k] == null) return;
+        let local = null;
+        try { local = JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) {}
+        const merged = mergeReadingEntry(k, local, unpackReading(all[k]));
+        if (merged != null) localStorage.setItem(k, JSON.stringify(merged));
+      });
+    }
+    if (typeof d['levelSettingsJson'] === 'string') {
+      let ls = {};
+      try { ls = JSON.parse(d['levelSettingsJson']) || {}; } catch(e) {}
+      Object.keys(ls).forEach(k => {
+        if (!/^typing-en-v2-settings-lv\d+$/.test(k) || ls[k] == null) return;
+        localStorage.setItem(k, JSON.stringify(ls[k]));
+      });
+    }
   } catch(e) { console.warn('Cloud load failed:', e); }
 }
 
 // ── localStorage書き換えを監視してクラウド同期 ──
 // 初回クラウド読み込み完了前はsyncをブロック
 let cloudLoadDone = false;
+let syncTimer = null;
+let syncDeadline = 0;   // 打ち続けていても、ここまでには必ず1回保存する時刻
+
+// 打っている最中の「途中経過」は0.5秒ごとに書き換わるので、
+// そのたびにFirestoreへ送ると書き込み回数が跳ね上がる。
+// 途中経過は8秒待ってからまとめて送り、打ちっぱなしでも20秒に1回は必ず保存する。
+function scheduleCloudSave(delay) {
+  const now = Date.now();
+  if (!syncDeadline) syncDeadline = now + 20000;
+  const wait = Math.min(delay, Math.max(0, syncDeadline - now));
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { syncDeadline = 0; saveAllToCloud(); }, wait);
+}
+function flushCloudSave() {
+  if (!currentUser || !cloudLoadDone) return;
+  clearTimeout(syncTimer); syncTimer = null; syncDeadline = 0;
+  saveAllToCloud();
+}
+
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
   if (key.startsWith('typing-en-v2-') && currentUser && cloudLoadDone) {
-    clearTimeout(localStorage._syncTimer);
-    localStorage._syncTimer = setTimeout(saveAllToCloud, 800);
+    // 途中経過（typing-en-v2-reading-<id>）だけ長めに待つ。記録・設定はこれまで通りすぐ送る
+    const isProgress = isReadingSyncKey(key) &&
+      !/^typing-en-v2-reading-(stats|best|last|log)-/.test(key);
+    scheduleCloudSave(isProgress ? 8000 : 800);
   }
 };
+
+// タブを閉じる・別のタブに移る時は、待たずにその場で保存する
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushCloudSave();
+});
+window.addEventListener('pagehide', flushCloudSave);
 
 // ── ログイン状態監視 ──
 onAuthStateChanged(auth, async user => {
@@ -117,10 +250,14 @@ onAuthStateChanged(auth, async user => {
     showSyncBadge('syncing');
     await loadFromCloud();
     cloudLoadDone = true;
+    // このPCにしか無かった記録を、突き合わせた結果ごとクラウドへ上げ直す
+    saveAllToCloud();
     showSyncBadge('ok');
     // ホーム画面を再描画（データ更新後）
     if (typeof rebuildPassages === 'function') rebuildPassages();
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
+    // 長文の一覧カード（途中○%・自己ベスト・練習回数）もクラウドの中身で描き直す
+    if (typeof renderReadingCards === 'function') renderReadingCards();
     // クラウドから来た設定を画面に反映（大文字・小文字の判定モード）
     if (typeof applyCaseStrictSetting === 'function') applyCaseStrictSetting();
     if (typeof applySkipParensSetting === 'function') applySkipParensSetting();
