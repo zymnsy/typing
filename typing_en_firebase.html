@@ -9334,6 +9334,48 @@ const RD_BUILTIN_PASSAGES = [
       {term:"-thing + 形容詞の後置", desc:"something innovative and different", ids:['L364']},
       {term:"過去完了 + 関係代名詞の省略", desc:"a determination (that) we had never shown before", ids:['L379']},
     ]
+  },
+  {
+    id: "san-quentin",
+    title: "San Quentin",
+    subtitle: "刑務所の入場案内（字幕）",
+    tag: "SUBTITLES",
+    added: "2026-08-29",
+    intro: "カリフォルニア州サン・クエンティン刑務所を訪れた人に向けた入場前の注意事項を、字幕の並び順のまま上から通して打ちます。",
+    docs: [
+      {
+        kind:'plain', tag:"San Quentin",
+        lines:[
+          {id:'L1', en:"Welcome to San Quentin.", ja:"サン・クエンティン刑務所へようこそ。"},
+          {id:'L2', en:"We're all excited you're here, staff and inmates alike.", ja:"職員も受刑者も、皆さんが来てくださってとても嬉しく思っています。"},
+          {id:'L3', en:"One thing I do have to tell you before you enter", ja:"中に入る前に、ひとつだけお伝えしなければならないことがあります。"},
+          {id:'L4', en:"the state has a no hostage policy.", ja:"州には「人質と交渉しない」という方針があります。"},
+          {id:'L5', en:"In the unlikely event that you are taken hostage", ja:"万が一、皆さんが人質に取られた場合でも、"},
+          {id:'L6', en:"the state will not negotiate your release in exchange for the release of an inmate.", ja:"州は、受刑者の釈放と引き換えに皆さんを解放するための交渉は行いません。"},
+          {id:'L7', en:"Agree with that?", ja:"それでよろしいですか？"},
+        ]
+      }
+    ],
+    vocab: [
+      {term:"San Quentin", desc:"サン・クエンティン州立刑務所。カリフォルニア州で最も古い刑務所", ids:['L1']},
+      {term:"inmate", desc:"受刑者・収容者。prisoner より事務的な言い方", ids:['L2','L6']},
+      {term:"staff and inmates alike", desc:"職員も受刑者も同様に。alike は「〜も…も等しく」", ids:['L2']},
+      {term:"the state", desc:"州（ここではカリフォルニア州政府）", ids:['L4','L6']},
+      {term:"no hostage policy", desc:"人質と交渉しない方針。no + 名詞 + policy で「〜禁止の方針」", ids:['L4']},
+      {term:"in the unlikely event that ~", desc:"万が一〜の場合には。unlikely は「起こりそうにない」", ids:['L5']},
+      {term:"be taken hostage", desc:"人質に取られる。hostage に冠詞が付かない決まり文句", ids:['L5']},
+      {term:"negotiate", desc:"交渉する", ids:['L6']},
+      {term:"release", desc:"解放・釈放。動詞にも名詞にも使う", ids:['L6']},
+      {term:"in exchange for ~", desc:"〜と引き換えに", ids:['L6']},
+      {term:"Agree with that?", desc:"Do you agree with that? の Do you を落とした口語", ids:['L7']},
+    ],
+    grammar: [
+      {term:"We're all excited (that) you're here", desc:"excited の後の that 節が省略。感情の理由を that 節で言う形", ids:['L2']},
+      {term:"One thing I do have to tell you", desc:"do は強調の助動詞「どうしても伝えなければ」。thing の後に関係代名詞 that が省略", ids:['L3']},
+      {term:"before you enter", desc:"時を表す副詞節。未来のことでも現在形で言う", ids:['L3']},
+      {term:"the state will not negotiate your release", desc:"will not で州の意思をはっきり否定する。主語 the state は単数扱い", ids:['L6']},
+      {term:"the release of an inmate", desc:"名詞 + of で「〜の釈放」。動詞 release を名詞化した表現", ids:['L6']},
+    ]
   }
 ];
 
