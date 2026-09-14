@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#335d76"><title>英会話リハーサル</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=5"><link rel="stylesheet" href="library.css?v=5"></head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M5 7h17v12H12l-7 5V7Zm18 6h4v14l-6-4h-5"/></svg></span><span>英会話リハーサル<small>CONVERSATION STUDIO</small></span></a><div class="top-actions"><button id="history-open" class="text-button">練習の記録</button><button id="sync-open" class="secondary small">保存・同期</button></div></header>
+<main>
+<section id="library" hidden>
+  <div class="hero"><div><p class="eyebrow">SPEAK. LISTEN. REPEAT.</p><h1 id="home-title" tabindex="-1">今日は、どんな場面で<br>話してみますか。</h1><p class="lead">タイトルを選んで、会話をひとつ。<br>続きからでも、はじめからでも。</p></div><div class="hero-note"><span class="note-number">A <i>↔</i> B</span><p>あなたが話す。相手が返す。</p><small>言い終わるまで待ちます。<br>途中でやめても、続きと記録が残ります。</small></div></div>
+  <div id="home-stats" class="home-stats"></div>
+  <div class="section-heading library-heading"><h2>練習する会話</h2><div class="helper-actions"><button id="manage-open" class="text-button">教材を管理</button><button id="add-lesson" class="secondary">＋ 教材を追加</button></div></div>
+  <label class="lesson-search-label">シチュエーションを探す<input id="lesson-search" type="search" placeholder="例：カフェ、ホテル、黒門市場"></label>
+  <div id="lesson-list" class="lesson-grid"></div>
+  <details class="about"><summary>音声・判定・保存について</summary><p>相手役は登録されたセリフを英語の合成音声で読みます。声の自然さは、端末・ブラウザで利用できる音声によって変わります。ChatGPTの自由会話や有料APIは使用しません。</p><p>判定は音声認識の英文とお手本の一致度です。音素・アクセント・抑揚を採点するものではありません。固有名詞などの誤認識はスキップできます。</p><p>Chromeなどでは、音声認識のため音声がブラウザ提供元のサービスへ送られます。通信が必要な場合があります。教材・進捗はこのブラウザ内に保存します。録音は保存しません。教材は書き出してバックアップできます。</p><p><a href="https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition" target="_blank" rel="noreferrer">音声認識の仕様</a> · <a href="https://learn.microsoft.com/en-us/azure/ai-services/speech-service/how-to-pronunciation-assessment" target="_blank" rel="noreferrer">より詳しい発音評価について（外部サービス・別契約）</a></p></details>
+</section>
+<section id="manager" hidden aria-labelledby="manager-title">
+  <div class="section-heading"><button id="manager-back" class="text-button">トップに戻る <kbd>Esc</kbd></button></div>
+  <p class="eyebrow">YOUR LIBRARY</p><h1 id="manager-title" tabindex="-1">教材を整える。</h1><p class="muted">今練習するものをトップへ。あとで使うものはアーカイブへ。<br>削除した教材はごみ箱から戻せます。練習の記録は残ります。</p>
+  <div id="manage-tabs" class="manage-tabs" aria-label="教材の保存場所"><button data-state="active" aria-pressed="true">練習中</button><button data-state="archived" aria-pressed="false">アーカイブ</button><button data-state="deleted" aria-pressed="false">ごみ箱</button></div>
+  <label class="lesson-search-label">タイトルを探す<input id="manage-search" type="search" placeholder="教材名で検索"></label>
+  <div class="manage-toolbar"><label class="check"><input id="manage-all" type="checkbox">表示中を選択</label><span id="manage-selected" class="small muted">0 件選択</span><div class="helper-actions"><button id="bulk-archive" class="secondary small" disabled>アーカイブ</button><button id="bulk-restore" class="secondary small" disabled>トップに戻す</button><button id="bulk-delete" class="text-button small" disabled>削除</button></div></div>
+  <p id="manage-status" class="small" role="status"></p><div id="manage-list" class="manage-list"></div>
+</section>
+<section id="studio" hidden>
+  <div class="section-heading studio-navigation"><button id="back" class="text-button">トップに戻る <kbd>Esc</kbd></button><button id="export-lesson" class="text-button">教材を書き出す</button></div>
+  <div class="studio-title"><div><p class="eyebrow">YOUR CONVERSATION</p><h1 id="lesson-title"></h1><p id="lesson-description" class="muted"></p></div><span id="session-count" class="pill"></span></div>
+  <div class="workspace"><aside class="settings panel">
+    <figure id="scene" class="scene"><img id="scene-image" src="scene-kuromon.png?v=3" alt="黒門市場をイメージした通路で、観光客がこちらを向いている写真風の生成画像"><div id="scene-error" hidden>画像を読み込めませんでした。<button id="scene-retry" class="secondary small">画像を再表示</button></div><figcaption><span>KUROMON MARKET</span><strong id="scene-state">観光客との会話</strong><small>練習用の生成イメージ</small></figcaption></figure>
+    <div class="flow-note"><strong>声をかけたら、会話が始まります。</strong><p>あなた → 相手 → あなた。<br>合格したら、そのまま次の返答へ。</p></div>
+    <details id="settings-details"><summary>声・テンポ・判定を調整</summary><div class="settings-inner">
+    <label>あなたの役<select id="role"><option value="A">聞き手</option><option value="B">相手</option></select></label>
+    <label>聞き取り判定<select id="difficulty"><option value="easy">優しい — 大筋が合えばOK</option><option value="medium" selected>中くらい — おおむね正確に</option><option value="strict">厳しい — ほぼ全文が一致</option></select></label>
+    <label>英語の声<select id="voice"></select></label><button id="voice-preview" class="text-button small">選んだ声を試聴</button>
+    <label>読み上げ速度 <output id="rate-value">1.0倍</output><input id="rate" type="range" min="0.65" max="1.15" step="0.05" value="1"></label>
+    <label>言い終わってから待つ時間<select id="gap"><option value="700" selected>0.7秒 — 自然な会話</option><option value="1200">1.2秒 — 少しゆったり</option><option value="2000">2秒 — 標準</option><option value="3200">3.2秒 — ゆっくり</option><option value="5000">5秒 — じっくり</option></select></label>
+    <label class="check"><input type="checkbox" id="auto" checked> 合格したら自動で次へ</label>
+    <label class="check"><input type="checkbox" id="translation" checked> 日本語訳を表示</label>
+    <label class="check"><input type="checkbox" id="scene-toggle" checked> 場面の画像を表示</label>
+    <div class="setting-note">途中で考えても大丈夫です。文末まで聞き取れてから、無音の時間を待って進みます。</div>
+    <p id="capability" class="muted small"></p>
+    </div></details>
+  </aside>
+  <div class="practice-column">
+    <div class="progress-head"><span id="progress-label">0 / 27 セリフ</span><span id="mode-label">準備できました</span></div><div class="progress-track"><div id="progress-fill"></div></div>
+    <div id="conversation-history" class="conversation-history" aria-label="直前のやりとり"></div>
+    <article class="conversation panel">
+      <div class="turn-top"><span id="speaker" class="speaker">あなたの番</span><span id="line-number" class="muted small"></span></div>
+      <p id="english" class="english" lang="en"></p><p id="japanese" class="japanese"></p>
+      <div id="hint-box" class="hint-box" hidden><span class="eyebrow">読みの手がかり</span><p id="hint-text"></p><small>カタカナは近似です。お手本の音も聞いてください。</small></div>
+      <div class="helper-actions"><button id="model" class="secondary small">お手本を聞く</button><button id="slow-model" class="secondary small">ゆっくり聞く</button><button id="hint" class="secondary small">カタカナヒント</button><button id="replay-partner" class="secondary small">相手の返答をもう一度</button></div>
+      <div class="listening-box"><div class="listening-heading"><span id="listen-indicator" class="indicator"></span><strong id="status" role="status" aria-live="polite">「会話を始める」でマイクを接続します</strong></div><div class="meter" aria-label="マイクの音量"><div id="meter-fill"></div></div><p id="mic-health" class="small muted">マイク：停止中</p><p id="heard" lang="en">聞き取った英語がここに表示されます。</p><p id="feedback" class="feedback"></p><button id="reconnect-mic" class="text-button small" hidden>マイクを接続し直す</button></div>
+      <div class="primary-actions"><button id="start" class="primary">会話を始める</button><button id="pause" class="secondary" hidden>一時停止</button><button id="done" class="primary" hidden>言い終わりました</button><button id="retry" class="secondary" hidden>最初から言い直す</button><button id="skip" class="text-button">このセリフをスキップ →</button><button id="exit-practice" class="text-button">中断・終了してトップへ</button></div>
+      <p id="flow-status" class="flow-status">開始は一度だけ。あとは話すだけで進みます。</p>
+      <p id="privacy" class="small muted">開始するとマイクを使います。音声認識はブラウザ提供元へ音声を送信する場合があります。</p>
+    </article>
+    <div id="next-preview" class="next-preview"></div>
+    <section id="line-notes" class="panel line-notes" aria-labelledby="notes-title"><p class="eyebrow">A LITTLE HELP</p><h2 id="notes-title">このセリフのポイント</h2><p class="small muted">意味と形を確認してから、そのまま声に出せます。</p><div id="notes-content" class="notes-grid"></div></section>
+    <details class="script-panel panel"><summary>会話全体を見る・途中のセリフから始める</summary><ol id="script-list"></ol></details>
+    <section id="result" class="panel result" hidden><p class="eyebrow">CONVERSATION COMPLETE</p><h2>最後まで話せました。</h2><div class="score-heading"><strong id="session-score">—</strong><span>聞き取り一致度 / 100点<small>音素・アクセントを採点した点数ではありません。</small></span></div><p id="result-summary"></p><div id="session-stats" class="session-stats"></div><p id="record-status" class="small muted"></p><h3>苦手だったところを、もう一度。</h3><p class="small muted">復習したい文を選んでください。今日は終わることもできます。</p><div id="review-list"></div><div id="word-review" class="word-review"></div><div class="helper-actions"><button id="review-sentences" class="primary">選んだ文章を練習</button><button id="review-words" class="secondary">苦手な単語を練習</button><button id="finish-today" class="secondary">今日はここまで</button><button id="restart" class="text-button">同じ会話をもう一度</button></div></section>
+  </div></div>
+</section>
+<p id="notice" class="notice" role="alert" hidden></p>
+</main>
+<dialog id="history-dialog"><div class="section-heading"><h2>練習の記録</h2><button id="history-close" class="text-button">閉じる</button></div><div id="history-summary" class="session-stats"></div><div id="history-list"></div></dialog>
+<dialog id="sync-dialog"><div class="section-heading"><h2>保存とパソコン間の同期</h2><button id="sync-close" class="text-button">閉じる</button></div><p>教材・点数・復習・練習回数を、この端末に自動保存します。別のパソコンにも同じGoogleアカウントで引き継げます。</p><div class="save-state"><strong id="local-save-status">端末に保存</strong><p id="cloud-state" role="status">クラウドは未接続です。</p><small id="cloud-account"></small></div><div class="helper-actions"><button id="cloud-login" class="primary">Googleで同期を始める</button><button id="cloud-sync" class="secondary" disabled>今すぐ同期</button><button id="cloud-logout" class="text-button" hidden>同期を切る</button></div><p class="small muted">同期先は既存タイピング用のFirebaseです。会話用の専用データに保存し、音声録音は送信・保存しません。接続できない時も端末の記録を残し、次の同期時に送ります。</p><hr><h3>ファイルにも控えを残す</h3><p class="small muted">教材と全練習履歴を一括で書き出します。別の端末への手動引き継ぎにも使えます。読み込みは同じ記録を二重に数えず、既存データと合流します。</p><div class="helper-actions"><button id="backup-export" class="secondary">全データを書き出す</button><label class="file-button secondary">バックアップを読み込む<input id="backup-import" type="file" accept=".json" hidden></label></div><p id="backup-status" role="status" class="small"></p><p class="small muted">Google同期を他の端末で使うにはHTTPS版の公開が必要です。現在のlocalhostはこのPC専用です。</p></dialog>
+<dialog id="import-dialog"><form id="import-form"><div class="section-heading"><h2>会話の教材を追加</h2><button type="button" id="close-import" class="text-button">閉じる</button></div><p class="muted">A と B のセリフを好きな順番で追加できます。同じ役が続いても大丈夫です。</p><label>教材名<input id="import-title" maxlength="100" placeholder="例：カフェで注文する"></label><label>ファイルを読み込む（CSV / JSON / TXT）<input id="import-file" type="file" accept=".csv,.json,.txt"></label><label>会話の内容<textarea id="import-text" rows="9" spellcheck="false" placeholder="A | Hi! Do you have a minute? | 少しお時間ありますか？ | ハイ！ ドゥーユー ハヴァ ミニット？&#10;B | Sure. What's up? | いいですよ。どうしました？ | シュア。ワッツ アップ？"></textarea></label><p class="small muted">1行ごとに「役 | 英文 | 日本語訳 | 読みのヒント」。訳とヒントは省略できます。CSVは role,en,ja,hint 列に対応。既存の長文CSVも「あなた：」「相手：」付きなら読み込めます。</p><div id="import-preview" class="small"></div><p id="import-error" role="alert"></p><div class="helper-actions"><button type="button" id="preview-import" class="secondary">内容を確認</button><button type="submit" class="primary">教材を保存</button></div></form></dialog>
+<div id="mobile-session-bar" class="mobile-session-bar" hidden><button id="mobile-toggle" class="primary">会話を始める</button><button id="mobile-exit" class="secondary">終了してトップへ</button></div>
+<script src="core.js?v=5"></script><script src="lessons.js?v=3"></script><script src="scenarios.js?v=3"></script><script src="directions.js?v=5"></script><script src="interview-notes.js?v=5"></script><script src="notes.js?v=5"></script><script src="score.js?v=3"></script><script src="records.js?v=5"></script><script src="app.js?v=5"></script>
+</body></html>
