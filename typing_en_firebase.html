@@ -668,14 +668,17 @@ body.hide-cursor,body.hide-cursor *{cursor:none!important}
 .rd-layout.no-left.no-right{grid-template-columns:minmax(0,1fr);}
 @media(max-width:1180px){
   .rd-layout{grid-template-columns:1fr;}
-  .rd-panel{position:static!important;max-height:240px!important;}
+  .rd-panel{position:static!important;height:auto!important;max-height:240px!important;}
   .rd-paper-col{order:-1;min-height:70vh;}
 }
+/* 高さは本文と同じにして、光っている項目を打っている行と同じ高さへ寄せられるようにする */
 .rd-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;
-  box-shadow:var(--sh);position:sticky;top:70px;max-height:calc(100vh - 200px);overflow-y:auto;}
+  box-shadow:var(--sh);position:sticky;top:70px;height:calc(100vh - 200px);overflow-y:auto;}
 .rd-panel::-webkit-scrollbar{width:6px;}
 .rd-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
-.rd-panel-title{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.rd-panel-title{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);
+  position:sticky;top:-14px;z-index:1;background:var(--surface);margin:-14px -14px 10px;padding:14px 14px 8px;}
+.rd-pad-top,.rd-pad-bot{height:0;}   /* 端の項目も行の高さまで動かせるように伸び縮みする余白 */
 .rd-item{padding:9px 11px;border-radius:var(--r-sm);margin-bottom:7px;border-left:3px solid transparent;
   background:var(--surface-alt);transition:background 0.2s var(--ease),border-color 0.2s var(--ease);}
 .rd-item-term{font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:2px;}
@@ -10108,7 +10111,10 @@ let rdPassage = null;      // 現在の長文
 let rdChars = [];          // {el, expected}
 let rdSegs = [];           // {id, start, end}
 let rdCursor = 0;
-let rdLocked = false;      // 最終ページに達して自動スクロールを止めた状態
+let rdLocked = false;      // 自動スクロールを止めた状態（本文が1画面に収まる・追いかけOFF・読み終えた）
+let rdVpTarget = null, rdVpTargetAt = 0;  // 本文をなめらかにスクロールさせている行き先と、その開始時刻
+let rdPanelKey = '';       // 左右の解説を最後に寄せた「行＋高さ」（同じなら動かさない）
+const rdWideMQ = window.matchMedia('(min-width:1181px)');   // 解説が本文の左右に並ぶ広さか
 let rdCorrect = 0, rdMiss = 0, rdStart = null;
 let rdLastSeg = null, rdPersistTimer = null;
 let rdSegStart = null, rdSegMiss = 0, rdSegKeys = 0;  // いま打っている文の計測用
@@ -10342,7 +10348,7 @@ function enterReading(id, opts){
     const vp = $('rd-viewport');
     if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
     else if(!rdAutoScroll) rdLock();          // 追いかけスクロールOFF
-    else if(rdCursor > 0) rdFollowCaret();
+    rdFollowCaret(true);                      // 続きの行へ一気に移り、左右の解説も同じ高さに
   });
 }
 // 長文画面から離れる時：計測を止めて、その時点の続きを確実に保存する
@@ -10365,6 +10371,7 @@ function rdBuildPaper(){
   rdChars = []; rdSegs = [];
   rdCursor = 0; rdCorrect = 0; rdMiss = 0; rdStart = null;
   rdLocked = false; rdLastSeg = null;
+  rdVpTarget = null; rdPanelKey = '';
   rdSegStart = null; rdSegMiss = 0; rdSegKeys = 0;
   rdStopIdle(); rdPausedAt = null; rdRestoredMs = 0;
   $('rd-mode-chip').textContent = '追いかけスクロール中';
@@ -10452,7 +10459,7 @@ function rdBuildPaper(){
 
 function rdRenderPanels(){
   const fill = (el, items) => {
-    el.innerHTML = '';
+    el.innerHTML = '<div class="rd-pad-top"></div>';
     items.forEach(it => {
       const d = document.createElement('div');
       d.className = 'rd-item';
@@ -10471,7 +10478,9 @@ function rdRenderPanels(){
       }
       el.appendChild(d);
     });
+    el.insertAdjacentHTML('beforeend', '<div class="rd-pad-bot"></div>');
   };
+  rdPanelKey = '';
   fill($('rd-grammar-list'), rdPassage.grammar);
   fill($('rd-vocab-list'), rdPassage.vocab);
   // 語句・文法が無い長文（CSVから入れたものなど）は空パネルを出さず本文を広く使う
@@ -10506,8 +10515,50 @@ function rdUpdatePanels(force){
     list.querySelectorAll('.rd-item').forEach(item=>{
       const on = item.dataset.ids.split(',').includes(seg.id);
       item.classList.toggle('active', on);
-      if(on) item.scrollIntoView({block:'nearest', behavior:'smooth'});
+      // 左右に並ぶ広い画面では rdAlignPanels が行の高さへ寄せる。狭い画面（縦積み）は見える所まで出すだけ
+      if(on && !rdWideMQ.matches) item.scrollIntoView({block:'nearest', behavior:'smooth'});
     });
+  });
+}
+// ── 左右の解説を、打っている行と同じ高さへ寄せる（lineY＝その行の画面上の高さ）──
+function rdAlignPanels(lineY, instant){
+  const pairs = [['rd-grammar-panel','rd-grammar-list'], ['rd-vocab-panel','rd-vocab-list']];
+  if(!rdWideMQ.matches){        // 縦積みの時は余白を消して普通のリストに戻す
+    pairs.forEach(([, lid])=>$(lid).querySelectorAll('.rd-pad-top,.rd-pad-bot').forEach(p=>{ if(p.style.height) p.style.height = ''; }));
+    rdPanelKey = '';
+    return;
+  }
+  const seg = rdCurrentSeg(); if(!seg) return;
+  const key = seg.id + '@' + Math.round(lineY);
+  if(!instant && key === rdPanelKey) return;   // 同じ行・同じ高さなら動かさない
+  rdPanelKey = key;
+  pairs.forEach(([pid, lid])=>{
+    const panel = $(pid), list = $(lid);
+    if(panel.hidden) return;
+    const item = list.querySelector('.rd-item.active');
+    if(!item) return;                            // この行に解説が無い時はそのまま
+    const padTop = list.querySelector('.rd-pad-top'), padBot = list.querySelector('.rd-pad-bot');
+    const pr = panel.getBoundingClientRect(), ir = item.getBoundingClientRect();
+    const head = panel.querySelector('.rd-panel-title').offsetHeight;
+    const sTop = panel.scrollTop, oldTop = padTop.offsetHeight, oldBot = padBot.offsetHeight;
+    // 項目の真ん中が、上の余白を除いた中身のどこにあるか（スクロールの途中でも変わらない値）
+    const itemY = sTop + (ir.top - pr.top) + ir.height/2 - oldTop;
+    // パネルの中で見せたい高さ＝打っている行の高さ（見出しの下〜パネルの底に収める）
+    const lo = head + ir.height/2 + 4;
+    const hi = Math.max(lo, panel.clientHeight - ir.height/2 - 4);
+    const want = Math.max(lo, Math.min(hi, lineY - pr.top));
+    // 上の余白：足りなければ足す。減らす時は今のスクロール量の範囲で（表示が跳ねないように）
+    let pad = Math.max(0, want - itemY);
+    if(pad < oldTop) pad = Math.max(pad, oldTop - sTop);
+    const dest = itemY + pad - want;
+    if(pad !== oldTop){
+      padTop.style.height = pad + 'px';
+      panel.scrollTop = sTop + (pad - oldTop);   // 余白を変えた分だけずらして、見た目はそのまま
+    }
+    // 下の余白：一番下の項目でも行の高さまで上げられるように
+    const needBot = Math.ceil(dest + panel.clientHeight - (panel.scrollHeight - oldBot));
+    if(needBot > oldBot) padBot.style.height = needBot + 'px';
+    panel.scrollTo({top: dest, behavior: instant ? 'auto' : 'smooth'});
   });
 }
 function rdLock(){
@@ -10517,22 +10568,36 @@ function rdLock(){
   chip.textContent = '入力モード(スクロール停止)';
   chip.classList.add('locked');
 }
-function rdFollowCaret(){
+// 打っている行を本文の真ん中に保つ（なめらかに上へ流す）。最後の方は下まで行ったらそれ以上は動かさない
+// instant=true は開いた時・画面の大きさが変わった時用（アニメーションせず一気に合わせる）
+function rdFollowCaret(instant){
   const i = Math.min(rdCursor, rdChars.length-1);
   if(i < 0 || !rdChars[i]) return;
   const vp = $('rd-viewport');
   const vr = vp.getBoundingClientRect();
+  if(!vr.height) return;                // 画面がまだ出ていない
   const er = rdChars[i].el.getBoundingClientRect();
-  const rel = er.top - vr.top;
-  if(rel < vr.height * 0.12){          // 打ち直しで上に戻った時は停止中でも追う
-    vp.scrollTop -= (vr.height * 0.12 - rel);
-    return;
+  // 本文の中での打つ位置（スクロールの途中でも変わらない値）
+  const lineY = vp.scrollTop + (er.top - vr.top) + er.height/2;
+  const max = Math.max(0, vp.scrollHeight - vp.clientHeight);
+  const moving = rdVpTarget !== null && Date.now() - rdVpTargetAt < 700;   // まだスクロールの途中
+  const cur = moving ? rdVpTarget : vp.scrollTop;
+  let top = cur;
+  if(rdAutoScroll && !rdLocked){
+    top = lineY - vp.clientHeight * 0.5;               // 常に真ん中（打ち直しで戻った時も）
+  } else if(lineY - cur < vp.clientHeight * 0.12){     // 停止中でも、上に戻って見えなくなる時だけ追う
+    top = lineY - vp.clientHeight * 0.12;
   }
-  if(rdLocked) return;
-  const target = vr.height * 0.42;      // 画面の中央あたりを保つ
-  if(rel > target) vp.scrollTop += (rel - target);
-  if(vp.scrollTop >= vp.scrollHeight - vp.clientHeight - 2) rdLock();
+  top = Math.round(Math.min(max, Math.max(0, top)));
+  if(Math.abs(top - vp.scrollTop) > 1 && (instant || top !== rdVpTarget || !moving)){
+    vp.scrollTo({top, behavior: instant ? 'auto' : 'smooth'});
+    rdVpTarget = top; rdVpTargetAt = Date.now();
+  }
+  rdAlignPanels(vr.top + lineY - top, instant);          // スクロールし終えた時の行の高さに解説を合わせる
 }
+window.addEventListener('resize', ()=>{
+  if(rdPassage && currentScreen() === 'reading') requestAnimationFrame(()=>rdFollowCaret(true));
+});
 // ── 経過時間（手が止まっている間は進めない／中断した分は引き継ぐ）──
 function rdElapsedMs(){
   if(!rdStart) return rdRestoredMs;            // まだ1打も打っていない
@@ -10684,6 +10749,8 @@ function rdRestart(){
   rdUpdateCaret(); rdUpdateProgress(); rdUpdatePanels(true); rdUpdateTimerChip();
   const vp = $('rd-viewport');
   if(vp.scrollHeight - vp.clientHeight <= 0) rdLock();
+  else if(!rdAutoScroll) rdLock();
+  rdFollowCaret(true);
   renderReadingCards();
   toast('最初からにしました（経過時間も0にリセット）','suc');
 }
@@ -10828,7 +10895,9 @@ function initReadingViewSettings(){
       set(e.target.checked);
       // 開いたまま切り替えた時のために、本文側にも即反映する
       rdApplyViewSettings();
-      if(rdPassage && currentScreen() === 'reading') rdRenderPanels();
+      if(rdPassage && currentScreen() === 'reading'){
+        rdRenderPanels(); rdUpdatePanels(true); rdFollowCaret(true);
+      }
     });
   };
   bind('rd-showja-toggle',     ()=>rdShowJa,     v=>{ rdShowJa = v;     saveSettings({rdShowJa:v}); });
