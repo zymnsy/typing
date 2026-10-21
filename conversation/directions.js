@@ -15,3 +15,88 @@ BUILTIN_LESSONS.push({id:'street-directions',title:'道案内・街で声をか�
   {role:'B',en:'Yes, I do. Thank you for your help.',ja:'はい、できます。助けてくださってありがとうございます。',hint:'イェス、アイ ドゥー。サンキュー ファ ユア ヘルプ。'},
   {role:'A',en:"You're welcome. Have a nice day.",ja:'どういたしまして。良い一日を。',hint:'ユア ウェルカム。ハヴァ ナイス デイ。'}
 ]});
+
+// Beginner alternative: keep the original directions lesson and append as built-in lesson 06.
+BUILTIN_LESSONS.push({
+  "id": "street-directions-smalltalk",
+  "title": "道案内・すぐそこですよ＋神戸で世間話",
+  "description": "駅はすぐそこ。道を教えたあと、神戸の旅について短い世間話をする初級会話です。",
+  "roles": {
+    "A": "道を案内する人",
+    "B": "道を尋ねる旅行者"
+  },
+  "lines": [
+    {
+      "role": "B",
+      "en": "Excuse me. Where's the station?",
+      "ja": "すみません。駅はどこですか？",
+      "hint": "イクスキューズ ミー。ウェアズ ザ ステイション？"
+    },
+    {
+      "role": "A",
+      "en": "It's right over there, next to the convenience store.",
+      "ja": "すぐそこですよ。コンビニの隣です。",
+      "hint": "イッツ ライト オウヴァ ゼア、ネクストゥ ザ コンヴィーニエンス ストア。"
+    },
+    {
+      "role": "B",
+      "en": "Oh, I see it now. Thank you!",
+      "ja": "あ、見えました。ありがとう！",
+      "hint": "オウ、アイ スィー イット ナウ。サンキュー！"
+    },
+    {
+      "role": "A",
+      "en": "You're welcome. Is this your first time in Kobe?",
+      "ja": "どういたしまして。神戸は初めてですか？",
+      "hint": "ユア ウェルカム。イズ ディス ユア ファースト タイム イン コウベイ？"
+    },
+    {
+      "role": "B",
+      "en": "Yes, it is. I arrived yesterday.",
+      "ja": "はい。昨日着きました。",
+      "hint": "イェス、イット イズ。アイ アライヴド イェスタデイ。"
+    },
+    {
+      "role": "A",
+      "en": "How do you like it so far?",
+      "ja": "今のところ、神戸はどうですか？",
+      "hint": "ハウ ドゥー ユー ライク イット ソウ ファー？"
+    },
+    {
+      "role": "B",
+      "en": "I love it. The food is really good.",
+      "ja": "とても気に入っています。食べ物がおいしいですね。",
+      "hint": "アイ ラヴ イット。ザ フード イズ リアリー グッド。"
+    },
+    {
+      "role": "A",
+      "en": "I'm glad to hear that.",
+      "ja": "それはよかったです。",
+      "hint": "アイム グラッドゥ ヒア ザット。"
+    },
+    {
+      "role": "B",
+      "en": "Do you live around here?",
+      "ja": "この辺りに住んでいるんですか？",
+      "hint": "ドゥー ユー リヴ アラウンド ヒア？"
+    },
+    {
+      "role": "A",
+      "en": "Yes, I live nearby.",
+      "ja": "はい、近くに住んでいます。",
+      "hint": "イェス、アイ リヴ ニアバイ。"
+    },
+    {
+      "role": "B",
+      "en": "That's nice. Thanks again for your help.",
+      "ja": "いいですね。教えてくれてありがとう。",
+      "hint": "ザッツ ナイス。サンクス アゲン ファ ユア ヘルプ。"
+    },
+    {
+      "role": "A",
+      "en": "No problem. Enjoy your trip!",
+      "ja": "どういたしまして。旅行を楽しんでください！",
+      "hint": "ノウ プラブレム。エンジョイ ユア トリップ！"
+    }
+  ]
+});
